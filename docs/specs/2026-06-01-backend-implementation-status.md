@@ -100,6 +100,21 @@ with patch("app.auth.service.random.randint", side_effect=[111111, 222222]):
 
 **解决方案**: 脚本批量修复，将 `"name"` key 替换为 `"name_cn"`。检查所有 JSON 文件确保字段一致。
 
+### 3.5 Code Review 修复记录（第二轮）
+
+第二轮 review 发现并修复了 6 个问题：
+
+| # | 严重度 | 问题 | 修复 |
+|---|--------|------|------|
+| 1 | Critical | SMS 验证码无频率限制，可被暴力破解 | 添加 60s 间隔 + 每日 10 次上限 |
+| 2 | Critical | DEV_MODE 泄露永久云密钥 | 改用 `DEV_MODE_MOCK_KEY` 模拟凭证 |
+| 3 | Critical | Token refresh 不验证用户存在 | refresh 接口查询数据库确认用户 |
+| 4 | Important | update_profile 用户不存在时 500 崩溃 | 改用 scalar_one_or_none + 抛 404 |
+| 5 | Important | AI 服务 HTTP 调用无错误处理 | 添加 timeout/api error/exception 三层 catch |
+| 6 | Important | AI 响应解析只支持 ` ```json ` 前缀 | 用正则提取，支持 code block/嵌入 JSON |
+
+**未修复（需生产环境配置）**：生产环境 STS 凭证和签名 URL 生成（需接入阿里云 SDK）。
+
 ---
 
 ## 4. 测试运行方式
