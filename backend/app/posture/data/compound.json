@@ -1,13 +1,15 @@
 [
   {
     "id": "CP-25",
-    "name": "分层综合征",
     "name_en": "Layer Syndrome",
     "abbr": "LS",
     "category": "compound",
     "aliases": [],
     "definition": "Janda提出的上交叉+下交叉混合型，上下半身同时存在肌肉失衡",
-    "severity_levels": ["中度", "重度"],
+    "severity_levels": [
+      "中度",
+      "重度"
+    ],
     "causes": [
       {
         "type": "行为习惯",
@@ -51,17 +53,21 @@
         "weight": 0.9,
         "relation": "包含LCS"
       }
-    ]
+    ],
+    "name_cn": "分层综合征"
   },
   {
     "id": "CP-26",
-    "name": "短信颈",
     "name_en": "Text Neck",
     "abbr": "TN",
     "category": "compound",
     "aliases": [],
     "definition": "长期低头看手机导致的FHP+颈曲变直复合问题",
-    "severity_levels": ["轻度", "中度", "重度"],
+    "severity_levels": [
+      "轻度",
+      "中度",
+      "重度"
+    ],
     "causes": [
       {
         "type": "行为习惯",
@@ -112,6 +118,7 @@
         "weight": 0.9,
         "relation": "共存"
       }
-    ]
+    ],
+    "name_cn": "短信颈"
   }
 ]

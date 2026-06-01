@@ -1,13 +1,18 @@
 [
   {
     "id": "LL-18",
-    "name": "X型腿",
     "name_en": "Genu Valgum",
     "abbr": "GV",
     "category": "lower_limb",
-    "aliases": ["膝外翻"],
+    "aliases": [
+      "膝外翻"
+    ],
     "definition": "双膝并拢时双侧内踝间距>8cm（成人）",
-    "severity_levels": ["轻度", "中度", "重度"],
+    "severity_levels": [
+      "轻度",
+      "中度",
+      "重度"
+    ],
     "causes": [
       {
         "type": "肌肉失衡",
@@ -40,7 +45,9 @@
         "desc": "膝骨关节炎风险增加"
       }
     ],
-    "red_flags": ["单侧、进行性加重或伴疼痛需就医"],
+    "red_flags": [
+      "单侧、进行性加重或伴疼痛需就医"
+    ],
     "related_issues": [
       {
         "id": "LL-23",
@@ -52,17 +59,23 @@
         "weight": 0.6,
         "relation": "力线代偿"
       }
-    ]
+    ],
+    "name_cn": "X型腿"
   },
   {
     "id": "LL-19",
-    "name": "O型腿",
     "name_en": "Genu Varum",
     "abbr": "GVR",
     "category": "lower_limb",
-    "aliases": ["膝内翻"],
+    "aliases": [
+      "膝内翻"
+    ],
     "definition": "双脚并拢时双侧膝关节内侧间距>5cm",
-    "severity_levels": ["轻度", "中度", "重度"],
+    "severity_levels": [
+      "轻度",
+      "中度",
+      "重度"
+    ],
     "causes": [
       {
         "type": "结构性",
@@ -95,24 +108,30 @@
         "desc": "膝内侧间室过度磨损"
       }
     ],
-    "red_flags": ["成人结构性O型腿改善有限，明显畸形需骨科评估"],
+    "red_flags": [
+      "成人结构性O型腿改善有限，明显畸形需骨科评估"
+    ],
     "related_issues": [
       {
         "id": "LL-24",
         "weight": 0.6,
         "relation": "力线相关"
       }
-    ]
+    ],
+    "name_cn": "O型腿"
   },
   {
     "id": "LL-20",
-    "name": "膝超伸",
     "name_en": "Genu Recurvatum",
     "abbr": "GR",
     "category": "lower_limb",
     "aliases": [],
     "definition": "膝关节过度向后伸展，超过中立位>5°",
-    "severity_levels": ["轻度", "中度", "重度"],
+    "severity_levels": [
+      "轻度",
+      "中度",
+      "重度"
+    ],
     "causes": [
       {
         "type": "肌肉失衡",
@@ -157,17 +176,21 @@
         "weight": 0.6,
         "relation": "矢状面代偿"
       }
-    ]
+    ],
+    "name_cn": "膝超伸"
   },
   {
     "id": "LL-21",
-    "name": "扁平足",
     "name_en": "Pes Planus",
     "abbr": "PP",
     "category": "lower_limb",
     "aliases": [],
     "definition": "足内侧纵弓塌陷，承重时足弓消失",
-    "severity_levels": ["轻度", "中度", "重度"],
+    "severity_levels": [
+      "轻度",
+      "中度",
+      "重度"
+    ],
     "causes": [
       {
         "type": "结构性",
@@ -200,7 +223,9 @@
         "desc": "足底筋膜炎、向上连锁膝外翻"
       }
     ],
-    "red_flags": ["僵硬性扁平足、单侧突发塌陷伴疼痛需就医"],
+    "red_flags": [
+      "僵硬性扁平足、单侧突发塌陷伴疼痛需就医"
+    ],
     "related_issues": [
       {
         "id": "LL-23",
@@ -212,17 +237,21 @@
         "weight": 0.9,
         "relation": "自下而上传导"
       }
-    ]
+    ],
+    "name_cn": "扁平足"
   },
   {
     "id": "LL-22",
-    "name": "高弓足",
     "name_en": "Pes Cavus",
     "abbr": "PC",
     "category": "lower_limb",
     "aliases": [],
     "definition": "内侧纵弓异常增高，足印中段缺失",
-    "severity_levels": ["轻度", "中度", "重度"],
+    "severity_levels": [
+      "轻度",
+      "中度",
+      "重度"
+    ],
     "causes": [
       {
         "type": "神经/遗传",
@@ -255,24 +284,32 @@
         "desc": "减震差→应力性骨折、踝关节易扭伤"
       }
     ],
-    "red_flags": ["进行性高弓足或伴足部无力/麻木→就医排查神经疾病"],
+    "red_flags": [
+      "进行性高弓足或伴足部无力/麻木→就医排查神经疾病"
+    ],
     "related_issues": [
       {
         "id": "LL-24",
         "weight": 0.9,
         "relation": "共存"
       }
-    ]
+    ],
+    "name_cn": "高弓足"
   },
   {
     "id": "LL-23",
-    "name": "足外翻",
     "name_en": "Overpronation",
     "abbr": "OP",
     "category": "lower_limb",
-    "aliases": ["过度内旋"],
+    "aliases": [
+      "过度内旋"
+    ],
     "definition": "跟骨外翻，内侧纵弓过度塌陷",
-    "severity_levels": ["轻度", "中度", "重度"],
+    "severity_levels": [
+      "轻度",
+      "中度",
+      "重度"
+    ],
     "causes": [
       {
         "type": "结构性",
@@ -317,17 +354,23 @@
         "weight": 0.9,
         "relation": "自下而上传导"
       }
-    ]
+    ],
+    "name_cn": "足外翻"
   },
   {
     "id": "LL-24",
-    "name": "足内翻",
     "name_en": "Oversupination",
     "abbr": "OS",
     "category": "lower_limb",
-    "aliases": ["过度外旋"],
+    "aliases": [
+      "过度外旋"
+    ],
     "definition": "跟骨内翻，足外侧受力过多",
-    "severity_levels": ["轻度", "中度", "重度"],
+    "severity_levels": [
+      "轻度",
+      "中度",
+      "重度"
+    ],
     "causes": [
       {
         "type": "结构性",
@@ -371,6 +414,7 @@
         "weight": 0.6,
         "relation": "力线相关"
       }
-    ]
+    ],
+    "name_cn": "足内翻"
   }
 ]

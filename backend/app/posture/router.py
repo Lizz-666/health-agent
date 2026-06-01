@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
@@ -11,7 +12,7 @@ router = APIRouter(prefix="/api/v1/posture", tags=["posture"])
 
 
 @router.get("/issues")
-async def list_issues(category: str | None = Query(None)):
+async def list_issues(category: Optional[str] = Query(None)):
     issues = service.get_all_issues_list(category)
     return [
         {"id": i["id"], "name_cn": i["name_cn"], "category": i["category"], "aliases": i["aliases"], "definition": i["definition"]}

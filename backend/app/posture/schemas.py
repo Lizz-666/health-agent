@@ -1,3 +1,4 @@
+from typing import List
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -17,7 +18,7 @@ class SelfAssessResponse(BaseModel):
 
 class PhotoAssessRequest(BaseModel):
     issue_id: str
-    photo_keys: list[str]
+    photo_keys: List[str]
 
 
 class AssessmentRecord(BaseModel):

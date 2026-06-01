@@ -1,3 +1,4 @@
+from typing import Optional, List, Tuple, Dict
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
@@ -5,11 +6,11 @@ from app.posture.models import PostureAssessment
 from app.posture.knowledge import get_issue_by_id, get_all_issues
 
 
-def get_all_issues_list(category: str | None = None) -> list[dict]:
+def get_all_issues_list(category: Optional[str] = None) -> List[dict]:
     return get_all_issues(category)
 
 
-def get_related_issues(issue_id: str) -> list[dict]:
+def get_related_issues(issue_id: str) -> List[dict]:
     issue = get_issue_by_id(issue_id)
     if not issue:
         return []
@@ -27,7 +28,7 @@ def get_related_issues(issue_id: str) -> list[dict]:
     return result[:3]
 
 
-def _evaluate_result(issue: dict, answer: str) -> tuple[str, str]:
+def _evaluate_result(issue: dict, answer: str) -> Tuple[str, str]:
     if answer == "negative":
         return "normal", "自测结果为阴性，你该方面的体态目前正常。保持良好习惯即可。"
     elif answer == "positive":
@@ -42,7 +43,7 @@ async def save_self_assessment(
     issue_id: str,
     answer: str,
     test_index: int,
-) -> dict | None:
+) -> Optional[dict]:
     issue = get_issue_by_id(issue_id)
     if not issue:
         return None
@@ -69,7 +70,7 @@ async def save_photo_assessment(
     db: AsyncSession,
     user_id: str,
     issue_id: str,
-    photo_keys: list[str],
+    photo_keys: List[str],
     ai_result: dict,
 ) -> dict:
     ai_level = ai_result.get("level", "normal")
@@ -102,7 +103,7 @@ async def save_photo_assessment(
     }
 
 
-async def get_user_history(db: AsyncSession, user_id: str, limit: int = 20, offset: int = 0) -> list[dict]:
+async def get_user_history(db: AsyncSession, user_id: str, limit: int = 20, offset: int = 0) -> List[dict]:
     stmt = (
         select(PostureAssessment)
         .where(PostureAssessment.user_id == UUID(user_id))

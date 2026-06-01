@@ -1,3 +1,4 @@
+from typing import Optional, List
 import json
 from pathlib import Path
 
@@ -19,10 +20,10 @@ _FILE_MAP = {
     "compound": "compound.json",
 }
 
-_ISSUES_CACHE: list[dict] | None = None
+_ISSUES_CACHE: Optional[List[dict]] = None
 
 
-def _load_all() -> list[dict]:
+def _load_all() -> List[dict]:
     global _ISSUES_CACHE
     if _ISSUES_CACHE is not None:
         return _ISSUES_CACHE
@@ -35,14 +36,14 @@ def _load_all() -> list[dict]:
     return _ISSUES_CACHE
 
 
-def get_all_issues(category: str | None = None) -> list[dict]:
+def get_all_issues(category: Optional[str] = None) -> List[dict]:
     issues = _load_all()
     if category:
         return [i for i in issues if i["category"] == category]
     return issues
 
 
-def get_issue_by_id(issue_id: str) -> dict | None:
+def get_issue_by_id(issue_id: str) -> Optional[dict]:
     for i in _load_all():
         if i["id"] == issue_id:
             return i
