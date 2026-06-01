@@ -1,0 +1,120 @@
+[
+  {
+    "id": "HN-01",
+    "name_cn": "头部前倾",
+    "name_en": "Forward Head Posture",
+    "abbr": "FHP",
+    "category": "head_neck",
+    "aliases": ["乌龟颈", "探颈"],
+    "definition": "耳垂落于肩峰垂线前方，颈椎下段屈曲、上段过伸",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "行为习惯", "desc": "长期低头看手机/电脑、伏案工作"},
+      {"type": "睡眠因素", "desc": "枕头过高或过低，破坏颈椎中立位"},
+      {"type": "肌肉失衡", "desc": "枕下肌群、胸锁乳突肌紧张缩短；颈深屈肌薄弱"}
+    ],
+    "self_tests": [
+      {
+        "name": "靠墙站立测试",
+        "steps": ["背靠墙站立", "后脑勺、上背、臀部贴墙", "观察后脑勺是否能自然贴墙"],
+        "positive_sign": "后脑勺无法自然贴墙",
+        "image_key": "assets/images/tests/hn01_wall_test.png",
+        "tools_needed": "无"
+      },
+      {
+        "name": "侧面拍照法",
+        "steps": ["自然站姿", "请他人从侧面拍照", "过肩峰画垂线，观察耳垂位置"],
+        "positive_sign": "耳垂明显落在垂线前方",
+        "image_key": "assets/images/tests/hn01_side_photo.png",
+        "tools_needed": "手机"
+      }
+    ],
+    "corrections": [
+      {"type": "拉伸", "target_muscle": "枕下肌群", "method": "收下巴训练（Chin Tuck）", "freq": "30秒×3，每日2次"},
+      {"type": "拉伸", "target_muscle": "上斜方肌", "method": "侧屈拉伸", "freq": "30秒×3，每日2次"},
+      {"type": "强化", "target_muscle": "颈深屈肌", "method": "收下巴抗阻训练", "freq": "10次×3组/日"},
+      {"type": "习惯", "desc": "屏幕抬至眼平、每30分钟活动颈部"}
+    ],
+    "consequences": [
+      {"timeframe": "短期", "desc": "颈肩僵硬、紧张性头痛、易疲劳"},
+      {"timeframe": "长期", "desc": "椎间盘压力增大加速退变、富贵包、颈源性头痛"}
+    ],
+    "red_flags": ["伴手臂放射痛、麻木、握力下降→提示神经根受压，需就医"],
+    "related_issues": [
+      {"id": "HN-02", "weight": 0.9, "relation": "因果/共存"},
+      {"id": "ST-04", "weight": 0.9, "relation": "共存(UCS)"}
+    ]
+  },
+  {
+    "id": "HN-02",
+    "name_cn": "颈曲变直",
+    "name_en": "Loss of Cervical Lordosis",
+    "abbr": "LCL",
+    "category": "head_neck",
+    "aliases": ["军人颈", "直颈"],
+    "definition": "颈椎生理前凸减小或反向（正常C2-C7 Cobb角约20°-40°）",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "行为习惯", "desc": "长期FHP累积代偿"},
+      {"type": "创伤", "desc": "颈部外伤（挥鞭伤）后肌肉保护性痉挛"},
+      {"type": "退变", "desc": "颈椎退行性变、椎间盘脱水"}
+    ],
+    "self_tests": [
+      {
+        "name": "仰卧触摸法",
+        "steps": ["仰卧平躺", "用手指触摸颈后与床面的间隙", "感受空隙大小"],
+        "positive_sign": "颈后几乎贴床、无空隙",
+        "image_key": "assets/images/tests/hn02_supine_test.png",
+        "tools_needed": "无"
+      }
+    ],
+    "corrections": [
+      {"type": "拉伸", "target_muscle": "颈后肌群", "method": "仰卧颈后垫毛巾卷做轻柔伸展", "freq": "每天10分钟"},
+      {"type": "强化", "target_muscle": "颈深屈肌", "method": "收下巴训练", "freq": "10次×3组/日"}
+    ],
+    "consequences": [
+      {"timeframe": "长期", "desc": "椎间盘前侧压力增大、退变加速、颈源性头痛"}
+    ],
+    "red_flags": ["多需影像确诊，App引导而非诊断"],
+    "related_issues": [
+      {"id": "HN-01", "weight": 0.9, "relation": "因果/共存"},
+      {"id": "ST-04", "weight": 0.6, "relation": "代偿"}
+    ]
+  },
+  {
+    "id": "HN-03",
+    "name_cn": "斜颈",
+    "name_en": "Torticollis",
+    "abbr": "TORT",
+    "category": "head_neck",
+    "aliases": ["歪脖"],
+    "definition": "头部歪向一侧，下巴转向对侧",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "先天性", "desc": "胸锁乳突肌纤维化、胎位异常（婴幼儿多见）"},
+      {"type": "姿势性", "desc": "长期单侧用力、颈肌痉挛"}
+    ],
+    "self_tests": [
+      {
+        "name": "镜像观察法",
+        "steps": ["正对镜子自然站立", "观察头部是否习惯性歪向一侧", "检查下巴是否转向对侧"],
+        "positive_sign": "头部明显歪向一侧",
+        "image_key": "assets/images/tests/hn03_mirror_test.png",
+        "tools_needed": "镜子"
+      }
+    ],
+    "corrections": [
+      {"type": "拉伸", "target_muscle": "紧张侧胸锁乳突肌", "method": "紧张侧拉伸", "freq": "30秒×3，每日2次"},
+      {"type": "强化", "target_muscle": "对侧肌肉", "method": "对侧抗阻训练", "freq": "每日1次"}
+    ],
+    "consequences": [
+      {"timeframe": "短期", "desc": "持续性颈痛、活动受限"},
+      {"timeframe": "长期", "desc": "颜面不对称、继发高低肩与脊柱侧弯"}
+    ],
+    "red_flags": ["新发斜颈、伴疼痛或神经症状必须就医"],
+    "related_issues": [
+      {"id": "ST-05", "weight": 0.6, "relation": "继发"},
+      {"id": "PS-11", "weight": 0.6, "relation": "继发"}
+    ]
+  }
+]

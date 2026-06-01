@@ -1,0 +1,260 @@
+[
+  {
+    "id": "ST-04",
+    "name_cn": "圆肩",
+    "name_en": "Rounded Shoulders",
+    "abbr": "RS",
+    "category": "shoulder_thorax",
+    "aliases": ["含胸"],
+    "definition": "肩胛骨前引+前倾+内旋，肩峰前移超过耳垂垂线",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "肌肉失衡", "desc": "胸小肌、胸大肌紧张缩短；中下斜方肌、菱形肌薄弱"},
+      {"type": "行为习惯", "desc": "长期含胸驼背、健身只练镜子肌"}
+    ],
+    "self_tests": [
+      {
+        "name": "拇指朝向测试",
+        "steps": ["自然站立放松", "双臂自然下垂", "观察手掌拇指的朝向"],
+        "positive_sign": "双手拇指指向大腿内侧甚至后方",
+        "image_key": "assets/images/tests/st04_thumb_test.png",
+        "tools_needed": "无"
+      }
+    ],
+    "corrections": [
+      {"type": "拉伸", "target_muscle": "胸小肌", "method": "门框胸肌拉伸", "freq": "30秒×3，每日2次"},
+      {"type": "强化", "target_muscle": "中下斜方肌", "method": "俯身W-Y-T划船", "freq": "12次×3组，隔日1次"},
+      {"type": "强化", "target_muscle": "菱形肌", "method": "面拉（Face Pull）", "freq": "15次×3组，隔日1次"}
+    ],
+    "consequences": [
+      {"timeframe": "短期", "desc": "肩峰下撞击综合征、肩袖损伤"},
+      {"timeframe": "长期", "desc": "与FHP共同发展为上交叉综合征、呼吸效率下降"}
+    ],
+    "red_flags": ["伴持续肩痛、活动受限需就医"],
+    "related_issues": [
+      {"id": "HN-01", "weight": 0.9, "relation": "共存(UCS)"},
+      {"id": "ST-08", "weight": 0.9, "relation": "共存(UCS)"},
+      {"id": "ST-07", "weight": 0.9, "relation": "归属(UCS)"}
+    ]
+  },
+  {
+    "id": "ST-05",
+    "name_cn": "高低肩",
+    "name_en": "Uneven Shoulders",
+    "abbr": "US",
+    "category": "shoulder_thorax",
+    "aliases": [],
+    "definition": "左右肩峰高度差 ≥ 1cm（非结构性而言）",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "功能性", "desc": "单侧背包、单侧用力运动、习惯性单侧耸肩"},
+      {"type": "结构性", "desc": "脊柱侧弯代偿、长短腿、骨盆侧倾向上传导"}
+    ],
+    "self_tests": [
+      {
+        "name": "正面对镜测试",
+        "steps": ["正对镜子放松站立", "观察双侧肩峰高度", "目测差异"],
+        "positive_sign": "双侧肩峰高度差异 ≥1cm",
+        "image_key": "assets/images/tests/st05_mirror_test.png",
+        "tools_needed": "镜子"
+      }
+    ],
+    "corrections": [
+      {"type": "拉伸", "target_muscle": "高侧上斜方肌、肩胛提肌", "method": "高侧放松", "freq": "30秒×3"},
+      {"type": "强化", "target_muscle": "低侧肌肉", "method": "低侧耸肩训练", "freq": "每日1次"},
+      {"type": "习惯", "desc": "改双肩背包、纠正单侧负重"}
+    ],
+    "consequences": [
+      {"timeframe": "短期", "desc": "慢性颈肩痛"},
+      {"timeframe": "长期", "desc": "若为侧弯代偿，忽视可致侧弯进展"}
+    ],
+    "red_flags": ["明显高低肩务必先排查脊柱侧弯，尤其青少年"],
+    "related_issues": [
+      {"id": "PS-11", "weight": 0.9, "relation": "因果(结构)"},
+      {"id": "PS-16", "weight": 0.9, "relation": "向上传导"}
+    ]
+  },
+  {
+    "id": "ST-06",
+    "name_cn": "翼状肩胛",
+    "name_en": "Winged Scapula",
+    "abbr": "WS",
+    "category": "shoulder_thorax",
+    "aliases": [],
+    "definition": "肩胛骨内侧缘翘离胸壁",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "肌肉", "desc": "前锯肌薄弱/麻痹（内侧翼状）"},
+      {"type": "神经", "desc": "胸长神经损伤、斜方肌麻痹（外侧翼状）"}
+    ],
+    "self_tests": [
+      {
+        "name": "俯卧撑墙测试",
+        "steps": ["面墙站立", "双手推墙做俯卧撑动作", "在动作过程中观察肩胛骨内侧缘"],
+        "positive_sign": "肩胛骨内侧缘明显翘起离开胸壁",
+        "image_key": "assets/images/tests/st06_pushup_test.png",
+        "tools_needed": "无"
+      }
+    ],
+    "corrections": [
+      {"type": "强化", "target_muscle": "前锯肌", "method": "Serratus Punch、Push-up Plus", "freq": "12次×3组"},
+      {"type": "强化", "target_muscle": "肩胛稳定肌群", "method": "四足支撑前推", "freq": "每日1次"}
+    ],
+    "consequences": [
+      {"timeframe": "短期", "desc": "肩关节上举受限、肩胛骨动力障碍"},
+      {"timeframe": "长期", "desc": "肩部撞击与疼痛"}
+    ],
+    "red_flags": ["突发明显翼状肩胛伴无力→排查神经损伤，应就医"],
+    "related_issues": [
+      {"id": "ST-04", "weight": 0.6, "relation": "肌力失衡相关"}
+    ]
+  },
+  {
+    "id": "ST-07",
+    "name_cn": "上交叉综合征",
+    "name_en": "Upper Crossed Syndrome",
+    "abbr": "UCS",
+    "category": "shoulder_thorax",
+    "aliases": ["UCS"],
+    "definition": "Janda提出的肌肉失衡模式——头前倾+圆肩+驼背三合一",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "行为习惯", "desc": "长期伏案久坐导致交叉式肌肉失衡"}
+    ],
+    "self_tests": [
+      {
+        "name": "三联征综合判断",
+        "steps": ["侧面拍照", "检查是否有头前倾（耳垂在肩峰前方）", "检查是否有圆肩（肩峰前移）", "检查是否有驼背（上背弯曲）"],
+        "positive_sign": "同时存在三个特征",
+        "image_key": "assets/images/tests/st07_side_photo.png",
+        "tools_needed": "手机"
+      }
+    ],
+    "corrections": [
+      {"type": "拉伸", "target_muscle": "上斜方肌、胸肌、枕下肌群", "method": "综合拉伸", "freq": "30秒×3，每日2次"},
+      {"type": "强化", "target_muscle": "中下斜方肌、菱形肌、颈深屈肌", "method": "收下巴+面拉+墙天使", "freq": "每日1次"},
+      {"type": "灵活性", "target_muscle": "胸椎", "method": "泡沫轴胸椎伸展、猫驼式", "freq": "每日1次"}
+    ],
+    "consequences": [
+      {"timeframe": "短期", "desc": "慢性颈肩痛、头痛"},
+      {"timeframe": "长期", "desc": "肩部撞击、退行性颈椎病加速、呼吸模式异常"}
+    ],
+    "red_flags": [],
+    "related_issues": [
+      {"id": "HN-01", "weight": 0.9, "relation": "组成部分"},
+      {"id": "ST-04", "weight": 0.9, "relation": "组成部分"},
+      {"id": "ST-08", "weight": 0.9, "relation": "组成部分"},
+      {"id": "CP-25", "weight": 0.7, "relation": "共同构成分层综合征"}
+    ]
+  },
+  {
+    "id": "ST-08",
+    "name_cn": "驼背",
+    "name_en": "Hyperkyphosis",
+    "abbr": "HK",
+    "category": "shoulder_thorax",
+    "aliases": ["胸椎后凸"],
+    "definition": "胸椎后凸Cobb角 >40°（正常20°-40°）",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "姿势性（可逆）", "desc": "长期含胸、肌力失衡，主动挺直可纠正"},
+      {"type": "结构性", "desc": "舒尔曼病（青少年椎体楔形变）"},
+      {"type": "老年性", "desc": "骨质疏松致椎体压缩骨折"}
+    ],
+    "self_tests": [
+      {
+        "name": "靠墙测试",
+        "steps": ["背靠墙站立", "后脑勺、上背、臀部贴墙", "观察上背与头部离墙程度"],
+        "positive_sign": "上背明显离墙无法贴住",
+        "image_key": "assets/images/tests/st08_wall_test.png",
+        "tools_needed": "无"
+      }
+    ],
+    "corrections": [
+      {"type": "拉伸", "target_muscle": "胸部、上斜方肌", "method": "泡沫轴放松+胸椎伸展", "freq": "每日1次"},
+      {"type": "强化", "target_muscle": "背部伸肌", "method": "俯卧抬头、Y-T-W-L", "freq": "12次×3组，隔日1次"}
+    ],
+    "consequences": [
+      {"timeframe": "短期", "desc": "慢性背痛、身高变矮"},
+      {"timeframe": "长期", "desc": "严重者影响心肺功能"}
+    ],
+    "red_flags": ["青少年僵硬性驼背、伴疼痛、进行性加重需就医（排查舒尔曼病）"],
+    "related_issues": [
+      {"id": "ST-04", "weight": 0.9, "relation": "共存(UCS)"},
+      {"id": "ST-07", "weight": 0.9, "relation": "归属(UCS)"},
+      {"id": "PS-13", "weight": 0.6, "relation": "矢状面代偿"}
+    ]
+  },
+  {
+    "id": "ST-09",
+    "name_cn": "平背",
+    "name_en": "Flat Back",
+    "abbr": "FB",
+    "category": "shoulder_thorax",
+    "aliases": [],
+    "definition": "正常胸椎后凸和腰椎前凸生理曲度减小或消失",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "肌肉失衡", "desc": "腘绳肌过紧、竖脊肌薄弱、骨盆后倾"}
+    ],
+    "self_tests": [
+      {
+        "name": "靠墙站立测试",
+        "steps": ["背靠墙站立", "用手测试腰部与墙壁的空隙"],
+        "positive_sign": "腰部几乎无空隙、完全贴墙",
+        "image_key": "assets/images/tests/st09_wall_test.png",
+        "tools_needed": "无"
+      }
+    ],
+    "corrections": [
+      {"type": "强化", "target_muscle": "竖脊肌", "method": "小燕飞", "freq": "12次×3组"},
+      {"type": "拉伸", "target_muscle": "腘绳肌", "method": "坐姿前屈", "freq": "30秒×3"}
+    ],
+    "consequences": [
+      {"timeframe": "短期", "desc": "缓冲能力下降、久站久坐易疲劳"},
+      {"timeframe": "长期", "desc": "椎间盘负荷增大、慢性腰痛"}
+    ],
+    "red_flags": [],
+    "related_issues": [
+      {"id": "PS-14", "weight": 0.9, "relation": "共存"},
+      {"id": "PS-12", "weight": 0.6, "relation": "共存"}
+    ]
+  },
+  {
+    "id": "ST-10",
+    "name_cn": "肋骨外翻",
+    "name_en": "Rib Flare",
+    "abbr": "RF",
+    "category": "shoulder_thorax",
+    "aliases": [],
+    "definition": "下肋骨向前外翻突出，常见于胸式呼吸过度或核心薄弱",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "呼吸模式", "desc": "长期胸式呼吸过度、腹式呼吸不足"},
+      {"type": "肌肉失衡", "desc": "腹横肌、腹斜肌薄弱；膈肌紧张"},
+      {"type": "代偿", "desc": "骨盆前倾向上传导代偿"}
+    ],
+    "self_tests": [
+      {
+        "name": "仰卧观察法",
+        "steps": ["仰卧放松", "双腿弯曲", "观察下肋骨是否明显向外突起"],
+        "positive_sign": "下肋骨明显高于腹部平面",
+        "image_key": "assets/images/tests/st10_supine_test.png",
+        "tools_needed": "无"
+      }
+    ],
+    "corrections": [
+      {"type": "强化", "target_muscle": "腹横肌", "method": "死虫式（Dead Bug）", "freq": "10次×3组/日"},
+      {"type": "强化", "target_muscle": "腹斜肌", "method": "侧平板支撑", "freq": "30秒×3/侧"},
+      {"type": "训练", "desc": "练习腹式呼吸、360度呼吸", "freq": "每日5分钟"}
+    ],
+    "consequences": [
+      {"timeframe": "短期", "desc": "核心稳定性差、呼吸效率低"},
+      {"timeframe": "长期", "desc": "腰痛风险增加"}
+    ],
+    "red_flags": [],
+    "related_issues": [
+      {"id": "PS-13", "weight": 0.6, "relation": "代偿"}
+    ]
+  }
+]

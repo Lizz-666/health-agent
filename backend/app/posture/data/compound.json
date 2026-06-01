@@ -1,0 +1,117 @@
+[
+  {
+    "id": "CP-25",
+    "name": "分层综合征",
+    "name_en": "Layer Syndrome",
+    "abbr": "LS",
+    "category": "compound",
+    "aliases": [],
+    "definition": "Janda提出的上交叉+下交叉混合型，上下半身同时存在肌肉失衡",
+    "severity_levels": ["中度", "重度"],
+    "causes": [
+      {
+        "type": "行为习惯",
+        "desc": "长期久坐缺乏运动者（程序员、中年人群）"
+      }
+    ],
+    "self_tests": [
+      {
+        "name": "全身侧面拍照",
+        "steps": [
+          "侧面拍照",
+          "综合检查是否同时有UCS和LCS特征"
+        ],
+        "positive_sign": "同时具备头前倾+圆肩+驼背+骨盆前倾+腰曲增大",
+        "image_key": "assets/images/tests/cp25_full_side.png",
+        "tools_needed": "手机"
+      }
+    ],
+    "corrections": [
+      {
+        "type": "综合",
+        "method": "需系统性分区域逐步纠正，建议专业指导",
+        "freq": "长期"
+      }
+    ],
+    "consequences": [
+      {
+        "timeframe": "长期",
+        "desc": "全身性慢性疼痛、多关节退变加速"
+      }
+    ],
+    "red_flags": [],
+    "related_issues": [
+      {
+        "id": "ST-07",
+        "weight": 0.9,
+        "relation": "包含UCS"
+      },
+      {
+        "id": "PS-15",
+        "weight": 0.9,
+        "relation": "包含LCS"
+      }
+    ]
+  },
+  {
+    "id": "CP-26",
+    "name": "短信颈",
+    "name_en": "Text Neck",
+    "abbr": "TN",
+    "category": "compound",
+    "aliases": [],
+    "definition": "长期低头看手机导致的FHP+颈曲变直复合问题",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {
+        "type": "行为习惯",
+        "desc": "每天低头用手机>2-4小时"
+      }
+    ],
+    "self_tests": [
+      {
+        "name": "习惯自查",
+        "steps": [
+          "回忆每天低头用手机时长",
+          "检查是否伴颈肩僵痛",
+          "参照FHP自测（靠墙测试）"
+        ],
+        "positive_sign": "每天低头>2小时且伴FHP体征",
+        "image_key": "assets/images/tests/cp26_habit_test.png",
+        "tools_needed": "无"
+      }
+    ],
+    "corrections": [
+      {
+        "type": "习惯",
+        "desc": "抬高手机至眼平、每20-30分钟活动颈部",
+        "freq": "持续"
+      },
+      {
+        "type": "强化",
+        "target_muscle": "颈深屈肌",
+        "method": "收下巴训练",
+        "freq": "10次×3组/日"
+      }
+    ],
+    "consequences": [
+      {
+        "timeframe": "长期",
+        "desc": "加速颈椎退变、慢性颈痛头痛"
+      }
+    ],
+    "red_flags": [],
+    "related_issues": [
+      {
+        "id": "HN-01",
+        "weight": 0.9,
+        "relation": "同源"
+      },
+      {
+        "id": "HN-02",
+        "weight": 0.9,
+        "relation": "共存"
+      }
+    ]
+  }
+]

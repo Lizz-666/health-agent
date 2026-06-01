@@ -1,0 +1,233 @@
+[
+  {
+    "id": "PS-11",
+    "name_cn": "脊柱侧弯",
+    "name_en": "Scoliosis",
+    "abbr": "SCOL",
+    "category": "pelvis_spine",
+    "aliases": [],
+    "definition": "脊柱冠状面侧弯Cobb角>10°，伴椎体旋转",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "特发性", "desc": "病因未明，可能遗传"}
+    ],
+    "self_tests": [
+      {
+        "name": "Adams前屈测试",
+        "steps": ["双脚并拢", "双手合十弯腰", "从背后观察两侧是否等高"],
+        "positive_sign": "一侧背部隆起（剃刀背）",
+        "image_key": "assets/images/tests/ps11_adams_test.png",
+        "tools_needed": "需他人观察"
+      }
+    ],
+    "corrections": [
+      {"type": "康复", "method": "Schroth施罗特疗法（需专业指导）", "freq": "遵医嘱"}
+    ],
+    "consequences": [
+      {"timeframe": "长期", "desc": "进展性弯曲、外观畸形、重度影响心肺"}
+    ],
+    "red_flags": ["任何疑似侧弯都应就医确诊"],
+    "related_issues": [
+      {"id": "ST-05", "weight": 0.9, "relation": "因果(结构)"},
+      {"id": "PS-16", "weight": 0.9, "relation": "因果/共存"}
+    ]
+  },
+  {
+    "id": "PS-12",
+    "name_cn": "摇摆背",
+    "name_en": "Sway Back",
+    "abbr": "SB",
+    "category": "pelvis_spine",
+    "aliases": [],
+    "definition": "骨盆后移+胸椎段后移，腰椎前凸减小，腹部突出",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "姿势", "desc": "习惯性挂在韧带上的省力站姿"}
+    ],
+    "self_tests": [
+      {
+        "name": "侧面拍照",
+        "steps": ["自然站立", "侧面拍照", "观察骨盆是否整体前移于踝关节前方"],
+        "positive_sign": "上半身后倾、腹部前突、臀部下垂",
+        "image_key": "assets/images/tests/ps12_side_photo.png",
+        "tools_needed": "手机"
+      }
+    ],
+    "corrections": [
+      {"type": "强化", "target_muscle": "下腹核心、臀肌", "method": "臀桥+死虫式", "freq": "每日1次"}
+    ],
+    "consequences": [
+      {"timeframe": "长期", "desc": "腰骶部慢性劳损"}
+    ],
+    "red_flags": [],
+    "related_issues": [
+      {"id": "PS-14", "weight": 0.6, "relation": "共存"}
+    ]
+  },
+  {
+    "id": "PS-13",
+    "name_cn": "骨盆前倾",
+    "name_en": "Anterior Pelvic Tilt",
+    "abbr": "APT",
+    "category": "pelvis_spine",
+    "aliases": [],
+    "definition": "髂前上棘前移，骨盆向前旋转，腰椎前凸增大",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "肌肉失衡", "desc": "髂腰肌、股直肌紧张；腹肌、臀大肌薄弱"},
+      {"type": "行为习惯", "desc": "久坐、长期高跟鞋"}
+    ],
+    "self_tests": [
+      {
+        "name": "靠墙测试",
+        "steps": ["贴墙站立", "测量腰后空隙"],
+        "positive_sign": "空隙明显大于一掌厚",
+        "image_key": "assets/images/tests/ps13_wall_test.png",
+        "tools_needed": "无"
+      }
+    ],
+    "corrections": [
+      {"type": "拉伸", "target_muscle": "髂腰肌", "method": "弓步拉伸", "freq": "30秒×3"},
+      {"type": "强化", "target_muscle": "臀大肌", "method": "臀桥", "freq": "12次×3组"}
+    ],
+    "consequences": [
+      {"timeframe": "长期", "desc": "慢性腰痛、膝足代偿"}
+    ],
+    "red_flags": [],
+    "related_issues": [
+      {"id": "PS-15", "weight": 0.9, "relation": "组成部分(LCS)"},
+      {"id": "LL-20", "weight": 0.6, "relation": "矢状面代偿"}
+    ]
+  },
+  {
+    "id": "PS-14",
+    "name_cn": "骨盆后倾",
+    "name_en": "Posterior Pelvic Tilt",
+    "abbr": "PPT",
+    "category": "pelvis_spine",
+    "aliases": [],
+    "definition": "骨盆向后旋转，尾骨内收，腰椎前凸变平",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "肌肉失衡", "desc": "腘绳肌、腹直肌紧张；髋屈肌薄弱"}
+    ],
+    "self_tests": [
+      {
+        "name": "靠墙站立",
+        "steps": ["贴墙站立", "测量腰后空隙"],
+        "positive_sign": "腰后空隙几乎消失",
+        "image_key": "assets/images/tests/ps14_wall_test.png",
+        "tools_needed": "无"
+      }
+    ],
+    "corrections": [
+      {"type": "拉伸", "target_muscle": "腘绳肌", "method": "坐姿前屈", "freq": "30秒×3"}
+    ],
+    "consequences": [
+      {"timeframe": "长期", "desc": "椎间盘后侧压力增大→突出风险"}
+    ],
+    "red_flags": [],
+    "related_issues": [
+      {"id": "ST-09", "weight": 0.9, "relation": "共存"},
+      {"id": "PS-12", "weight": 0.6, "relation": "共存"}
+    ]
+  },
+  {
+    "id": "PS-15",
+    "name_cn": "下交叉综合征",
+    "name_en": "Lower Crossed Syndrome",
+    "abbr": "LCS",
+    "category": "pelvis_spine",
+    "aliases": [],
+    "definition": "Janda提出的骨盆带肌肉失衡模式，常与APT共存",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "行为习惯", "desc": "长期久坐导致骨盆带交叉式失衡"}
+    ],
+    "self_tests": [
+      {
+        "name": "托马斯测试",
+        "steps": ["仰卧抱一侧膝至胸", "观察对侧大腿是否抬离床面"],
+        "positive_sign": "对侧大腿抬离床面（髋屈肌紧张）",
+        "image_key": "assets/images/tests/ps15_thomas_test.png",
+        "tools_needed": "床/瑜伽垫"
+      }
+    ],
+    "corrections": [
+      {"type": "拉伸", "target_muscle": "髂腰肌、竖脊肌", "method": "弓步拉伸+猫牛式", "freq": "每日1次"},
+      {"type": "强化", "target_muscle": "臀大肌、腹肌", "method": "臀桥+死虫式+平板", "freq": "每日1次"}
+    ],
+    "consequences": [
+      {"timeframe": "长期", "desc": "慢性腰痛、髋关节问题"}
+    ],
+    "red_flags": [],
+    "related_issues": [
+      {"id": "PS-13", "weight": 0.9, "relation": "组成部分"},
+      {"id": "CP-25", "weight": 0.7, "relation": "共同构成分层综合征"}
+    ]
+  },
+  {
+    "id": "PS-16",
+    "name_cn": "骨盆侧倾",
+    "name_en": "Pelvic Obliquity",
+    "abbr": "PO",
+    "category": "pelvis_spine",
+    "aliases": [],
+    "definition": "骨盆一侧高于另一侧（冠状面倾斜）",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "结构性", "desc": "结构性长短腿"},
+      {"type": "功能性", "desc": "单侧臀中肌薄弱"}
+    ],
+    "self_tests": [
+      {
+        "name": "双手叉腰触髂嵴",
+        "steps": ["正面对镜", "双手叉腰触摸髂嵴", "比较双侧高度"],
+        "positive_sign": "双侧髂嵴明显不等高",
+        "image_key": "assets/images/tests/ps16_hip_test.png",
+        "tools_needed": "镜子"
+      }
+    ],
+    "corrections": [
+      {"type": "强化", "target_muscle": "薄弱侧臀中肌", "method": "侧桥、蚌式", "freq": "12次×3组"}
+    ],
+    "consequences": [
+      {"timeframe": "长期", "desc": "继发高低肩、脊柱侧弯"}
+    ],
+    "red_flags": [],
+    "related_issues": [
+      {"id": "PS-11", "weight": 0.9, "relation": "因果/共存"},
+      {"id": "ST-05", "weight": 0.6, "relation": "向上传导"}
+    ]
+  },
+  {
+    "id": "PS-17",
+    "name_cn": "骨盆旋转",
+    "name_en": "Pelvic Rotation",
+    "abbr": "PR",
+    "category": "pelvis_spine",
+    "aliases": [],
+    "definition": "骨盆在水平面上不对称旋转",
+    "severity_levels": ["轻度", "中度", "重度"],
+    "causes": [
+      {"type": "行为习惯", "desc": "长期单侧运动、习惯性翘腿"}
+    ],
+    "self_tests": [
+      {
+        "name": "仰卧ASIS观察",
+        "steps": ["仰卧放松", "触摸双侧ASIS（髂前上棘）", "判断是否一侧更前突"],
+        "positive_sign": "一侧ASIS明显比另一侧前突",
+        "image_key": "assets/images/tests/ps17_asis_test.png",
+        "tools_needed": "无"
+      }
+    ],
+    "corrections": [
+      {"type": "灵活性", "method": "平衡双侧髋关节灵活性与力量", "freq": "每日1次"}
+    ],
+    "consequences": [
+      {"timeframe": "长期", "desc": "步态异常、单侧关节磨损"}
+    ],
+    "red_flags": [],
+    "related_issues": []
+  }
+]
