@@ -1,12 +1,15 @@
 import json
+import re
 import logging
 import httpx
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.config import settings
 from app.posture.knowledge import get_issue_by_id
 from app.upload.service import generate_signed_url
 from app.auth.models import User
+from app.core.exceptions import BadRequest
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -29,7 +32,7 @@ async def _get_user_info(db: AsyncSession, user_id: str) -> dict:
 
 async def analyze_posture_photo(
     issue_id: str,
-    photo_keys: list[str],
+    photo_keys: List[str],
     user_id: str,
     db: AsyncSession,
 ) -> dict:
@@ -77,24 +80,42 @@ async def analyze_posture_photo(
         "max_tokens": 1000,
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            QWEN_VL_URL,
-            headers={
-                "Authorization": f"Bearer {settings.DASHSCOPE_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=body,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"]
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                QWEN_VL_URL,
+                headers={
+                    "Authorization": f"Bearer {settings.DASHSCOPE_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json=body,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            content = data["choices"][0]["message"]["content"]
+    except httpx.TimeoutException:
+        logger.error("Qwen VL API timeout")
+        return {"level": "normal", "confidence": 0, "evidence": [], "suggestion": "AI 分析超时，请稍后重试", "need_retake": False}
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Qwen VL API error: {e.response.status_code} {e.response.text[:200]}")
+        return {"level": "normal", "confidence": 0, "evidence": [], "suggestion": "AI 服务暂时不可用，请稍后重试", "need_retake": False}
+    except Exception as e:
+        logger.error(f"Qwen VL unexpected error: {e}")
+        return {"level": "normal", "confidence": 0, "evidence": [], "suggestion": "AI 分析失败，请稍后重试", "need_retake": False}
 
+    # 提取 JSON：支持 markdown code block、纯 JSON、或文本中包含 JSON
     content = content.strip()
-    if content.startswith("```"):
-        content = content.split("\n", 1)[1].rsplit("\n", 1)[0]
-        if content.startswith("json"):
-            content = content[4:]
+
+    # 尝试从 markdown code block 中提取
+    code_block_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", content, re.DOTALL)
+    if code_block_match:
+        content = code_block_match.group(1).strip()
+
+    # 如果还不是纯 JSON，尝试找第一个 { 到最后一个 }
+    if not content.startswith("{"):
+        json_match = re.search(r"\{.*\}", content, re.DOTALL)
+        if json_match:
+            content = json_match.group(0)
 
     try:
         ai_result = json.loads(content)

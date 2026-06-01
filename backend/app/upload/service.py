@@ -6,9 +6,9 @@ def generate_sts_credentials(user_id: str) -> dict:
     path_prefix = f"posture_photos/{user_id}/{uuid.uuid4().hex[:8]}/"
     if settings.DEV_MODE:
         return {
-            "access_key_id": settings.ALIBABA_CLOUD_ACCESS_KEY_ID,
-            "access_key_secret": settings.ALIBABA_CLOUD_ACCESS_KEY_SECRET,
-            "security_token": "",
+            "access_key_id": "DEV_MODE_MOCK_KEY",
+            "access_key_secret": "DEV_MODE_MOCK_SECRET",
+            "security_token": "DEV_MODE_MOCK_TOKEN",
             "bucket": settings.OSS_BUCKET,
             "region": settings.OSS_REGION,
             "endpoint": settings.OSS_ENDPOINT,

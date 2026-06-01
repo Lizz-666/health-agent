@@ -23,3 +23,8 @@ class NotFound(AppException):
 class BadRequest(AppException):
     def __init__(self, detail: str = "请求参数错误"):
         super().__init__(400, detail, "bad_request")
+
+
+class TooManyRequests(AppException):
+    def __init__(self, detail: str = "请求过于频繁"):
+        super().__init__(429, detail, "too_many_requests")

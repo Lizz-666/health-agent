@@ -28,11 +28,15 @@ async def verify_login(request: VerifyLoginRequest, db: AsyncSession = Depends(g
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(request: RefreshRequest):
+async def refresh(request: RefreshRequest, db: AsyncSession = Depends(get_db)):
     payload = decode_token(request.refresh_token)
     if not payload or payload.get("type") != "refresh":
         raise Unauthorized("Refresh Token 无效")
     user_id = payload["sub"]
+    # 验证用户仍然存在
+    user = await service.get_user_by_id(db, user_id)
+    if user is None:
+        raise Unauthorized("用户不存在或已禁用")
     return TokenResponse(
         access_token=create_access_token(user_id),
         refresh_token=create_refresh_token(user_id),

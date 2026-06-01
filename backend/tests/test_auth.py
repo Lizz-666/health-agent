@@ -26,12 +26,13 @@ async def test_verify_login_creates_user(client):
 @pytest.mark.asyncio
 async def test_verify_login_existing_user(client):
     with patch("app.auth.service.random.randint", side_effect=[111111, 222222]):
-        await client.post("/api/v1/auth/send-code", json={"phone": "13800138001"})
-        resp1 = await client.post("/api/v1/auth/verify-login", json={"phone": "13800138001", "code": "111111"})
-        assert resp1.json()["is_new_user"] is True
+        with patch("app.auth.service.SEND_CODE_INTERVAL_SECONDS", 0):
+            await client.post("/api/v1/auth/send-code", json={"phone": "13800138001"})
+            resp1 = await client.post("/api/v1/auth/verify-login", json={"phone": "13800138001", "code": "111111"})
+            assert resp1.json()["is_new_user"] is True
 
-        await client.post("/api/v1/auth/send-code", json={"phone": "13800138001"})
-        resp2 = await client.post("/api/v1/auth/verify-login", json={"phone": "13800138001", "code": "222222"})
+            await client.post("/api/v1/auth/send-code", json={"phone": "13800138001"})
+            resp2 = await client.post("/api/v1/auth/verify-login", json={"phone": "13800138001", "code": "222222"})
     assert resp2.status_code == 200, f"Got {resp2.status_code}: {resp2.text}"
     assert resp2.json()["is_new_user"] is False
 
