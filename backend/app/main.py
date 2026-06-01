@@ -25,6 +25,9 @@ async def app_exception_handler(request: Request, exc: AppException):
 
 app.include_router(auth_router)
 
+from app.user.router import router as user_router
+app.include_router(user_router)
+
 
 @app.get("/health")
 async def health():
