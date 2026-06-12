@@ -1,7 +1,12 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",
+    )
+
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/posture_app"
     SECRET_KEY: str = "CHANGE-ME-IN-PRODUCTION"
     ALGORITHM: str = "HS256"
@@ -25,10 +30,6 @@ class Settings(BaseSettings):
     # 开发管理员账号（仅 DEV_MODE=True 时可用）
     DEV_ADMIN_PHONE: str = ""
     DEV_ADMIN_PASSWORD: str = ""
-
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
 
 
 settings = Settings()
