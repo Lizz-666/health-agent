@@ -1,8 +1,14 @@
 import pytest
 from unittest.mock import patch, AsyncMock
+from app.core.config import settings
 from app.core.exceptions import ServiceUnavailable
 from app.posture.models import PostureAssessment
 from sqlalchemy import select
+
+
+@pytest.fixture
+def photo_analysis_enabled(monkeypatch):
+    monkeypatch.setattr(settings, "PHOTO_ANALYSIS_ENABLED", True)
 
 
 async def _login_user(client, phone="13800138000"):
@@ -108,7 +114,52 @@ async def test_get_related(client):
 
 
 @pytest.mark.asyncio
-async def test_photo_assess_ai_failure_returns_503(client):
+async def test_photo_assess_returns_503_when_photo_disabled(client):
+    token = await _login_user(client)
+    resp = await client.post(
+        "/api/v1/posture/assess/photo",
+        json={"issue_id": "HN-01", "photo_keys": ["test/placeholder.jpg"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 503
+    assert resp.json() == {
+        "detail": "照片分析在当前数据模式下未启用",
+        "code": "photo_analysis_disabled",
+    }
+
+
+@pytest.mark.asyncio
+async def test_photo_assess_does_not_call_ai_when_disabled(client):
+    token = await _login_user(client)
+    with patch(
+        "app.posture.ai_service.analyze_posture_photo", new_callable=AsyncMock
+    ) as mock_ai:
+        await client.post(
+            "/api/v1/posture/assess/photo",
+            json={"issue_id": "HN-01", "photo_keys": ["test/placeholder.jpg"]},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    mock_ai.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_photo_assess_does_not_create_assessment_when_disabled(client):
+    token = await _login_user(client)
+    await client.post(
+        "/api/v1/posture/assess/photo",
+        json={"issue_id": "HN-01", "photo_keys": ["test/placeholder.jpg"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    resp = await client.get(
+        "/api/v1/posture/history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()) == 0
+
+
+@pytest.mark.asyncio
+async def test_photo_assess_ai_failure_returns_503(client, photo_analysis_enabled):
     """When AI service fails, photo assessment returns 503 and saves no record."""
     token = await _login_user(client)
     with patch(
@@ -133,7 +184,9 @@ async def test_photo_assess_ai_failure_returns_503(client):
 
 
 @pytest.mark.asyncio
-async def test_photo_assess_need_retake_returns_503_without_saving(client):
+async def test_photo_assess_need_retake_returns_503_without_saving(
+    client, photo_analysis_enabled
+):
     token = await _login_user(client)
     with patch(
         "app.posture.ai_service.analyze_posture_photo",
@@ -155,7 +208,9 @@ async def test_photo_assess_need_retake_returns_503_without_saving(client):
 
 
 @pytest.mark.asyncio
-async def test_photo_assess_mild_mapped_to_moderate(client):
+async def test_photo_assess_mild_mapped_to_moderate(
+    client, photo_analysis_enabled
+):
     """AI mild must be mapped to moderate for Flutter, not stored as mild or normal."""
     token = await _login_user(client)
     mock_ai_result = {

@@ -2,8 +2,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
+from app.core.config import settings
 from app.core.dependencies import get_current_user
-from app.core.exceptions import NotFound, BadRequest
+from app.core.exceptions import AppException, NotFound, BadRequest
 from app.posture import service
 from app.posture.schemas import SelfAssessRequest, PhotoAssessRequest
 from app.posture.knowledge import get_issue_by_id
@@ -15,7 +16,13 @@ router = APIRouter(prefix="/api/v1/posture", tags=["posture"])
 async def list_issues(category: Optional[str] = Query(None)):
     issues = service.get_all_issues_list(category)
     return [
-        {"id": i["id"], "name_cn": i["name_cn"], "category": i["category"], "aliases": i["aliases"], "definition": i["definition"]}
+        {
+            "id": i["id"],
+            "name_cn": i["name_cn"],
+            "category": i["category"],
+            "aliases": i["aliases"],
+            "definition": i["definition"],
+        }
         for i in issues
     ]
 
@@ -41,7 +48,9 @@ async def self_assess(
 ):
     if request.answer not in ("positive", "negative", "uncertain"):
         raise BadRequest("答案只能是 positive/negative/uncertain")
-    result = await service.save_self_assessment(db, user_id, request.issue_id, request.answer, request.test_index)
+    result = await service.save_self_assessment(
+        db, user_id, request.issue_id, request.answer, request.test_index
+    )
     if result is None:
         raise NotFound("体态问题不存在")
     return result
@@ -53,14 +62,25 @@ async def photo_assess(
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if not settings.PHOTO_ANALYSIS_ENABLED:
+        raise AppException(
+            503,
+            "照片分析在当前数据模式下未启用",
+            "photo_analysis_disabled",
+        )
     from app.posture.ai_service import analyze_posture_photo
+
     issue = get_issue_by_id(request.issue_id)
     if issue is None:
         raise NotFound("体态问题不存在")
     if not request.photo_keys:
         raise BadRequest("请上传至少一张照片")
-    ai_result = await analyze_posture_photo(request.issue_id, request.photo_keys, user_id, db)
-    result = await service.save_photo_assessment(db, user_id, request.issue_id, request.photo_keys, ai_result)
+    ai_result = await analyze_posture_photo(
+        request.issue_id, request.photo_keys, user_id, db
+    )
+    result = await service.save_photo_assessment(
+        db, user_id, request.issue_id, request.photo_keys, ai_result
+    )
     return result
 
 

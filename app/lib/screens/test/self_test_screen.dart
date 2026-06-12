@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/constants.dart';
 import '../../models/issue.dart';
 import '../../models/assessment.dart';
 import '../../providers/issue_provider.dart';
@@ -49,7 +50,7 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
         method: 'self_test',
       );
 
-      if (answer == 'uncertain') {
+      if (answer == 'uncertain' && AppConstants.photoAnalysisEnabled) {
         _showPhotoDialog(result);
       } else {
         _goToResult(result.id, result.result, result.suggestion);

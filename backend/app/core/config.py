@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     DEV_MODE: bool = False
     TEST_DATABASE_URL: str = "sqlite+aiosqlite:///./test.db"
 
+    # 照片分析门禁：默认关闭，需显式启用
+    PHOTO_ANALYSIS_ENABLED: bool = False
+
     # 开发管理员账号（仅 DEV_MODE=True 时可用）
     DEV_ADMIN_PHONE: str = ""
     DEV_ADMIN_PASSWORD: str = ""

@@ -4,6 +4,9 @@ class AppConstants {
     'API_BASE_URL',
     defaultValue: 'http://10.0.2.2:8000/api/v1',
   );
+  static const bool photoAnalysisEnabled = bool.fromEnvironment(
+    'PHOTO_ANALYSIS_ENABLED',
+  );
   static const String appName = '体态分析';
   static const Duration httpTimeout = Duration(seconds: 30);
   static const String devAdminPhone = String.fromEnvironment('DEV_ADMIN_PHONE');
