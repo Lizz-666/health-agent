@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
 import '../../core/api_client.dart';
+import '../../core/constants.dart';
 import '../../providers/assessment_provider.dart';
 import '../../providers/posture_state_provider.dart';
 
@@ -97,6 +98,35 @@ class _PhotoTestScreenState extends ConsumerState<PhotoTestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!AppConstants.photoAnalysisEnabled) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('AI 拍照分析')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.photo_camera_outlined, size: 64, color: Color(0xFF83898C)),
+                SizedBox(height: 24),
+                Text(
+                  '照片分析在当前数据模式下未启用',
+                  style: TextStyle(fontSize: 18),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 12),
+                Text(
+                  '当前仅支持图示自测，照片分析将在完成隐私与数据保护准备后开放。',
+                  style: TextStyle(color: Color(0xFF83898C), fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('AI 拍照分析')),
       body: _analyzing

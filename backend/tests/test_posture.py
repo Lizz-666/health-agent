@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch, AsyncMock
 
 
 async def _login_user(client, phone="13800138000"):
@@ -15,14 +16,18 @@ async def _login_user(client, phone="13800138000"):
         )
         code = result.scalar_one().code
 
-    resp = await client.post("/api/v1/auth/verify-login", json={"phone": phone, "code": code})
+    resp = await client.post(
+        "/api/v1/auth/verify-login", json={"phone": phone, "code": code}
+    )
     return resp.json()["access_token"]
 
 
 @pytest.mark.asyncio
 async def test_list_issues(client):
     token = await _login_user(client)
-    resp = await client.get("/api/v1/posture/issues", headers={"Authorization": f"Bearer {token}"})
+    resp = await client.get(
+        "/api/v1/posture/issues", headers={"Authorization": f"Bearer {token}"}
+    )
     assert resp.status_code == 200
     assert len(resp.json()) == 26
 
@@ -30,7 +35,10 @@ async def test_list_issues(client):
 @pytest.mark.asyncio
 async def test_list_issues_by_category(client):
     token = await _login_user(client)
-    resp = await client.get("/api/v1/posture/issues?category=head_neck", headers={"Authorization": f"Bearer {token}"})
+    resp = await client.get(
+        "/api/v1/posture/issues?category=head_neck",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert resp.status_code == 200
     for issue in resp.json():
         assert issue["category"] == "head_neck"
@@ -39,7 +47,9 @@ async def test_list_issues_by_category(client):
 @pytest.mark.asyncio
 async def test_get_issue_detail(client):
     token = await _login_user(client)
-    resp = await client.get("/api/v1/posture/issues/HN-01", headers={"Authorization": f"Bearer {token}"})
+    resp = await client.get(
+        "/api/v1/posture/issues/HN-01", headers={"Authorization": f"Bearer {token}"}
+    )
     assert resp.status_code == 200
     assert resp.json()["name_cn"] == "头部前倾"
 
@@ -76,7 +86,9 @@ async def test_get_history(client):
         json={"issue_id": "HN-01", "test_index": 0, "answer": "negative"},
         headers={"Authorization": f"Bearer {token}"},
     )
-    resp = await client.get("/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"})
+    resp = await client.get(
+        "/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"}
+    )
     assert resp.status_code == 200
     assert len(resp.json()) == 1
 
@@ -84,6 +96,60 @@ async def test_get_history(client):
 @pytest.mark.asyncio
 async def test_get_related(client):
     token = await _login_user(client)
-    resp = await client.get("/api/v1/posture/issues/HN-01/related", headers={"Authorization": f"Bearer {token}"})
+    resp = await client.get(
+        "/api/v1/posture/issues/HN-01/related",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert resp.status_code == 200
     assert len(resp.json()) > 0
+
+
+# --- Photo analysis gate tests ---
+
+
+@pytest.mark.asyncio
+async def test_photo_assess_returns_503_when_photo_disabled(client):
+    """When PHOTO_ANALYSIS_ENABLED=false, photo assess endpoint returns 503."""
+    token = await _login_user(client)
+    resp = await client.post(
+        "/api/v1/posture/assess/photo",
+        json={"issue_id": "HN-01", "photo_keys": ["test/placeholder.jpg"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 503
+    data = resp.json()
+    assert data["detail"] == "照片分析在当前数据模式下未启用"
+    assert data["code"] == "photo_analysis_disabled"
+
+
+@pytest.mark.asyncio
+async def test_photo_assess_does_not_call_ai_when_disabled(client):
+    """When photo analysis is disabled, AI model adapter must not be called."""
+    token = await _login_user(client)
+    with patch(
+        "app.posture.ai_service.analyze_posture_photo", new_callable=AsyncMock
+    ) as mock_ai:
+        await client.post(
+            "/api/v1/posture/assess/photo",
+            json={"issue_id": "HN-01", "photo_keys": ["test/placeholder.jpg"]},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        mock_ai.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_photo_assess_does_not_create_assessment_when_disabled(client):
+    """When photo analysis is disabled, no PostureAssessment record is created."""
+    token = await _login_user(client)
+    await client.post(
+        "/api/v1/posture/assess/photo",
+        json={"issue_id": "HN-01", "photo_keys": ["test/placeholder.jpg"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    # Verify no assessment records were created
+    resp = await client.get(
+        "/api/v1/posture/history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()) == 0
