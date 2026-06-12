@@ -120,7 +120,7 @@ flutter analyze
 
 ### Task 3: 默认关闭真实照片路径
 
-**Status:** [ ]
+**Status:** [x]
 
 **Files:**
 
