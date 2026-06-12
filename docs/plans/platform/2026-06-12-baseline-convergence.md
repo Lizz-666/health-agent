@@ -87,7 +87,7 @@ flutter test
 
 ### Task 2: 让 Flutter API 地址可配置
 
-**Status:** [ ]
+**Status:** [x]
 
 **Files:**
 

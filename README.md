@@ -43,13 +43,25 @@ flutter analyze
 flutter test
 ```
 
+### 编译参数
+
+| 参数 | 默认值 | 用途 |
+| --- | --- | --- |
+| `API_BASE_URL` | `http://10.0.2.2:8000/api/v1` | 后端 API 地址 |
+
+不得通过 `--dart-define` 传递 Token、密码或云服务密钥。
+
 ### 运行（Android 模拟器）
 
 ```bash
 flutter run
 ```
 
-> **注意：** API 地址当前硬编码为 `http://10.0.2.2:8000/api/v1`（Android 模拟器宿主机地址）。Task 2 将改为通过 `--dart-define=API_BASE_URL=...` 覆盖。
+默认使用 Android 模拟器宿主机地址。覆盖示例（宿主机换端口）：
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:9000/api/v1
+```
 
 ## 数据模式
 
@@ -73,6 +85,5 @@ health/
 ## 已知限制
 
 - Android command-line tools 缺失，license 状态未确认
-- Flutter API 地址硬编码（Task 2 将处理）
 - 照片路径无显式门禁（Task 3 将关闭该路径）
 - 当前仅有体态问题浏览和图示自测功能
