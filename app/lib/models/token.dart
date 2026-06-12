@@ -13,8 +13,8 @@ class TokenResponse {
   });
 
   factory TokenResponse.fromJson(Map<String, dynamic> json) => TokenResponse(
-    accessToken: json['access_token'] as String,
-    refreshToken: json['refresh_token'] as String,
+    accessToken: (json['access_token'] as String?) ?? '',
+    refreshToken: (json['refresh_token'] as String?) ?? '',
     tokenType: (json['token_type'] as String?) ?? 'bearer',
     isNewUser: (json['is_new_user'] as bool?) ?? false,
   );

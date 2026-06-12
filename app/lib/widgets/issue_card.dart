@@ -32,8 +32,13 @@ class IssueCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(issue.nameCn,
-                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                        Text(
+                          issue.nameCn,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const SizedBox(width: 8),
                         if (result != null) _resultBadge(result!),
                       ],
@@ -43,19 +48,31 @@ class IssueCard extends StatelessWidget {
                       Wrap(
                         spacing: 6,
                         children: issue.aliases
-                            .map((a) => Chip(
-                                  label: Text(a, style: const TextStyle(fontSize: 11)),
-                                  padding: EdgeInsets.zero,
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  visualDensity: VisualDensity.compact,
-                                ))
+                            .map(
+                              (a) => Chip(
+                                label: Text(
+                                  a,
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                                padding: EdgeInsets.zero,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            )
                             .toList(),
                       ),
                     ],
                     const SizedBox(height: 8),
-                    Text(issue.definition,
-                        style: const TextStyle(color: Color(0xFF8892B0), fontSize: 13),
-                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Text(
+                      issue.definition,
+                      style: const TextStyle(
+                        color: Color(0xFF8892B0),
+                        fontSize: 13,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
@@ -77,11 +94,18 @@ class IssueCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: Color(colors[r] ?? AppConstants.primaryColor).withOpacity(0.2),
+        color: Color(
+          colors[r] ?? AppConstants.primaryColor,
+        ).withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(labels[r] ?? r,
-          style: TextStyle(color: Color(colors[r] ?? AppConstants.primaryColor), fontSize: 11)),
+      child: Text(
+        labels[r] ?? r,
+        style: TextStyle(
+          color: Color(colors[r] ?? AppConstants.primaryColor),
+          fontSize: 11,
+        ),
+      ),
     );
   }
 }

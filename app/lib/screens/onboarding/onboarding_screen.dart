@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -17,7 +18,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   double _weight = 65;
   int _age = 25;
   String? _gender;
-  String? _nickname;
 
   void _next() {
     if (_currentPage < 3) {
@@ -26,12 +26,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _finish() async {
+    if (_gender == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请选择性别')));
+      return;
+    }
     final ok = await ref.read(userProvider.notifier).updateProfile(
-      height: _height, weight: _weight, age: _age, gender: _gender, nickname: _nickname);
+      height: _height, weight: _weight, age: _age, gender: _gender);
     if (ok && mounted) context.go('/');
   }
 
   Future<void> _skip() async {
+    ref.read(authProvider.notifier).clearisNewUser();
     if (mounted) context.go('/');
   }
 
@@ -41,18 +47,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            LinearProgressIndicator(value: (_currentPage + 1) / 5),
+            LinearProgressIndicator(value: (_currentPage + 1) / 4),
             Expanded(
               child: PageView(
                 controller: _pageController,
                 onPageChanged: (i) => setState(() => _currentPage = i),
                 children: [
                   _buildSliderPage('你的身高？', 'cm', _height, 100, 220,
-                      (v) => _height = v, Icons.height),
+                      (v) => setState(() => _height = v), Icons.height),
                   _buildSliderPage('你的体重？', 'kg', _weight, 30, 200,
-                      (v) => _weight = v, Icons.monitor_weight_outlined),
+                      (v) => setState(() => _weight = v), Icons.monitor_weight_outlined),
                   _buildNumberPage('你的年龄？', _age, 13, 120,
-                      (v) => _age = v),
+                      (v) => setState(() => _age = v)),
                   _buildGenderPage(),
                 ],
               ),
@@ -64,7 +70,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 children: [
                   TextButton(onPressed: _skip, child: const Text('稍后完善')),
                   Row(
-                    children: List.generate(5, (i) => Container(
+                    children: List.generate(4, (i) => Container(
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       width: 8, height: 8,
                       decoration: BoxDecoration(

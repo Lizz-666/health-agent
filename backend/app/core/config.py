@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/posture_app"
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    SECRET_KEY: str = "CHANGE-ME-IN-PRODUCTION"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -21,6 +21,10 @@ class Settings(BaseSettings):
 
     DEV_MODE: bool = False
     TEST_DATABASE_URL: str = "sqlite+aiosqlite:///./test.db"
+
+    # 开发管理员账号（仅 DEV_MODE=True 时可用）
+    DEV_ADMIN_PHONE: str = ""
+    DEV_ADMIN_PASSWORD: str = ""
 
     class Config:
         env_file = ".env"

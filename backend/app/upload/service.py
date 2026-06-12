@@ -1,5 +1,6 @@
 import uuid
 from app.core.config import settings
+from app.core.exceptions import AppException
 
 
 def generate_sts_credentials(user_id: str) -> dict:
@@ -14,16 +15,10 @@ def generate_sts_credentials(user_id: str) -> dict:
             "endpoint": settings.OSS_ENDPOINT,
             "path_prefix": path_prefix,
         }
+    if not settings.ALIBABA_CLOUD_ACCESS_KEY_ID:
+        raise AppException(501, "STS 服务暂未配置", "not_implemented")
     # TODO: 生产环境调用阿里云 STS SDK 获取临时凭证
-    return {
-        "access_key_id": "",
-        "access_key_secret": "",
-        "security_token": "",
-        "bucket": settings.OSS_BUCKET,
-        "region": settings.OSS_REGION,
-        "endpoint": settings.OSS_ENDPOINT,
-        "path_prefix": path_prefix,
-    }
+    raise AppException(501, "STS 服务暂未实现", "not_implemented")
 
 
 def generate_signed_url(object_key: str, expires_in: int = 3600) -> str:

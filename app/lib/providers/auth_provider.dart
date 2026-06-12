@@ -28,12 +28,13 @@ class AuthState {
     bool? isNewUser,
     int? countdown,
     bool clearError = false,
+    bool clearisNewUser = false,
   }) =>
       AuthState(
         isLoggedIn: isLoggedIn ?? this.isLoggedIn,
         isLoading: isLoading ?? this.isLoading,
         error: clearError ? null : (error ?? this.error),
-        isNewUser: isNewUser ?? this.isNewUser,
+        isNewUser: clearisNewUser ? false : (isNewUser ?? this.isNewUser),
         countdown: countdown ?? this.countdown,
       );
 }
@@ -42,11 +43,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _api;
   Timer? _timer;
 
-  AuthNotifier(this._api) : super(const AuthState());
+  AuthNotifier(this._api) : super(const AuthState()) {
+    _api.onAuthFailed = _onAuthFailed;
+  }
+
+  void _onAuthFailed() {
+    if (state.isLoggedIn) {
+      state = const AuthState();
+    }
+  }
 
   Future<void> checkAuth() async {
     final hasToken = await AppStorage.hasToken();
-    state = state.copyWith(isLoggedIn: hasToken);
+    if (!hasToken) {
+      state = state.copyWith(isLoggedIn: false);
+      return;
+    }
+    try {
+      await _api.dio.get('/user/profile');
+      state = state.copyWith(isLoggedIn: true);
+    } catch (_) {
+      await AppStorage.clearTokens();
+      state = state.copyWith(isLoggedIn: false);
+    }
   }
 
   Future<bool> sendCode(String phone) async {
@@ -57,8 +76,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } on DioException catch (e) {
-      final msg = e.response?.data?['detail'] ?? '发送验证码失败';
+      final msg = _extractError(e);
       state = state.copyWith(isLoading: false, error: msg);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '发送验证码失败');
       return false;
     }
   }
@@ -79,8 +101,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return true;
     } on DioException catch (e) {
-      final msg = e.response?.data?['detail'] ?? '登录失败';
+      final msg = _extractError(e);
       state = state.copyWith(isLoading: false, error: msg);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '登录失败，请重试');
       return false;
     }
   }
@@ -88,6 +113,44 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await AppStorage.clearTokens();
     state = const AuthState();
+  }
+
+  /// 开发环境密码快速登录
+  Future<bool> devLogin(String phone, String password) async {
+    try {
+      state = state.copyWith(isLoading: true, clearError: true);
+      final resp = await _api.dio.post('/auth/dev-login', data: {
+        'phone': phone,
+        'password': password,
+      });
+      final token = TokenResponse.fromJson(resp.data as Map<String, dynamic>);
+      await AppStorage.saveTokens(token.accessToken, token.refreshToken);
+      state = state.copyWith(
+        isLoading: false,
+        isLoggedIn: true,
+        isNewUser: token.isNewUser,
+      );
+      return true;
+    } on DioException catch (e) {
+      final msg = _extractError(e);
+      state = state.copyWith(isLoading: false, error: msg);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '登录失败');
+      return false;
+    }
+  }
+
+  void clearisNewUser() {
+    state = state.copyWith(clearisNewUser: true);
+  }
+
+  String _extractError(DioException e) {
+    final data = e.response?.data;
+    if (data is Map<String, dynamic>) {
+      return (data['detail'] as String?) ?? '请求失败';
+    }
+    return '请求失败';
   }
 
   void _startCountdown() {

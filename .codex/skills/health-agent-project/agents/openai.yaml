@@ -1,0 +1,4 @@
+interface:
+  display_name: "Health Agent Project"
+  short_description: "Plan and deliver the personal health Agent safely"
+  default_prompt: "Use $health-agent-project to plan and deliver the next safe, testable increment of this health Agent project."

@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.posture.knowledge import get_issue_by_id
 from app.upload.service import generate_signed_url
 from app.auth.models import User
-from app.core.exceptions import BadRequest
+from app.core.exceptions import BadRequest, ServiceUnavailable
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,13 @@ async def analyze_posture_photo(
 ) -> dict:
     issue = get_issue_by_id(issue_id)
     if not issue:
-        return {"level": "normal", "confidence": 0, "evidence": [], "suggestion": "问题不存在", "need_retake": False}
+        return {
+            "level": "normal",
+            "confidence": 0,
+            "evidence": [],
+            "suggestion": "问题不存在",
+            "need_retake": False,
+        }
 
     signed_urls = [generate_signed_url(key) for key in photo_keys]
     user_info = await _get_user_info(db, user_id)
@@ -49,17 +55,17 @@ async def analyze_posture_photo(
 
     prompt = f"""你是一位专业的运动康复评估师，具备丰富的体态评估经验。
 
-当前评估问题：{issue['name_cn']}（{issue['definition']}）
+当前评估问题：{issue["name_cn"]}（{issue["definition"]}）
 
 用户信息：
-- 性别：{user_info['gender']}
-- 年龄：{user_info['age']}
-- 身高：{user_info['height']}
-- 体重：{user_info['weight']}
+- 性别：{user_info["gender"]}
+- 年龄：{user_info["age"]}
+- 身高：{user_info["height"]}
+- 体重：{user_info["weight"]}
 
 请分析用户上传的照片，完成以下任务：
 
-1. 识别照片中与"{issue['name_cn']}"相关的体征
+1. 识别照片中与"{issue["name_cn"]}"相关的体征
 2. 给出判定等级：normal（正常）/ mild（轻度）/ moderate（中度）/ severe（重度）
 3. 给出判定依据（具体哪些视觉特征支持你的判断）
 4. 如果照片角度、清晰度不足以准确判断，明确说明并建议重拍
@@ -95,13 +101,15 @@ async def analyze_posture_photo(
             content = data["choices"][0]["message"]["content"]
     except httpx.TimeoutException:
         logger.error("Qwen VL API timeout")
-        return {"level": "normal", "confidence": 0, "evidence": [], "suggestion": "AI 分析超时，请稍后重试", "need_retake": False}
+        raise ServiceUnavailable("AI 分析超时，请稍后重试")
     except httpx.HTTPStatusError as e:
-        logger.error(f"Qwen VL API error: {e.response.status_code} {e.response.text[:200]}")
-        return {"level": "normal", "confidence": 0, "evidence": [], "suggestion": "AI 服务暂时不可用，请稍后重试", "need_retake": False}
+        logger.error(
+            f"Qwen VL API error: {e.response.status_code} {e.response.text[:200]}"
+        )
+        raise ServiceUnavailable("AI 服务暂时不可用，请稍后重试")
     except Exception as e:
         logger.error(f"Qwen VL unexpected error: {e}")
-        return {"level": "normal", "confidence": 0, "evidence": [], "suggestion": "AI 分析失败，请稍后重试", "need_retake": False}
+        raise ServiceUnavailable("AI 分析失败，请稍后重试")
 
     # 提取 JSON：支持 markdown code block、纯 JSON、或文本中包含 JSON
     content = content.strip()
@@ -121,7 +129,13 @@ async def analyze_posture_photo(
         ai_result = json.loads(content)
     except json.JSONDecodeError:
         logger.error(f"AI response parse error: {content[:200]}")
-        ai_result = {"level": "normal", "confidence": 0, "evidence": [], "suggestion": "AI 分析结果解析失败，建议重新尝试", "need_retake": False}
+        ai_result = {
+            "level": "normal",
+            "confidence": 0,
+            "evidence": [],
+            "suggestion": "AI 分析结果解析失败，建议重新尝试",
+            "need_retake": False,
+        }
 
     ai_result.setdefault("level", "normal")
     ai_result.setdefault("confidence", 0)

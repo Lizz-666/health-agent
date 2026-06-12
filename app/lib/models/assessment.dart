@@ -18,12 +18,12 @@ class AssessmentRecord {
 
   factory AssessmentRecord.fromJson(Map<String, dynamic> json) =>
       AssessmentRecord(
-        id: json['id'] as String,
-        issueId: json['issue_id'] as String,
-        issueName: json['issue_name'] as String,
-        method: json['method'] as String,
-        result: json['result'] as String,
-        createdAt: DateTime.parse(json['created_at'] as String),
+        id: (json['id'] as String?) ?? '',
+        issueId: (json['issue_id'] as String?) ?? '',
+        issueName: (json['issue_name'] as String?) ?? '',
+        method: (json['method'] as String?) ?? '',
+        result: (json['result'] as String?) ?? '',
+        createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
       );
 }
 
@@ -42,9 +42,9 @@ class SelfAssessResult {
 
   factory SelfAssessResult.fromJson(Map<String, dynamic> json) =>
       SelfAssessResult(
-        id: json['id'] as String,
-        issueId: json['issue_id'] as String,
-        result: json['result'] as String,
-        suggestion: json['suggestion'] as String,
+        id: (json['id'] as String?) ?? '',
+        issueId: (json['issue_id'] as String?) ?? '',
+        result: (json['result'] as String?) ?? '',
+        suggestion: (json['suggestion'] as String?) ?? '',
       );
 }

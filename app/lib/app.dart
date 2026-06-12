@@ -16,92 +16,125 @@ import 'screens/result/result_screen.dart';
 import 'screens/history/history_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/profile/posture_profile_screen.dart';
+import 'screens/search/search_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
+
+class _AuthNotifier extends ChangeNotifier {
+  final Ref _ref;
+  _AuthNotifier(this._ref) {
+    _ref.listen(authProvider, (_, _) => notifyListeners());
+    _ref.listen(userProvider, (_, _) => notifyListeners());
+  }
+}
+
+final _authNotifierProvider = Provider<_AuthNotifier>(
+  (ref) => _AuthNotifier(ref),
+);
+
+final routerProvider = Provider<GoRouter>((ref) {
+  final notifier = ref.watch(_authNotifierProvider);
+
+  return GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: '/login',
+    refreshListenable: notifier,
+    redirect: (context, state) {
+      final authState = ref.read(authProvider);
+      final userState = ref.read(userProvider);
+      final onLogin = state.matchedLocation == '/login';
+      final onOnboarding = state.matchedLocation == '/onboarding';
+
+      if (!authState.isLoggedIn && !onLogin) return '/login';
+      if (authState.isLoggedIn && onLogin) return '/';
+      if (authState.isLoggedIn &&
+          userState.profile != null &&
+          userState.profile!.hasProfile != true &&
+          !onOnboarding) {
+        return '/onboarding';
+      }
+      return null;
+    },
+    routes: [
+      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
+      StatefulShellRoute.indexedStack(
+        builder: (_, _, navigationShell) =>
+            AppShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/', builder: (_, _) => const HomeScreen())],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/history',
+                builder: (_, _) => const HistoryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/profile',
+                builder: (_, _) => const ProfileScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'posture',
+                    builder: (_, _) => const PostureProfileScreen(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/issues/:category',
+        builder: (_, state) =>
+            IssueListScreen(category: state.pathParameters['category'] ?? ''),
+      ),
+      GoRoute(
+        path: '/issue/:id/detail',
+        builder: (_, state) =>
+            IssueDetailScreen(issueId: state.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        path: '/issue/:id/test',
+        builder: (_, state) =>
+            SelfTestScreen(issueId: state.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        path: '/issue/:id/photo',
+        builder: (_, state) =>
+            PhotoTestScreen(issueId: state.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        path: '/issue/:id/result',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          if (extra == null) {
+            return const HomeScreen();
+          }
+          return ResultScreen(
+            issueId: state.pathParameters['id'] ?? '',
+            assessmentId: extra['assessmentId'] as String? ?? '',
+            result: extra['result'] as String? ?? 'normal',
+            suggestion: extra['suggestion'] as String? ?? '',
+          );
+        },
+      ),
+      GoRoute(path: '/search', builder: (_, _) => const SearchScreen()),
+    ],
+  );
+});
 
 class PostureApp extends ConsumerWidget {
   const PostureApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authProvider);
-    final userState = ref.watch(userProvider);
-
-    final router = GoRouter(
-      navigatorKey: _rootNavigatorKey,
-      initialLocation: '/login',
-      redirect: (context, state) {
-        final onLogin = state.matchedLocation == '/login';
-        final onOnboarding = state.matchedLocation == '/onboarding';
-        if (!authState.isLoggedIn && !onLogin) return '/login';
-        if (authState.isLoggedIn && onLogin) return '/';
-        if (authState.isLoggedIn && userState.profile?.hasProfile != true && !onOnboarding) {
-          return '/onboarding';
-        }
-        return null;
-      },
-      routes: [
-        GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-        GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingScreen()),
-        StatefulShellRoute.indexedStack(
-          builder: (_, __, navigationShell) =>
-              AppShell(navigationShell: navigationShell),
-          branches: [
-            StatefulShellBranch(routes: [
-              GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
-            ]),
-            StatefulShellBranch(routes: [
-              GoRoute(path: '/history', builder: (_, __) => const HistoryScreen()),
-            ]),
-            StatefulShellBranch(routes: [
-              GoRoute(
-                path: '/profile',
-                builder: (_, __) => const ProfileScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'posture',
-                    builder: (_, __) => const PostureProfileScreen(),
-                  ),
-                ],
-              ),
-            ]),
-          ],
-        ),
-        GoRoute(
-          path: '/issues/:category',
-          builder: (_, state) =>
-              IssueListScreen(category: state.pathParameters['category']!),
-        ),
-        GoRoute(
-          path: '/issues/:id/detail',
-          builder: (_, state) =>
-              IssueDetailScreen(issueId: state.pathParameters['id']!),
-        ),
-        GoRoute(
-          path: '/issues/:id/test',
-          builder: (_, state) =>
-              SelfTestScreen(issueId: state.pathParameters['id']!),
-        ),
-        GoRoute(
-          path: '/issues/:id/photo',
-          builder: (_, state) =>
-              PhotoTestScreen(issueId: state.pathParameters['id']!),
-        ),
-        GoRoute(
-          path: '/issues/:id/result',
-          builder: (_, state) {
-            final extra = state.extra as Map<String, dynamic>;
-            return ResultScreen(
-              issueId: state.pathParameters['id']!,
-              assessmentId: extra['assessmentId'] as String,
-              result: extra['result'] as String,
-              suggestion: extra['suggestion'] as String,
-            );
-          },
-        ),
-      ],
-    );
-
+    final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: '体态分析',
       theme: AppTheme.darkTheme,
@@ -122,12 +155,27 @@ class AppShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: (index) {
-          navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
+          navigationShell.goBranch(
+            index,
+            initialLocation: index == navigationShell.currentIndex,
+          );
         },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: '首页'),
-          NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history), label: '历史'),
-          NavigationDestination(icon: Icon(Icons.person_outlined), selectedIcon: Icon(Icons.person), label: '我的'),
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: '首页',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
+            label: '历史',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outlined),
+            selectedIcon: Icon(Icons.person),
+            label: '我的',
+          ),
         ],
       ),
     );

@@ -9,7 +9,7 @@ app = FastAPI(title="体态分析 API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -26,12 +26,15 @@ async def app_exception_handler(request: Request, exc: AppException):
 app.include_router(auth_router)
 
 from app.user.router import router as user_router
+
 app.include_router(user_router)
 
 from app.posture.router import router as posture_router
+
 app.include_router(posture_router)
 
 from app.upload.router import router as upload_router
+
 app.include_router(upload_router)
 
 

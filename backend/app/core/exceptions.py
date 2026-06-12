@@ -28,3 +28,8 @@ class BadRequest(AppException):
 class TooManyRequests(AppException):
     def __init__(self, detail: str = "请求过于频繁"):
         super().__init__(429, detail, "too_many_requests")
+
+
+class ServiceUnavailable(AppException):
+    def __init__(self, detail: str = "服务暂不可用"):
+        super().__init__(503, detail, "service_unavailable")

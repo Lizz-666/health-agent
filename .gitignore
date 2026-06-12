@@ -1,0 +1,23 @@
+# IDE and local tooling
+.idea/
+.vscode/
+.opencode/node_modules/
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.ruff_cache/
+**/.venv/
+**/.env
+**/*.db
+
+# Runtime output and Windows device-name artifacts
+**/*.log
+**/nul
+
+# Flutter and Dart
+**/.dart_tool/
+**/.flutter-plugins-dependencies
+**/build/
+**/coverage/

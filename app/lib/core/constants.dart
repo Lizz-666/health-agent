@@ -3,19 +3,28 @@ class AppConstants {
   static const String apiBaseUrl = 'http://10.0.2.2:8000/api/v1';
   static const String appName = '体态分析';
   static const Duration httpTimeout = Duration(seconds: 30);
+  static const String devAdminPhone = String.fromEnvironment('DEV_ADMIN_PHONE');
+  static const String devAdminPassword = String.fromEnvironment(
+    'DEV_ADMIN_PASSWORD',
+  );
 
-  // 色板
-  static const int bgColor = 0xFF1A1A2E;
-  static const int cardColor = 0xFF16213E;
-  static const int primaryColor = 0xFF0F3460;
-  static const int accentColor = 0xFFE94560;
+  // 色板 — Light Gray Glassmorphism (F1 branding)
+  static const int bgColor = 0xFFD6D8D9; // 浅灰背景
+  static const int cardColor = 0x40FFFFFF; // 白色 25% opacity (glass)
+  static const int primaryColor = 0xFF353D40; // 深炭灰
+  static const int accentColor = 0xFF00AA88; // 深 teal 主操作
+  static const int accentLight = 0xFF21E2C2; // 亮 teal 装饰
+  static const int glassBorder = 0x50FFFFFF; // 白色 30% 卡片边框
+  static const int textColor = 0xFF353D40; // 深色主文字
+  static const int textMuted = 0xFF83898C; // 中灰次要文字
+  static const int surfaceDark = 0xFF2A3038; // 深色表面
+  static const int dividerColor = 0xFFC8CACC; // 分割线
 
-  // 结果颜色
-  static const int normalColor = 0xFF00C853;
-  static const int moderateColor = 0xFFFFB300;
-  static const int severeColor = 0xFFFF1744;
+  // 语义色
+  static const int normalColor = 0xFF00AA88;
+  static const int moderateColor = 0xFFE5A100;
+  static const int severeColor = 0xFFDC3545;
 
-  // 分类映射
   static const Map<String, String> categoryNames = {
     'head_neck': '头颈部',
     'shoulder_thorax': '肩胸区',
@@ -24,7 +33,6 @@ class AppConstants {
     'compound': '复合综合征',
   };
 
-  // 分类与3D区域的对应关系
   static const Map<String, String> categoryRoutes = {
     'head_neck': '/issues/head_neck',
     'shoulder_thorax': '/issues/shoulder_thorax',

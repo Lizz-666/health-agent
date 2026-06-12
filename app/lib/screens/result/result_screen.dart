@@ -6,7 +6,7 @@ import '../../providers/issue_provider.dart';
 import '../../widgets/result_badge.dart';
 import '../../widgets/disclaimer_banner.dart';
 
-class ResultScreen extends ConsumerWidget {
+class ResultScreen extends ConsumerStatefulWidget {
   final String issueId;
   final String assessmentId;
   final String result;
@@ -21,15 +21,27 @@ class ResultScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detail = ref.watch(issueProvider).currentDetail;
+  ConsumerState<ResultScreen> createState() => _ResultScreenState();
+}
 
-    // severe 时自动弹就医提示
-    if (result == 'severe') {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+class _ResultScreenState extends ConsumerState<ResultScreen> {
+  bool _dialogShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(issueProvider.notifier).fetchDetail(widget.issueId);
+      if (widget.result == 'severe' && !_dialogShown) {
+        _dialogShown = true;
         _showSevereDialog(context);
-      });
-    }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = ref.watch(issueProvider).currentDetail;
 
     return Scaffold(
       appBar: AppBar(title: const Text('评估结果')),
@@ -47,66 +59,106 @@ class ResultScreen extends ConsumerWidget {
                       padding: const EdgeInsets.all(24),
                       child: Column(
                         children: [
-                          ResultBadge(result: result, size: 22),
+                          ResultBadge(result: widget.result, size: 22),
                           const SizedBox(height: 16),
-                          Text(suggestion,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 16, height: 1.5)),
+                          Text(
+                            widget.suggestion,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 16, height: 1.5),
+                          ),
                         ],
                       ),
                     ),
                   ),
                   // 纠正建议（仅 moderate 时显示）
-                  if (result == 'moderate' && detail != null) ...[
+                  if (widget.result == 'moderate' && detail != null) ...[
                     const SizedBox(height: 16),
-                    const Text('纠正建议', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const Text(
+                      '纠正建议',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    ...detail.corrections.map((c) => Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              c['type'] == '拉伸' ? Icons.fitness_center : c['type'] == '强化' ? Icons.trending_up : Icons.lightbulb,
-                              color: const Color(0xFFE94560), size: 20),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (c['target_muscle'] != null)
-                                    Text(c['target_muscle'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  if (c['method'] != null)
-                                    Text(c['method'] as String, style: const TextStyle(height: 1.4)),
-                                  if (c['freq'] != null)
-                                    Text(c['freq'] as String, style: const TextStyle(color: Color(0xFF8892B0), fontSize: 12)),
-                                  if (c['desc'] != null)
-                                    Text(c['desc'] as String, style: const TextStyle(height: 1.4)),
-                                ],
+                    ...detail.corrections.map(
+                      (c) => Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                c['type'] == '拉伸'
+                                    ? Icons.fitness_center
+                                    : c['type'] == '强化'
+                                    ? Icons.trending_up
+                                    : Icons.lightbulb,
+                                color: const Color(0xFFE94560),
+                                size: 20,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (c['target_muscle'] != null)
+                                      Text(
+                                        c['target_muscle'] as String,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    if (c['method'] != null)
+                                      Text(
+                                        c['method'] as String,
+                                        style: const TextStyle(height: 1.4),
+                                      ),
+                                    if (c['freq'] != null)
+                                      Text(
+                                        c['freq'] as String,
+                                        style: const TextStyle(
+                                          color: Color(0xFF8892B0),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    if (c['desc'] != null)
+                                      Text(
+                                        c['desc'] as String,
+                                        style: const TextStyle(height: 1.4),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    )),
+                    ),
                   ],
                   // 相关推荐
                   if (detail != null && detail.relatedIssues.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    const Text('你可能还需要关注', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const Text(
+                      '你可能还需要关注',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     SizedBox(
                       height: 120,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: detail.relatedIssues.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
                         itemBuilder: (_, i) {
                           final rel = detail.relatedIssues[i];
                           return GestureDetector(
-                            onTap: () => context.push('/issues/${rel.id}/detail'),
+                            onTap: () =>
+                                context.push('/issue/${rel.id}/detail'),
                             child: Container(
                               width: 160,
                               padding: const EdgeInsets.all(12),
@@ -117,13 +169,28 @@ class ResultScreen extends ConsumerWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(rel.id,
-                                      style: const TextStyle(fontSize: 12, color: Color(0xFF8892B0))),
+                                  Text(
+                                    rel.id,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF8892B0),
+                                    ),
+                                  ),
                                   const SizedBox(height: 4),
-                                  Text(rel.relation,
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                                  Text('关联度: ${rel.weight}',
-                                      style: const TextStyle(fontSize: 12, color: Color(0xFF8892B0))),
+                                  Text(
+                                    rel.relation,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    '关联度: ${rel.weight}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF8892B0),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -149,7 +216,9 @@ class ResultScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.warning, color: Color(0xFFFF1744), size: 48),
         title: const Text('建议及时就医'),
-        content: const Text('你的评估结果为"严重"。本 App 的评估仅供参考，不能替代专业医疗诊断。建议你尽快咨询专业医师进行详细检查。'),
+        content: const Text(
+          '你的评估结果为"严重"。本 App 的评估仅供参考，不能替代专业医疗诊断。建议你尽快咨询专业医师进行详细检查。',
+        ),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),

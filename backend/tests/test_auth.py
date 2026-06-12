@@ -41,3 +41,31 @@ async def test_verify_login_existing_user(client):
 async def test_verify_login_wrong_code(client):
     resp = await client.post("/api/v1/auth/verify-login", json={"phone": "13800138000", "code": "000000"})
     assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_dev_login_requires_configured_credentials(client):
+    with (
+        patch.object(settings, "DEV_ADMIN_PHONE", ""),
+        patch.object(settings, "DEV_ADMIN_PASSWORD", ""),
+    ):
+        resp = await client.post(
+            "/api/v1/auth/dev-login",
+            json={"phone": "13800000001", "password": "local-password"},
+        )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "开发管理员账号未配置"
+
+
+@pytest.mark.asyncio
+async def test_dev_login_with_configured_credentials(client):
+    with (
+        patch.object(settings, "DEV_ADMIN_PHONE", "13800000001"),
+        patch.object(settings, "DEV_ADMIN_PASSWORD", "local-password"),
+    ):
+        resp = await client.post(
+            "/api/v1/auth/dev-login",
+            json={"phone": "13800000001", "password": "local-password"},
+        )
+    assert resp.status_code == 200
+    assert "access_token" in resp.json()

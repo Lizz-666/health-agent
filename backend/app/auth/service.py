@@ -2,8 +2,9 @@ import random
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Tuple
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from app.auth.models import User, VerificationCode
 from app.core.config import settings
 from app.core.exceptions import BadRequest, TooManyRequests
@@ -11,9 +12,9 @@ from app.core.exceptions import BadRequest, TooManyRequests
 logger = logging.getLogger(__name__)
 
 # 频率限制常量
-SEND_CODE_INTERVAL_SECONDS = 60       # 同一手机号两次发送间隔
-SEND_CODE_DAILY_LIMIT = 10            # 同一手机号每天最多发送次数
-VERIFY_MAX_ATTEMPTS = 5               # 同一手机号最大验证尝试次数
+SEND_CODE_INTERVAL_SECONDS = 60  # 同一手机号两次发送间隔
+SEND_CODE_DAILY_LIMIT = 10  # 同一手机号每天最多发送次数
+VERIFY_MAX_ATTEMPTS = 5  # 同一手机号最大验证尝试次数
 
 
 async def send_verification_code(db: AsyncSession, phone: str) -> None:
@@ -24,7 +25,8 @@ async def send_verification_code(db: AsyncSession, phone: str) -> None:
         select(VerificationCode)
         .where(
             VerificationCode.phone == phone,
-            VerificationCode.created_at > now - timedelta(seconds=SEND_CODE_INTERVAL_SECONDS),
+            VerificationCode.created_at
+            > now - timedelta(seconds=SEND_CODE_INTERVAL_SECONDS),
         )
         .order_by(VerificationCode.created_at.desc())
         .limit(1)
@@ -61,7 +63,6 @@ async def send_verification_code(db: AsyncSession, phone: str) -> None:
 
 
 async def verify_code(db: AsyncSession, phone: str, code: str) -> bool:
-    # 检查近期失败次数（5分钟内超过5次则拒绝）
     now = datetime.now(timezone.utc)
     recent_codes_stmt = (
         select(func.count())
@@ -71,25 +72,23 @@ async def verify_code(db: AsyncSession, phone: str, code: str) -> bool:
             VerificationCode.created_at > now - timedelta(minutes=5),
         )
     )
-    recent_count = (await db.execute(recent_codes_stmt)).scalar()
-    # 通过已使用的code数量间接判断尝试次数（保守估计）
-    # 更精确：每次验证失败也记录一次尝试，但当前schema不支持
-    # 这里用 total_codes - used_codes 的比值来保护
+    recent_count: int = (await db.execute(recent_codes_stmt)).scalar() or 0
+    if recent_count >= VERIFY_MAX_ATTEMPTS:
+        raise TooManyRequests("验证尝试次数过多，请重新获取验证码")
 
     stmt = (
-        select(VerificationCode)
+        update(VerificationCode)
         .where(
             VerificationCode.phone == phone,
             VerificationCode.code == code,
             VerificationCode.used == False,
             VerificationCode.expires_at > now,
         )
-        .order_by(VerificationCode.created_at.desc())
+        .values(used=True)
+        .returning(VerificationCode.id)
     )
     result = await db.execute(stmt)
-    vc = result.scalar_one_or_none()
-    if vc:
-        vc.used = True
+    if result.scalar_one_or_none() is not None:
         await db.commit()
         return True
     return False
@@ -104,15 +103,26 @@ async def find_or_create_user(db: AsyncSession, phone: str) -> Tuple[str, bool]:
     if user:
         return str(user.id), False
 
-    user = User(phone=phone)
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return str(user.id), True
+    try:
+        user = User(phone=phone)
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        return str(user.id), True
+    except IntegrityError:
+        await db.rollback()
+        result = await db.execute(select(User).where(User.phone == phone))
+        user = result.scalar_one()
+        return str(user.id), False
 
 
 async def get_user_by_id(db: AsyncSession, user_id: str):
     from uuid import UUID
-    stmt = select(User).where(User.id == UUID(user_id))
+
+    try:
+        uid = UUID(user_id)
+    except ValueError:
+        return None
+    stmt = select(User).where(User.id == uid)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()

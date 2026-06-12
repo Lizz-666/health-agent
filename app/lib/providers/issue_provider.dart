@@ -20,13 +20,14 @@ class IssueState {
   IssueState copyWith({
     Map<String, List<IssueSummary>>? issuesByCategory,
     IssueDetail? currentDetail,
+    bool clearDetail = false,
     bool? isLoading,
     String? error,
     bool clearError = false,
   }) =>
       IssueState(
         issuesByCategory: issuesByCategory ?? this.issuesByCategory,
-        currentDetail: currentDetail ?? this.currentDetail,
+        currentDetail: clearDetail ? null : (currentDetail ?? this.currentDetail),
         isLoading: isLoading ?? this.isLoading,
         error: clearError ? null : (error ?? this.error),
       );
@@ -37,7 +38,6 @@ class IssueNotifier extends StateNotifier<IssueState> {
 
   IssueNotifier(this._api) : super(const IssueState());
 
-  // 获取分类问题列表，缓存到 Map
   Future<void> fetchIssues(String? category) async {
     try {
       state = state.copyWith(isLoading: true, clearError: true);
@@ -52,22 +52,30 @@ class IssueNotifier extends StateNotifier<IssueState> {
       newMap[key] = list;
       state = state.copyWith(issuesByCategory: newMap, isLoading: false);
     } on DioException catch (e) {
-      state = state.copyWith(
-          isLoading: false,
-          error: e.response?.data?['detail'] ?? '加载失败');
+      final data = e.response?.data;
+      final msg = (data is Map<String, dynamic>)
+          ? (data['detail'] as String?) ?? '加载失败'
+          : '加载失败';
+      state = state.copyWith(isLoading: false, error: msg);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '数据解析异常');
     }
   }
 
   Future<void> fetchDetail(String issueId) async {
     try {
-      state = state.copyWith(isLoading: true, clearError: true);
+      state = state.copyWith(isLoading: true, clearError: true, clearDetail: true);
       final resp = await _api.dio.get('/posture/issues/$issueId');
       final detail = IssueDetail.fromJson(resp.data as Map<String, dynamic>);
       state = state.copyWith(currentDetail: detail, isLoading: false);
     } on DioException catch (e) {
-      state = state.copyWith(
-          isLoading: false,
-          error: e.response?.data?['detail'] ?? '加载失败');
+      final data = e.response?.data;
+      final msg = (data is Map<String, dynamic>)
+          ? (data['detail'] as String?) ?? '加载失败'
+          : '加载失败';
+      state = state.copyWith(isLoading: false, error: msg);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '数据解析异常');
     }
   }
 }

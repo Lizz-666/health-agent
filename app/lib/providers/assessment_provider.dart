@@ -19,15 +19,17 @@ class AssessmentState {
 
   AssessmentState copyWith({
     SelfAssessResult? currentResult,
+    bool clearResult = false,
     List<AssessmentRecord>? history,
     bool? isLoading,
     String? error,
+    bool clearError = false,
   }) =>
       AssessmentState(
-        currentResult: currentResult ?? this.currentResult,
+        currentResult: clearResult ? null : (currentResult ?? this.currentResult),
         history: history ?? this.history,
         isLoading: isLoading ?? this.isLoading,
-        error: error ?? this.error,
+        error: clearError ? null : (error ?? this.error),
       );
 }
 
@@ -38,7 +40,7 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
 
   Future<SelfAssessResult?> submitSelfAssess(String issueId, int testIndex, String answer) async {
     try {
-      state = state.copyWith(isLoading: true);
+      state = state.copyWith(isLoading: true, clearError: true);
       final resp = await _api.dio.post('/posture/assess', data: {
         'issue_id': issueId,
         'test_index': testIndex,
@@ -48,36 +50,56 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
       state = state.copyWith(currentResult: result, isLoading: false);
       return result;
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.response?.data?['detail'] ?? '提交失败');
+      final data = e.response?.data;
+      final msg = (data is Map<String, dynamic>)
+          ? (data['detail'] as String?) ?? '提交失败'
+          : '提交失败';
+      state = state.copyWith(isLoading: false, error: msg);
+      return null;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '提交失败');
       return null;
     }
   }
 
   Future<Map<String, dynamic>?> submitPhotoAssess(String issueId, List<String> photoKeys) async {
     try {
-      state = state.copyWith(isLoading: true);
+      state = state.copyWith(isLoading: true, clearError: true, clearResult: true);
       final resp = await _api.dio.post('/posture/assess/photo', data: {
         'issue_id': issueId,
         'photo_keys': photoKeys,
       });
-      state = state.copyWith(currentResult: null, isLoading: false);
+      state = state.copyWith(isLoading: false);
       return resp.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.response?.data?['detail'] ?? '分析失败');
+      final data = e.response?.data;
+      final msg = (data is Map<String, dynamic>)
+          ? (data['detail'] as String?) ?? '分析失败'
+          : '分析失败';
+      state = state.copyWith(isLoading: false, error: msg);
+      return null;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '分析失败');
       return null;
     }
   }
 
   Future<void> fetchHistory({int limit = 20, int offset = 0}) async {
     try {
-      state = state.copyWith(isLoading: true);
+      state = state.copyWith(isLoading: true, clearError: true);
       final resp = await _api.dio.get('/posture/history', queryParameters: {'limit': limit, 'offset': offset});
       final list = (resp.data as List)
           .map((e) => AssessmentRecord.fromJson(e as Map<String, dynamic>))
           .toList();
       state = state.copyWith(history: list, isLoading: false);
     } on DioException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.response?.data?['detail'] ?? '加载失败');
+      final data = e.response?.data;
+      final msg = (data is Map<String, dynamic>)
+          ? (data['detail'] as String?) ?? '加载失败'
+          : '加载失败';
+      state = state.copyWith(isLoading: false, error: msg);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '数据解析异常');
     }
   }
 }

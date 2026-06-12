@@ -116,7 +116,7 @@ class PostureProfileScreen extends ConsumerWidget {
                         style: const TextStyle(fontSize: 11, color: Color(0xFF8892B0)))
                     : null,
                 trailing: const Icon(Icons.chevron_right, size: 18, color: Color(0xFF8892B0)),
-                onTap: () => context.push('/issues/${issue.id}/detail'),
+                onTap: () => context.push('/issue/${issue.id}/detail'),
               );
             }),
           ],

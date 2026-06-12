@@ -1,8 +1,16 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
-from app.auth.schemas import SendCodeRequest, SendCodeResponse, VerifyLoginRequest, TokenResponse, RefreshRequest
+from app.auth.schemas import (
+    SendCodeRequest,
+    SendCodeResponse,
+    VerifyLoginRequest,
+    TokenResponse,
+    RefreshRequest,
+    DevLoginRequest,
+)
 from app.auth import service
+from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, decode_token
 from app.core.exceptions import BadRequest, Unauthorized
 
@@ -40,4 +48,24 @@ async def refresh(request: RefreshRequest, db: AsyncSession = Depends(get_db)):
     return TokenResponse(
         access_token=create_access_token(user_id),
         refresh_token=create_refresh_token(user_id),
+    )
+
+
+@router.post("/dev-login", response_model=TokenResponse)
+async def dev_login(request: DevLoginRequest, db: AsyncSession = Depends(get_db)):
+    """开发环境管理员密码登录，仅 DEV_MODE=True 时可用"""
+    if not settings.DEV_MODE:
+        raise BadRequest("该接口仅开发环境可用")
+    if not settings.DEV_ADMIN_PHONE or not settings.DEV_ADMIN_PASSWORD:
+        raise BadRequest("开发管理员账号未配置")
+    if (
+        request.phone != settings.DEV_ADMIN_PHONE
+        or request.password != settings.DEV_ADMIN_PASSWORD
+    ):
+        raise BadRequest("账号或密码错误")
+    user_id, is_new = await service.find_or_create_user(db, request.phone)
+    return TokenResponse(
+        access_token=create_access_token(user_id),
+        refresh_token=create_refresh_token(user_id),
+        is_new_user=is_new,
     )

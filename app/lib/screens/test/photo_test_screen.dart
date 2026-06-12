@@ -26,28 +26,29 @@ class _PhotoTestScreenState extends ConsumerState<PhotoTestScreen> {
     final xFile = await _picker.pickImage(source: source, maxWidth: 1024, maxHeight: 1024);
     if (xFile == null) return;
     setState(() => _photo = File(xFile.path));
-    await _uploadAndAnalyze();
   }
 
   Future<void> _uploadAndAnalyze() async {
-    if (_photo == null) return;
+    if (_photo == null || _analyzing) return;
     setState(() => _analyzing = true);
 
     try {
       final api = ref.read(apiClientProvider);
-      // 1. 获取 OSS 凭证
       final stsResp = await api.dio.post('/upload/sts-token');
       final sts = stsResp.data as Map<String, dynamic>;
 
-      // 2. 上传到 OSS
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
       final objectKey = '${sts['path_prefix']}$fileName';
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(_photo!.path, filename: fileName),
         'key': objectKey,
+        'OSSAccessKeyId': sts['access_key_id'] ?? '',
+        'policy': sts['policy'] ?? '',
+        'Signature': sts['signature'] ?? '',
+        'x-oss-security-token': sts['security_token'] ?? '',
       });
-      // 开发模式：使用直传URL，生产需 OSS SDK
-      await api.dio.post(
+      final ossDio = Dio();
+      await ossDio.post(
         'https://${sts['bucket']}.${sts['endpoint']}',
         data: formData,
         options: Options(headers: {
@@ -55,7 +56,6 @@ class _PhotoTestScreenState extends ConsumerState<PhotoTestScreen> {
         }),
       );
 
-      // 3. 提交 AI 分析
       final result = await ref
           .read(assessmentProvider.notifier)
           .submitPhotoAssess(widget.issueId, [objectKey]);
@@ -68,16 +68,27 @@ class _PhotoTestScreenState extends ConsumerState<PhotoTestScreen> {
           result: aiLevel,
           method: 'ai_photo',
         );
-        context.push('/issues/${widget.issueId}/result', extra: {
-          'assessmentId': result['id'] ?? '',
-          'result': aiLevel,
-          'suggestion': aiSuggestion,
-        });
+        if (mounted) {
+          context.push('/issue/${widget.issueId}/result', extra: {
+            'assessmentId': result['id'] ?? '',
+            'result': aiLevel,
+            'suggestion': aiSuggestion,
+          });
+        }
       }
     } on DioException catch (e) {
-      final msg = e.response?.data?['detail'] ?? '上传或分析失败，请重试';
+      final data = e.response?.data;
+      final msg = (data is Map<String, dynamic>)
+          ? (data['detail'] as String?) ?? '上传或分析失败，请重试'
+          : '上传或分析失败，请重试';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('发生错误，请重试')),
+        );
       }
     } finally {
       if (mounted) setState(() => _analyzing = false);

@@ -1,4 +1,5 @@
 // app/lib/services/sync_service.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/assessment_provider.dart';
 import '../providers/issue_provider.dart';
@@ -10,15 +11,22 @@ class SyncService {
 
   SyncService(this._ref);
 
-  /// App 启动时调用：加载数据并同步
   Future<void> startupSync() async {
-    // 1. 加载用户信息
-    await _ref.read(userProvider.notifier).fetchProfile();
-    // 2. 加载所有问题列表
-    await _ref.read(issueProvider.notifier).fetchIssues(null);
-    // 3. 加载评估历史
-    await _ref.read(assessmentProvider.notifier).fetchHistory();
-    // 4. 从历史聚合推导体态状态
+    try {
+      await _ref.read(userProvider.notifier).fetchProfile();
+    } catch (e) {
+      debugPrint('Sync: fetchProfile failed: $e');
+    }
+    try {
+      await _ref.read(issueProvider.notifier).fetchIssues(null);
+    } catch (e) {
+      debugPrint('Sync: fetchIssues failed: $e');
+    }
+    try {
+      await _ref.read(assessmentProvider.notifier).fetchHistory();
+    } catch (e) {
+      debugPrint('Sync: fetchHistory failed: $e');
+    }
     final history = _ref.read(assessmentProvider).history;
     _ref.read(postureStateProvider.notifier).rebuildFromHistory(history);
   }

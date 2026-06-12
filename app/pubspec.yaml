@@ -35,13 +35,13 @@ dependencies:
   dio: ^5.4.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  model_viewer_plus: ^1.10.0
   image_picker: ^1.1.0
   flutter_secure_storage: ^9.2.0
   intl: ^0.19.0
   cached_network_image: ^3.3.0
 
   cupertino_icons: ^1.0.8
+  lpinyin: ^2.0.3
 
 dev_dependencies:
   flutter_test:
@@ -66,7 +66,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/models/
     - assets/images/tests/
   # assets:
   #   - images/a_dot_burr.jpeg

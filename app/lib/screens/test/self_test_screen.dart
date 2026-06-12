@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/issue.dart';
+import '../../models/assessment.dart';
 import '../../providers/issue_provider.dart';
 import '../../providers/assessment_provider.dart';
 import '../../providers/posture_state_provider.dart';
@@ -17,6 +19,15 @@ class SelfTestScreen extends ConsumerStatefulWidget {
 class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
   final _pageController = PageController();
   int _currentTest = 0;
+  int _activeTestForAnswer = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      if (mounted) ref.read(issueProvider.notifier).fetchDetail(widget.issueId);
+    });
+  }
 
   @override
   void dispose() {
@@ -27,7 +38,9 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
   Future<void> _submitAnswer(String answer) async {
     final result = await ref
         .read(assessmentProvider.notifier)
-        .submitSelfAssess(widget.issueId, _currentTest, answer);
+        .submitSelfAssess(widget.issueId, _activeTestForAnswer, answer);
+
+    if (!mounted) return;
 
     if (result != null) {
       ref.read(postureStateProvider.notifier).updateState(
@@ -37,14 +50,14 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
       );
 
       if (answer == 'uncertain') {
-        _showPhotoDialog();
+        _showPhotoDialog(result);
       } else {
         _goToResult(result.id, result.result, result.suggestion);
       }
     }
   }
 
-  void _showPhotoDialog() {
+  void _showPhotoDialog(SelfAssessResult selfResult) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -54,17 +67,14 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              final result = ref.read(assessmentProvider).currentResult;
-              if (result != null) {
-                _goToResult(result.id, result.result, result.suggestion);
-              }
+              _goToResult(selfResult.id, selfResult.result, selfResult.suggestion);
             },
             child: const Text('以后再说'),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context.push('/issues/${widget.issueId}/photo');
+              if (mounted) context.push('/issue/${widget.issueId}/photo');
             },
             child: const Text('拍照分析'),
           ),
@@ -74,7 +84,8 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
   }
 
   void _goToResult(String assessmentId, String result, String suggestion) {
-    context.push('/issues/${widget.issueId}/result', extra: {
+    if (!mounted) return;
+    context.push('/issue/${widget.issueId}/result', extra: {
       'assessmentId': assessmentId,
       'result': result,
       'suggestion': suggestion,
@@ -88,7 +99,7 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
     if (detail == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('自测')),
-        body: const Center(child: Text('请先查看详情')),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -104,7 +115,6 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
       appBar: AppBar(title: Text('${detail.nameCn} 自测')),
       body: Column(
         children: [
-          // 进度指示
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -126,7 +136,14 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
             child: PageView.builder(
               controller: _pageController,
               itemCount: tests.length + 1,
-              onPageChanged: (i) => setState(() => _currentTest = i),
+              onPageChanged: (i) {
+                setState(() {
+                  _currentTest = i;
+                  if (i < tests.length) {
+                    _activeTestForAnswer = i;
+                  }
+                });
+              },
               itemBuilder: (_, index) {
                 if (index < tests.length) {
                   return _buildTestPage(tests[index], index + 1, tests.length);
@@ -140,8 +157,7 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
     );
   }
 
-  Widget _buildTestPage(dynamic test, int current, int total) {
-    // test is SelfTest
+  Widget _buildTestPage(SelfTest test, int current, int total) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -149,7 +165,6 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
         children: [
           Text('自测方法 $current/$total', style: const TextStyle(color: Color(0xFF8892B0))),
           const SizedBox(height: 16),
-          // 示意图区域
           Container(
             height: 220,
             width: double.infinity,

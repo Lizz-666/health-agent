@@ -131,29 +131,27 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   void _editField(BuildContext context, WidgetRef ref, String label, String unit, int value, int min, int max, ValueChanged<int> onSave) {
+    int temp = value; // 提到外层，让 actions 能访问最新值
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('$label'),
-        content: StatefulBuilder(
-          builder: (_, setDialogState) {
-            int temp = value;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$temp $unit', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                Slider(
-                  value: temp.toDouble(), min: min.toDouble(), max: max.toDouble(),
-                  onChanged: (v) => setDialogState(() => temp = v.toInt()),
-                ),
-              ],
-            );
-          },
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(label),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('$temp $unit', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              Slider(
+                value: temp.toDouble(), min: min.toDouble(), max: max.toDouble(),
+                onChanged: (v) => setDialogState(() => temp = v.toInt()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            ElevatedButton(onPressed: () { onSave(temp); Navigator.pop(ctx); }, child: const Text('保存')),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          ElevatedButton(onPressed: () { onSave(value); Navigator.pop(ctx); }, child: const Text('保存')),
-        ],
       ),
     );
   }

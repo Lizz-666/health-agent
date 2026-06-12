@@ -11,8 +11,18 @@ class UserState {
 
   const UserState({this.profile, this.isLoading = false, this.error});
 
-  UserState copyWith({UserProfile? profile, bool? isLoading, String? error, bool clearError = false}) =>
-      UserState(profile: profile ?? this.profile, isLoading: isLoading ?? this.isLoading, error: clearError ? null : (error ?? this.error));
+  UserState copyWith({
+    UserProfile? profile,
+    bool clearProfile = false,
+    bool? isLoading,
+    String? error,
+    bool clearError = false,
+  }) =>
+      UserState(
+        profile: clearProfile ? null : (profile ?? this.profile),
+        isLoading: isLoading ?? this.isLoading,
+        error: clearError ? null : (error ?? this.error),
+      );
 }
 
 class UserNotifier extends StateNotifier<UserState> {
@@ -22,13 +32,18 @@ class UserNotifier extends StateNotifier<UserState> {
 
   Future<void> fetchProfile() async {
     try {
-      state = state.copyWith(isLoading: true);
+      state = state.copyWith(isLoading: true, clearError: true);
       final resp = await _api.dio.get('/user/profile');
       final profile = UserProfile.fromJson(resp.data as Map<String, dynamic>);
       state = state.copyWith(profile: profile, isLoading: false);
     } on DioException catch (e) {
-      final msg = e.response?.data?['detail'] ?? '获取用户信息失败';
+      final data = e.response?.data;
+      final msg = (data is Map<String, dynamic>)
+          ? (data['detail'] as String?) ?? '获取用户信息失败'
+          : '获取用户信息失败';
       state = state.copyWith(isLoading: false, error: msg);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '获取用户信息失败');
     }
   }
 
@@ -40,7 +55,7 @@ class UserNotifier extends StateNotifier<UserState> {
     String? gender,
   }) async {
     try {
-      state = state.copyWith(isLoading: true);
+      state = state.copyWith(isLoading: true, clearError: true);
       final data = <String, dynamic>{};
       if (nickname != null) data['nickname'] = nickname;
       if (height != null) data['height'] = height;
@@ -52,8 +67,14 @@ class UserNotifier extends StateNotifier<UserState> {
       state = state.copyWith(profile: profile, isLoading: false);
       return true;
     } on DioException catch (e) {
-      final msg = e.response?.data?['detail'] ?? '更新失败';
+      final data = e.response?.data;
+      final msg = (data is Map<String, dynamic>)
+          ? (data['detail'] as String?) ?? '更新失败'
+          : '更新失败';
       state = state.copyWith(isLoading: false, error: msg);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '更新失败');
       return false;
     }
   }

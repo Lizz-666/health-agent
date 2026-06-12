@@ -76,7 +76,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                   style: const TextStyle(fontSize: 12)),
                               trailing: Text(DateFormat('HH:mm').format(r.createdAt),
                                   style: const TextStyle(color: Color(0xFF8892B0), fontSize: 13)),
-                              onTap: () => context.push('/issues/${r.issueId}/result', extra: {
+                              onTap: () => context.push('/issue/${r.issueId}/result', extra: {
                                 'assessmentId': r.id,
                                 'result': r.result,
                                 'suggestion': '',

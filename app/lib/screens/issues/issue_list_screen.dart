@@ -19,8 +19,9 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() =>
-        ref.read(issueProvider.notifier).fetchIssues(widget.category));
+    Future.microtask(() {
+      if (mounted) ref.read(issueProvider.notifier).fetchIssues(widget.category);
+    });
   }
 
   @override
@@ -33,23 +34,37 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(categoryName)),
-      body: issueState.isLoading
+      body: issueState.isLoading && issues.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : issues.isEmpty
-              ? const Center(
-                  child: Text('该分类暂无问题', style: TextStyle(color: Color(0xFF8892B0))))
-              : ListView.builder(
-                  itemCount: issues.length,
-                  itemBuilder: (_, i) {
-                    final issue = issues[i];
-                    final state = postureStates[issue.id];
-                    return IssueCard(
-                      issue: issue,
-                      result: state?.result,
-                      onTap: () => context.push('/issues/${issue.id}/detail'),
-                    );
-                  },
-                ),
+          : issueState.error != null && issues.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(issueState.error!, style: const TextStyle(color: Color(0xFFFF1744))),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => ref.read(issueProvider.notifier).fetchIssues(widget.category),
+                        child: const Text('重试'),
+                      ),
+                    ],
+                  ),
+                )
+              : issues.isEmpty
+                  ? const Center(
+                      child: Text('该分类暂无问题', style: TextStyle(color: Color(0xFF8892B0))))
+                  : ListView.builder(
+                      itemCount: issues.length,
+                      itemBuilder: (_, i) {
+                        final issue = issues[i];
+                        final state = postureStates[issue.id];
+                        return IssueCard(
+                          issue: issue,
+                          result: state?.result,
+                          onTap: () => context.push('/issue/${issue.id}/detail'),
+                        );
+                      },
+                    ),
     );
   }
 }

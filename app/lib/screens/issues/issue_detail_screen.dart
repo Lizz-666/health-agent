@@ -16,14 +16,34 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() =>
-        ref.read(issueProvider.notifier).fetchDetail(widget.issueId));
+    Future.microtask(() {
+      if (mounted) ref.read(issueProvider.notifier).fetchDetail(widget.issueId);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(issueProvider);
     final detail = state.currentDetail;
+
+    if (state.error != null && detail == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('加载失败')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(state.error!, style: const TextStyle(color: Color(0xFFFF1744))),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.read(issueProvider.notifier).fetchDetail(widget.issueId),
+                child: const Text('重试'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     if (state.isLoading || detail == null) {
       return Scaffold(
@@ -36,7 +56,6 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       appBar: AppBar(title: Text(detail.nameCn)),
       body: CustomScrollView(
         slivers: [
-          // 定义区
           SliverToBoxAdapter(
             child: Card(
               margin: const EdgeInsets.all(16),
@@ -74,7 +93,6 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
               ),
             ),
           ),
-          // 成因
           SliverToBoxAdapter(
             child: Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -97,10 +115,10 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                               color: const Color(0xFF0F3460),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(c['type'] as String,
+                            child: Text((c['type'] as String?) ?? '',
                                 style: const TextStyle(fontSize: 11, color: Colors.white)),
                           ),
-                          Expanded(child: Text(c['desc'] as String, style: const TextStyle(height: 1.4))),
+                          Expanded(child: Text((c['desc'] as String?) ?? '', style: const TextStyle(height: 1.4))),
                         ],
                       ),
                     )),
@@ -109,7 +127,6 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
               ),
             ),
           ),
-          // 纠正方法
           SliverToBoxAdapter(
             child: Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -125,7 +142,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(c['type'] == '拉伸' ? Icons.fitness_center : c['type'] == '强化' ? Icons.trending_up : Icons.lightbulb_outline,
+                          Icon((c['type'] as String?) == '拉伸' ? Icons.fitness_center : (c['type'] as String?) == '强化' ? Icons.trending_up : Icons.lightbulb_outline,
                               size: 18, color: const Color(0xFFE94560)),
                           const SizedBox(width: 8),
                           Expanded(
@@ -149,7 +166,6 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
               ),
             ),
           ),
-          // 后果
           SliverToBoxAdapter(
             child: Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -164,9 +180,9 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Row(
                         children: [
-                          Text('${c['timeframe']}：',
+                          Text('${c['timeframe'] ?? ''}：',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          Expanded(child: Text(c['desc'] as String, style: const TextStyle(fontSize: 14))),
+                          Expanded(child: Text((c['desc'] as String?) ?? '', style: const TextStyle(fontSize: 14))),
                         ],
                       ),
                     )),
@@ -175,7 +191,6 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
               ),
             ),
           ),
-          // 红旗征
           if (detail.redFlags.isNotEmpty)
             SliverToBoxAdapter(
               child: Card(
@@ -213,7 +228,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: () => context.push('/issues/${detail.id}/test'),
+              onPressed: () => context.push('/issue/${detail.id}/test'),
               child: const Text('开始自测', style: TextStyle(fontSize: 18)),
             ),
           ),

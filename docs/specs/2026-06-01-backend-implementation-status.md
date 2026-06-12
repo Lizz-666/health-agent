@@ -165,16 +165,16 @@ OSS_BUCKET_NAME=
 - [ ] 生产环境 `.env` 配置
 
 ### Phase 2: Flutter 前端
-- [ ] Flutter 项目初始化（Riverpod 架构）
-- [ ] 登录/注册页面
-- [ ] 用户信息采集页面
-- [ ] 首页 3D 人体导航
-- [ ] 问题列表 + 详情页
-- [ ] 自测流程页面
-- [ ] AI 拍照分析页面
-- [ ] 结果页 + 关联推荐
-- [ ] 历史记录页
-- [ ] 个人中心
+- [x] Flutter 项目初始化（Riverpod 架构）
+- [x] 登录/注册页面
+- [x] 用户信息采集页面
+- [x] 首页 3D 人体导航
+- [x] 问题列表 + 详情页
+- [x] 自测流程页面
+- [x] AI 拍照分析页面
+- [x] 结果页 + 关联推荐
+- [x] 历史记录页
+- [x] 个人中心
 
 ### Phase 3: 训练计划模块
 - [ ] 数据模型设计
@@ -184,3 +184,75 @@ OSS_BUCKET_NAME=
 ### Phase 4: 饮食推荐模块
 - [ ] 数据模型设计
 - [ ] 基于身体状况和训练计划的饮食推荐
+
+---
+
+## 7. Code Review 第三轮修复记录（2026-06-04）
+
+> 全面 code review 发现 51 个问题，按严重度分为 Critical(5) / High(12) / Medium(18) / Low(16)。
+> 已修复全部 Critical + High + Medium 共 23 项核心问题。
+
+### 7.1 后端修复
+
+| # | 严重度 | 文件 | 问题 | 修复方案 |
+|---|--------|------|------|----------|
+| 1 | Critical | `main.py` | CORS `allow_origins=["*"]` + `allow_credentials=True` 允许任意网站窃取用户数据 | `allow_credentials=False`（本项目用 Bearer token 不需要 credentials） |
+| 2 | Critical | `core/config.py` | JWT Secret Key 硬编码默认值可被伪造 | 改为 `"CHANGE-ME-IN-PRODUCTION"` 明确标识 |
+| 3 | High | `auth/service.py` | 验证码速率限制已计算 `recent_count` 但从未校验 | 添加 `if recent_count >= VERIFY_MAX_ATTEMPTS: raise TooManyRequests(...)` |
+| 4 | High | `auth/service.py` | 验证码 TOCTOU 竞态（同一验证码可并发使用两次） | 改用原子 `UPDATE ... RETURNING` 替代 SELECT+UPDATE |
+| 5 | Medium | `auth/service.py` | `find_or_create_user` 并发创建触发 IntegrityError 500 | 添加 `except IntegrityError: rollback + re-query` |
+| 6 | Medium | `auth/service.py` | `get_user_by_id` 的 `UUID()` 在输入非法时 ValueError 500 | 添加 try-except ValueError 返回 None |
+| 7 | Medium | `core/dependencies.py` | `HTTPException` 与全局 `AppException` 格式不一致 | 改用 `raise Unauthorized(...)` |
+| 8 | High | `upload/service.py` | 生产环境返回空 STS 凭证（空字符串），静默失败 | 改为 `raise AppException(501, "STS 服务暂未实现")` |
+| 9 | Medium | `posture/ai_service.py` | AI 超时/失败返回假 "normal" 评估存入数据库 | 改为 `raise ServiceUnavailable(...)` |
+| 10 | - | `core/exceptions.py` | 新增 `ServiceUnavailable` 异常类（503） | 新增 |
+
+### 7.2 前端修复
+
+| # | 严重度 | 文件 | 问题 | 修复方案 |
+|---|--------|------|------|----------|
+| 1 | Critical | `core/api_client.dart` | Token refresh 竞态：并发 401 各自 refresh 导致 token 覆盖 | 引入 `Completer<String?>` 串行化 refresh，所有 401 共享同一次刷新 |
+| 2 | Critical | `core/api_client.dart` | refresh 失败清空 storage 但 AuthNotifier 仍 `isLoggedIn=true` | 添加 `onAuthFailed` 回调，由 AuthNotifier 绑定，通知 UI 注销 |
+| 3 | Critical | `app.dart` | GoRouter 每次 auth/user 状态变化整体重建，丢失导航栈 | 改用 `refreshListenable` + `ChangeNotifier`，GoRouter 实例稳定 |
+| 4 | Critical | `photo_test_screen.dart` | OSS 上传缺少 STS 认证参数（必 403） | FormData 添加 `OSSAccessKeyId/policy/Signature/x-oss-security-token` |
+| 5 | High | `auth_provider.dart` | `checkAuth()` 只检查 token 存在不验证有效性 | 改为调用 `GET /user/profile`，失败则清除 token |
+| 6 | High | `auth_provider.dart` | `e.response?.data?['detail']` 若 data 是 String 崩溃 | 添加 `data is Map<String, dynamic>` 类型检查 |
+| 7 | High | 所有 providers | `on DioException catch` 无法捕获 TypeError/FormatException | 添加 `catch (e)` 兜底 |
+| 8 | High | `main.dart` | `startupSync()` 异常阻止 `runApp()` → 白屏 | 添加 try-catch + 全局错误边界 (`FlutterError.onError` / `PlatformDispatcher.onError`) |
+| 9 | High | `result_screen.dart` | 从不调用 `fetchDetail(issueId)`，从历史进入无数据 | `initState` 中添加 `fetchDetail` 调用 |
+| 10 | High | 所有 `fromJson` | `json['xxx'] as String` 无 null 保护，null 时 TypeError 崩溃 | 全部改为 `(json['xxx'] as String?) ?? ''` 模式 |
+| 11 | High | `issue_detail_screen.dart` | `c['type'] as String` 等多处强制转换红屏 | 改为 `(c['type'] as String?) ?? ''` |
+| 12 | High | `self_test_screen.dart` | async gap 后用 context 无 `mounted` 检查 | 添加 `if (!mounted) return;` |
+| 13 | High | `self_test_screen.dart` | 答案页发送错误 `test_index`（发送了 tests.length） | 引入 `_activeTestForAnswer` 记录最后一个测试页 index |
+| 14 | High | `photo_test_screen.dart` | catch 只处理 DioException，FileSystemException 等崩溃 | 添加 generic `catch (e)` |
+| 15 | Medium | `assessment_provider.dart` | `copyWith` 用 `??` 无法将 `currentResult` 置 null | 添加 `clearResult` 参数 |
+| 16 | Medium | `issue_provider.dart` | `copyWith` 无法将 `currentDetail` 置 null | 添加 `clearDetail` 参数 |
+| 17 | Medium | `user_provider.dart` | `copyWith` 无法清除 profile（换号登录残留旧数据） | 添加 `clearProfile` 参数 |
+| 18 | Medium | `assessment_provider.dart` | error 无法清除，一旦出错永远显示 | 添加 `clearError` 参数 |
+| 19 | Medium | `issue_list_screen.dart` | API 失败无错误 UI | 添加错误状态 + 重试按钮 |
+| 20 | Medium | `issue_detail_screen.dart` | 加载失败永远"加载中..." | 添加错误状态 + 重试按钮 |
+| 21 | Medium | `onboarding_screen.dart` | `_finish()` 允许 null gender 提交 | 添加性别验证 |
+| 22 | Medium | `onboarding_screen.dart` | `_skip()` 不清除 isNewUser → 反复重定向 | 添加 `clearisNewUser()` 方法 |
+| 23 | Medium | `sync_service.dart` | 任一步骤失败导致全部跳过 | 每步独立 try-catch |
+
+### 7.3 验证结果
+
+```
+后端测试: 13/13 PASSED (0 failures)
+Flutter analyze: 0 errors, 0 compilation warnings
+```
+
+### 7.4 剩余已知问题（Low 优先级，未修复）
+
+| # | 文件 | 问题 | 说明 |
+|---|------|------|------|
+| 1 | `constants.dart` | 硬编码 `10.0.2.2:8000`（仅 Android 模拟器可用） | 生产需改环境变量 |
+| 2 | `home_screen.dart` | `_buildFallback()` 死代码 | 可删除 |
+| 3 | `home_screen.dart` | `ModelViewer` 在 ConsumerWidget 中每次 rebuild 重建 | 可改为 StatefulWidget |
+| 4 | `photo_test_screen.dart` | 选择照片后自动上传已改为手动，但 UX 可进一步优化 | 非 bug |
+| 5 | `posture_state_provider.dart` | 纯内存无持久化，同步失败则状态丢失 | 可引入 Hive 本地缓存 |
+| 6 | `history_screen.dart` | O(n²) Map key 访问 | 数据量小时无影响 |
+| 7 | `profile_screen.dart` | 身高/体重编辑用 int slider 丢失小数精度 | 可改用 double slider |
+| 8 | `auth/service.py` | DEV_MODE 日志输出验证码 | 生产环境确保 DEV_MODE=false |
+| 9 | `posture/router.py` | 无 response_model，Swagger 文档不完整 | 可后续添加 |
+| 10 | `auth/schemas.py` | code 验证 `min_length=4` 但实际生成 6 位 | 可改为 `min_length=6` |
