@@ -1,4 +1,8 @@
 import pytest
+from unittest.mock import patch, AsyncMock
+from app.core.exceptions import ServiceUnavailable
+from app.posture.models import PostureAssessment
+from sqlalchemy import select
 
 
 async def _login_user(client, phone="13800138000"):
@@ -15,14 +19,18 @@ async def _login_user(client, phone="13800138000"):
         )
         code = result.scalar_one().code
 
-    resp = await client.post("/api/v1/auth/verify-login", json={"phone": phone, "code": code})
+    resp = await client.post(
+        "/api/v1/auth/verify-login", json={"phone": phone, "code": code}
+    )
     return resp.json()["access_token"]
 
 
 @pytest.mark.asyncio
 async def test_list_issues(client):
     token = await _login_user(client)
-    resp = await client.get("/api/v1/posture/issues", headers={"Authorization": f"Bearer {token}"})
+    resp = await client.get(
+        "/api/v1/posture/issues", headers={"Authorization": f"Bearer {token}"}
+    )
     assert resp.status_code == 200
     assert len(resp.json()) == 26
 
@@ -30,7 +38,10 @@ async def test_list_issues(client):
 @pytest.mark.asyncio
 async def test_list_issues_by_category(client):
     token = await _login_user(client)
-    resp = await client.get("/api/v1/posture/issues?category=head_neck", headers={"Authorization": f"Bearer {token}"})
+    resp = await client.get(
+        "/api/v1/posture/issues?category=head_neck",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert resp.status_code == 200
     for issue in resp.json():
         assert issue["category"] == "head_neck"
@@ -39,7 +50,9 @@ async def test_list_issues_by_category(client):
 @pytest.mark.asyncio
 async def test_get_issue_detail(client):
     token = await _login_user(client)
-    resp = await client.get("/api/v1/posture/issues/HN-01", headers={"Authorization": f"Bearer {token}"})
+    resp = await client.get(
+        "/api/v1/posture/issues/HN-01", headers={"Authorization": f"Bearer {token}"}
+    )
     assert resp.status_code == 200
     assert resp.json()["name_cn"] == "头部前倾"
 
@@ -76,7 +89,9 @@ async def test_get_history(client):
         json={"issue_id": "HN-01", "test_index": 0, "answer": "negative"},
         headers={"Authorization": f"Bearer {token}"},
     )
-    resp = await client.get("/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"})
+    resp = await client.get(
+        "/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"}
+    )
     assert resp.status_code == 200
     assert len(resp.json()) == 1
 
@@ -84,6 +99,91 @@ async def test_get_history(client):
 @pytest.mark.asyncio
 async def test_get_related(client):
     token = await _login_user(client)
-    resp = await client.get("/api/v1/posture/issues/HN-01/related", headers={"Authorization": f"Bearer {token}"})
+    resp = await client.get(
+        "/api/v1/posture/issues/HN-01/related",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert resp.status_code == 200
     assert len(resp.json()) > 0
+
+
+@pytest.mark.asyncio
+async def test_photo_assess_ai_failure_returns_503(client):
+    """When AI service fails, photo assessment returns 503 and saves no record."""
+    token = await _login_user(client)
+    with patch(
+        "app.posture.ai_service.analyze_posture_photo",
+        new_callable=AsyncMock,
+        side_effect=ServiceUnavailable("AI service failed"),
+    ):
+        resp = await client.post(
+            "/api/v1/posture/assess/photo",
+            json={"issue_id": "HN-01", "photo_keys": ["fake-key.jpg"]},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 503
+
+    # Verify no assessment was persisted
+    resp = await client.get(
+        "/api/v1/posture/history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()) == 0
+
+
+@pytest.mark.asyncio
+async def test_photo_assess_need_retake_returns_503_without_saving(client):
+    token = await _login_user(client)
+    with patch(
+        "app.posture.ai_service.analyze_posture_photo",
+        new_callable=AsyncMock,
+        side_effect=ServiceUnavailable("照片质量不足，请重新拍照"),
+    ):
+        resp = await client.post(
+            "/api/v1/posture/assess/photo",
+            json={"issue_id": "HN-01", "photo_keys": ["fake-key.jpg"]},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert resp.status_code == 503
+
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        result = await db.execute(select(PostureAssessment))
+        assert result.scalars().all() == []
+
+
+@pytest.mark.asyncio
+async def test_photo_assess_mild_mapped_to_moderate(client):
+    """AI mild must be mapped to moderate for Flutter, not stored as mild or normal."""
+    token = await _login_user(client)
+    mock_ai_result = {
+        "level": "mild",
+        "confidence": 0.7,
+        "evidence": ["slight forward head position"],
+        "suggestion": "轻度前倾，建议关注",
+        "need_retake": False,
+        "retake_reason": "",
+    }
+    with patch(
+        "app.posture.ai_service.analyze_posture_photo",
+        new_callable=AsyncMock,
+        return_value=mock_ai_result,
+    ):
+        resp = await client.post(
+            "/api/v1/posture/assess/photo",
+            json={"issue_id": "HN-01", "photo_keys": ["fake-key.jpg"]},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        # Flutter sees "moderate", not "mild" or "normal"
+        assert resp.json()["result"] == "moderate"
+
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        result = await db.execute(select(PostureAssessment))
+        assessment = result.scalar_one()
+        assert assessment.result == "moderate"
+        assert assessment.ai_response["level"] == "mild"

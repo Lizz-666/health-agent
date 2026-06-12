@@ -18,12 +18,14 @@ def get_related_issues(issue_id: str) -> List[dict]:
     for rel in issue.get("related_issues", []):
         related = get_issue_by_id(rel["id"])
         if related and rel.get("weight", 0) >= 0.6:
-            result.append({
-                "id": rel["id"],
-                "name_cn": related["name_cn"],
-                "weight": rel["weight"],
-                "relation": rel["relation"],
-            })
+            result.append(
+                {
+                    "id": rel["id"],
+                    "name_cn": related["name_cn"],
+                    "weight": rel["weight"],
+                    "relation": rel["relation"],
+                }
+            )
     result.sort(key=lambda x: x["weight"], reverse=True)
     return result[:3]
 
@@ -32,7 +34,10 @@ def _evaluate_result(issue: dict, answer: str) -> Tuple[str, str]:
     if answer == "negative":
         return "normal", "自测结果为阴性，你该方面的体态目前正常。保持良好习惯即可。"
     elif answer == "positive":
-        return "moderate", "自测结果为阳性，建议进行以下纠正训练。如伴红旗征请及时就医。"
+        return (
+            "moderate",
+            "自测结果为阳性，建议进行以下纠正训练。如伴红旗征请及时就医。",
+        )
     else:
         return "uncertain", "自测结果不确定。建议使用 AI 拍照分析进行更精确的判断。"
 
@@ -66,6 +71,19 @@ async def save_self_assessment(
     }
 
 
+def _map_ai_level_to_db(ai_level: str) -> str:
+    """Map AI analysis level to a DB/Flutter-compatible result.
+
+    Flutter currently recognises normal / moderate / severe / uncertain.
+    AI ``mild`` is deterministically promoted to ``moderate`` so that
+    Flutter does not encounter an unknown state.  The original AI level
+    is preserved in the ``ai_response`` JSONB column.
+    """
+    if ai_level == "mild":
+        return "moderate"
+    return ai_level
+
+
 async def save_photo_assessment(
     db: AsyncSession,
     user_id: str,
@@ -73,16 +91,27 @@ async def save_photo_assessment(
     photo_keys: List[str],
     ai_result: dict,
 ) -> dict:
-    ai_level = ai_result.get("level", "normal")
-    if ai_level in ("normal", "mild"):
-        db_result = "normal"
-        suggestion = "AI分析结果为正常/轻微。保持良好的体态习惯即可。"
-    elif ai_level == "moderate":
-        db_result = "moderate"
-        suggestion = ai_result.get("suggestion", "建议进行纠正训练。")
-    else:
-        db_result = "severe"
-        suggestion = ai_result.get("suggestion", "建议尽快咨询专业医师。")
+    # ai_result is already validated by AIAnalysisResult schema in ai_service.
+    # level must be one of: normal, mild, moderate, severe.
+    # Never fall back to "normal" on missing/invalid data.
+    ai_level = ai_result["level"]
+    db_result = _map_ai_level_to_db(ai_level)
+
+    if db_result == "normal":
+        suggestion = (
+            ai_result.get("suggestion", "")
+            or "AI 分析结果为正常，保持良好的体态习惯即可。"
+        )
+    elif db_result == "moderate":
+        suggestion = (
+            ai_result.get("suggestion", "")
+            or "存在需要关注的体态问题，建议进行纠正训练。"
+        )
+    else:  # severe
+        suggestion = (
+            ai_result.get("suggestion", "")
+            or "体态问题较为明显，建议尽快咨询专业医师。"
+        )
 
     assessment = PostureAssessment(
         user_id=UUID(user_id),
@@ -103,7 +132,9 @@ async def save_photo_assessment(
     }
 
 
-async def get_user_history(db: AsyncSession, user_id: str, limit: int = 20, offset: int = 0) -> List[dict]:
+async def get_user_history(
+    db: AsyncSession, user_id: str, limit: int = 20, offset: int = 0
+) -> List[dict]:
     stmt = (
         select(PostureAssessment)
         .where(PostureAssessment.user_id == UUID(user_id))
@@ -116,12 +147,14 @@ async def get_user_history(db: AsyncSession, user_id: str, limit: int = 20, offs
     output = []
     for r in records:
         issue = get_issue_by_id(r.issue_id)
-        output.append({
-            "id": str(r.id),
-            "issue_id": r.issue_id,
-            "issue_name": issue["name_cn"] if issue else r.issue_id,
-            "method": r.method,
-            "result": r.result,
-            "created_at": r.created_at,
-        })
+        output.append(
+            {
+                "id": str(r.id),
+                "issue_id": r.issue_id,
+                "issue_name": issue["name_cn"] if issue else r.issue_id,
+                "method": r.method,
+                "result": r.result,
+                "created_at": r.created_at,
+            }
+        )
     return output
