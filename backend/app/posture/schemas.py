@@ -1,6 +1,27 @@
 from typing import List
-from pydantic import BaseModel
+from enum import Enum
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
+
+
+class PostureLevel(str, Enum):
+    normal = "normal"
+    mild = "mild"
+    moderate = "moderate"
+    severe = "severe"
+
+
+class AIAnalysisResult(BaseModel):
+    """Strict schema for AI model output. Rejects missing or invalid fields."""
+
+    level: PostureLevel
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence: List[str]
+    suggestion: str
+    need_retake: bool
+    retake_reason: str = ""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
 
 
 class SelfAssessRequest(BaseModel):
