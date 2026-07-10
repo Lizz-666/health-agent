@@ -224,7 +224,7 @@ python -m pytest tests -q
 
 ### Task 5: 补齐体态 API response schema
 
-**Status:** [ ]
+**Status:** [x]
 
 **Files:**
 
