@@ -18,7 +18,7 @@
 
 ## Current Evidence
 
-2026-06-12 本机验证结果：
+2026-06-12 初始验证结果：
 
 - Python `3.9.13`
 - Flutter `3.44.0`
@@ -30,14 +30,37 @@
 - Android SDK `36.1.0` 已发现，存在 `Pixel_6` 模拟器
 - Android command-line tools 缺失，license 状态未知，当前无 Android 设备连接
 
-当前已确认的基线缺口：
+2026-07-10 Task 1-5 完成、Task 6 文档整理后验证结果：
 
-- Flutter API 地址硬编码为 Android 模拟器地址
-- 体态路由缺少明确的 response model
-- pytest 和 Pydantic 存在弃用警告
-- 真实照片路径没有开发期隐私门
-- AI JSON 解析失败会降级为 `normal`
-- 旧计划和旧状态文档没有统一标记为历史资料
+- Python `3.9.13`
+- Flutter `3.44.0`
+- Dart `3.12.0`
+- Java `21.0.10`
+- 后端测试：`69 passed`（含 OpenAPI 契约、照片门禁、AI 校验、响应形状）
+- Flutter analyze：`No issues found`
+- Flutter 测试：`7 passed`（含配置、照片门禁组件、widget）
+- Android SDK `36.1.0`，Emulator `36.6.11.0`
+- Pixel_6 模拟器：可启动（`emulator-5554`，Android 14 API 34）
+- Android toolchain 告警：cmdline-tools 缺失，license 状态未知
+- 当前源码 APK：`flutter build apk --debug` 在验证时限内未完成（Gradle 依赖下载停滞）
+- Android 核心流程验收：**未执行**（未生成当前源码 APK）
+- 后端生产数据库初始化：**无支持方式**（Alembic 已安装但未配置，无 migration）
+
+已修复的基线缺口（Task 1-5）：
+
+- [x] Flutter API 地址硬编码 → 改为 `--dart-define` 可配置
+- [x] 体态路由缺少 response model → 6 路由全部声明 Pydantic response_model
+- [x] pytest 和 Pydantic 弃用警告 → 已消除
+- [x] 真实照片路径无隐私门 → 前后端默认关闭，后端为最终边界
+- [x] AI JSON 解析失败降级为 normal → 全部返回 503，不落库
+- [x] 旧计划和旧状态文档无标记 → 全部加注历史资料标记
+
+未解决的阻塞项：
+
+- `flutter build apk --debug` 在验证时限内未完成，Gradle 依赖下载停滞；未生成当前源码 APK；根因和解决方案待后续任务调查
+- 后端无数据库 schema 初始化方式：Alembic 在依赖中但未配置（无 alembic.ini、无 migrations/），`main.py` 无 `create_all`，新开发者无法在 PostgreSQL 上创建表
+- Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不影响模拟器启动）
+- 退出标准第 1 条（新环境可按命令启动前后端）和第 7 条（Android 冒烟）未满足
 
 ## Users And Scenarios
 

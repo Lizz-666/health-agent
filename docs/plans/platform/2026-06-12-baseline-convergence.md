@@ -263,7 +263,7 @@ python -m pytest tests -q
 
 ### Task 6: 整理当前文档并完成阶段 0 验收
 
-**Status:** [ ]
+**Status:** [ ] — 文档整理完成；APK 构建未完成（Gradle 依赖下载停滞）、后端无 DB schema 初始化方式，验收未通过，roadmap 未标记完成
 
 **Files:**
 

@@ -1,3 +1,6 @@
+> **⚠️ 历史资料** — 本文档记录早期开发过程，不代表当前完成状态或当前架构决策。
+> 当前规格和计划见 [docs/README.md](../README.md)。
+
 # UI Redesign Spec — Light Gray Glassmorphism
 
 ## 1. 概述
