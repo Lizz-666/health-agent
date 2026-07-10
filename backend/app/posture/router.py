@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,13 +7,21 @@ from app.core.dependencies import get_current_user
 from app.core.exceptions import NotFound, BadRequest
 from app.core.photo_gate import require_photo_analysis
 from app.posture import service
-from app.posture.schemas import SelfAssessRequest, PhotoAssessRequest
+from app.posture.schemas import (
+    SelfAssessRequest,
+    PhotoAssessRequest,
+    IssueSummary,
+    IssueDetail,
+    RelatedIssue,
+    SelfAssessResponse,
+    AssessmentRecord,
+)
 from app.posture.knowledge import get_issue_by_id
 
 router = APIRouter(prefix="/api/v1/posture", tags=["posture"])
 
 
-@router.get("/issues")
+@router.get("/issues", response_model=List[IssueSummary])
 async def list_issues(category: Optional[str] = Query(None)):
     issues = service.get_all_issues_list(category)
     return [
@@ -28,7 +36,7 @@ async def list_issues(category: Optional[str] = Query(None)):
     ]
 
 
-@router.get("/issues/{issue_id}")
+@router.get("/issues/{issue_id}", response_model=IssueDetail)
 async def get_issue_detail(issue_id: str):
     issue = get_issue_by_id(issue_id)
     if issue is None:
@@ -36,12 +44,12 @@ async def get_issue_detail(issue_id: str):
     return issue
 
 
-@router.get("/issues/{issue_id}/related")
+@router.get("/issues/{issue_id}/related", response_model=List[RelatedIssue])
 async def get_related(issue_id: str):
     return service.get_related_issues(issue_id)
 
 
-@router.post("/assess")
+@router.post("/assess", response_model=SelfAssessResponse)
 async def self_assess(
     request: SelfAssessRequest,
     user_id: str = Depends(get_current_user),
@@ -57,7 +65,11 @@ async def self_assess(
     return result
 
 
-@router.post("/assess/photo", dependencies=[Depends(require_photo_analysis)])
+@router.post(
+    "/assess/photo",
+    response_model=SelfAssessResponse,
+    dependencies=[Depends(require_photo_analysis)],
+)
 async def photo_assess(
     request: Request,
     user_id: str = Depends(get_current_user),
@@ -96,7 +108,7 @@ async def photo_assess(
     return result
 
 
-@router.get("/history")
+@router.get("/history", response_model=List[AssessmentRecord])
 async def get_history(
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
