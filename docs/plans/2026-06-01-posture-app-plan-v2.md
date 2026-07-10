@@ -1,3 +1,6 @@
+> **⚠️ 历史资料** — 本文档记录早期开发过程，不代表当前完成状态或当前架构决策。
+> 当前规格和计划见 [docs/README.md](../README.md)。
+
 # 体态分析 Flutter App 实现计划 v2
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
