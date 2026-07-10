@@ -3,6 +3,17 @@
 import pytest
 from unittest.mock import patch
 
+from app.core.config import settings
+
+
+@pytest.fixture(autouse=True)
+def _force_photo_disabled():
+    """Ensure PHOTO_ANALYSIS_ENABLED is False regardless of environment."""
+    original = settings.PHOTO_ANALYSIS_ENABLED
+    settings.PHOTO_ANALYSIS_ENABLED = False
+    yield
+    settings.PHOTO_ANALYSIS_ENABLED = original
+
 
 async def _login_user(client, phone="13800138000"):
     await client.post("/api/v1/auth/send-code", json={"phone": phone})
@@ -48,3 +59,10 @@ async def test_sts_token_does_not_call_generate_sts_credentials_when_disabled(cl
             headers={"Authorization": f"Bearer {token}"},
         )
         mock_gen.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_sts_token_returns_401_when_unauthenticated(client):
+    """Unauthenticated request must return 401, not 503 (auth before gate)."""
+    resp = await client.post("/api/v1/upload/sts-token")
+    assert resp.status_code == 401

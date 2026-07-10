@@ -1,10 +1,11 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
-from app.core.config import settings
 from app.core.dependencies import get_current_user
-from app.core.exceptions import AppException, NotFound, BadRequest
+from app.core.exceptions import NotFound, BadRequest
+from app.core.photo_gate import require_photo_analysis
 from app.posture import service
 from app.posture.schemas import SelfAssessRequest, PhotoAssessRequest
 from app.posture.knowledge import get_issue_by_id
@@ -56,30 +57,41 @@ async def self_assess(
     return result
 
 
-@router.post("/assess/photo")
+@router.post("/assess/photo", dependencies=[Depends(require_photo_analysis)])
 async def photo_assess(
-    request: PhotoAssessRequest,
+    request: Request,
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if not settings.PHOTO_ANALYSIS_ENABLED:
-        raise AppException(
-            503,
-            "照片分析在当前数据模式下未启用",
-            "photo_analysis_disabled",
-        )
+    """Photo assessment endpoint.
+
+    Body is parsed manually (rather than via a Pydantic function parameter) so
+    that the decorator-level auth+gate dependency chain is guaranteed to
+    complete before any body reading occurs.  This prevents invalid JSON from
+    producing a 422 that bypasses the 503 feature-gate response.
+    """
     from app.posture.ai_service import analyze_posture_photo
 
-    issue = get_issue_by_id(request.issue_id)
+    try:
+        body = await request.json()
+    except Exception:
+        raise BadRequest("请求体JSON格式错误")
+
+    try:
+        photo_req = PhotoAssessRequest.model_validate(body)
+    except ValidationError:
+        raise BadRequest("请求参数错误")
+
+    issue = get_issue_by_id(photo_req.issue_id)
     if issue is None:
         raise NotFound("体态问题不存在")
-    if not request.photo_keys:
+    if not photo_req.photo_keys:
         raise BadRequest("请上传至少一张照片")
     ai_result = await analyze_posture_photo(
-        request.issue_id, request.photo_keys, user_id, db
+        photo_req.issue_id, photo_req.photo_keys, user_id, db
     )
     result = await service.save_photo_assessment(
-        db, user_id, request.issue_id, request.photo_keys, ai_result
+        db, user_id, photo_req.issue_id, photo_req.photo_keys, ai_result
     )
     return result
 

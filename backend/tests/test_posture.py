@@ -113,7 +113,17 @@ async def test_get_related(client):
     assert len(resp.json()) > 0
 
 
+# --- Photo analysis gate tests ---
+
+
+@pytest.fixture()
+def _force_photo_disabled(monkeypatch):
+    """Ensure PHOTO_ANALYSIS_ENABLED is False regardless of environment."""
+    monkeypatch.setattr(settings, "PHOTO_ANALYSIS_ENABLED", False)
+
+
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("_force_photo_disabled")
 async def test_photo_assess_returns_503_when_photo_disabled(client):
     token = await _login_user(client)
     resp = await client.post(
@@ -129,6 +139,7 @@ async def test_photo_assess_returns_503_when_photo_disabled(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("_force_photo_disabled")
 async def test_photo_assess_does_not_call_ai_when_disabled(client):
     token = await _login_user(client)
     with patch(
@@ -143,6 +154,7 @@ async def test_photo_assess_does_not_call_ai_when_disabled(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("_force_photo_disabled")
 async def test_photo_assess_does_not_create_assessment_when_disabled(client):
     token = await _login_user(client)
     await client.post(
@@ -156,6 +168,36 @@ async def test_photo_assess_does_not_create_assessment_when_disabled(client):
     )
     assert resp.status_code == 200
     assert len(resp.json()) == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("_force_photo_disabled")
+async def test_photo_assess_returns_401_when_unauthenticated(client):
+    """Unauthenticated request must return 401, not 503 (auth before gate)."""
+    resp = await client.post(
+        "/api/v1/posture/assess/photo",
+        json={"issue_id": "HN-01", "photo_keys": ["test/placeholder.jpg"]},
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("_force_photo_disabled")
+async def test_photo_assess_invalid_json_returns_503_when_disabled(client):
+    """Authenticated + invalid JSON body + disabled -> 503, not 422."""
+    token = await _login_user(client)
+    resp = await client.post(
+        "/api/v1/posture/assess/photo",
+        content=b"not valid json {{{",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+    )
+    assert resp.status_code == 503
+    data = resp.json()
+    assert data["detail"] == "照片分析在当前数据模式下未启用"
+    assert data["code"] == "photo_analysis_disabled"
 
 
 @pytest.mark.asyncio
