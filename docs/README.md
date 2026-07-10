@@ -1,7 +1,7 @@
 # 文档导航
 
 > 日期：2026-07-10
-> 当前阶段：阶段 0 基线收敛（未完成 — PostgreSQL schema 初始化缺失；Android 当前源码验收未完成）
+> 当前阶段：阶段 0 基线收敛（未完成 — Alembic 迁移仅完成离线验证，真实 PostgreSQL 演练待执行；Android 当前源码验收未完成）
 
 ## 当前产品文档
 
@@ -50,7 +50,9 @@
 
 | 验证项 | 结果 |
 | --- | --- |
-| 后端 pytest | 69 passed |
+| 后端 pytest | 81 passed |
+| Alembic 离线 upgrade/downgrade SQL | 通过（PostgreSQL 方言，含 3 表、索引、外键） |
+| 真实 PostgreSQL 迁移演练 | **未执行** — 本机无可丢弃 PostgreSQL |
 | Flutter analyze | No issues found |
 | Flutter test | 7 passed |
 | Pixel_6 模拟器启动 | 成功（emulator-5554, Android 14 API 34） |
@@ -60,7 +62,7 @@
 ## 未解决阻塞项
 
 - **APK 构建未完成**：`flutter build apk --debug` 在验证时限内未完成，Gradle 依赖下载停滞；根因和解决方案待后续任务调查
-- **后端无数据库初始化方式**：Alembic 已在 requirements.txt 但从未执行 `alembic init`，无 migration 文件，`main.py` 无 `create_all`；新开发者无法在 PostgreSQL 上创建 schema（需要后续任务实现）
+- **数据库迁移真实演练待执行**：Alembic 已配置（`alembic.ini` + `env.py` + 初始 migration），离线 SQL 已验证；但真实 PostgreSQL 的 `upgrade head` / `downgrade base` / 再 `upgrade head` 演练尚未执行（本机无可丢弃 PostgreSQL）。演练通过前，数据库初始化 blocker 只降级为“待真实演练”，不完全移除
 - Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不阻塞模拟器启动）
 
 ## 已知限制

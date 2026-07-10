@@ -46,6 +46,19 @@
 - Android 核心流程验收：**未执行**（未生成当前源码 APK）
 - 后端生产数据库初始化：**无支持方式**（Alembic 已安装但未配置，无 migration）
 
+2026-07-10 Task 7（Alembic schema 初始化闭环）验证结果：
+
+- 新增 `backend/alembic.ini`、`backend/alembic/env.py`、`backend/alembic/script.py.mako`
+- 新增初始 migration `0001_initial_schema`，覆盖 users / verification_codes / posture_assessments，含 PostgreSQL UUID、JSONB、主键、外键、唯一索引（users.phone）和索引
+- `alembic.ini` 不含数据库凭据；URL 由 `env.py` 从 `settings.DATABASE_URL` 注入
+- FastAPI 启动不调用 `Base.metadata.create_all`（保持不变）
+- `python -m alembic heads` → 单一 head `0001_initial_schema`
+- `python -m alembic upgrade head --sql` → PostgreSQL 方言 SQL，含 3 表、索引、外键
+- `python -m alembic downgrade head:base --sql` → 反序删除索引与表
+- `python -m pytest tests/test_migrations.py -q` → 12 passed
+- `python -m pytest tests -q` → 81 passed
+- 真实 PostgreSQL upgrade / downgrade / re-upgrade 演练：**未执行**（本机无可丢弃 PostgreSQL，且未安装外部服务）
+
 已修复的基线缺口（Task 1-5）：
 
 - [x] Flutter API 地址硬编码 → 改为 `--dart-define` 可配置
@@ -58,9 +71,9 @@
 未解决的阻塞项：
 
 - `flutter build apk --debug` 在验证时限内未完成，Gradle 依赖下载停滞；未生成当前源码 APK；根因和解决方案待后续任务调查
-- 后端无数据库 schema 初始化方式：Alembic 在依赖中但未配置（无 alembic.ini、无 migrations/），`main.py` 无 `create_all`，新开发者无法在 PostgreSQL 上创建表
+- 数据库 schema 初始化：Alembic 已配置且离线 SQL 已验证，但真实 PostgreSQL 的 upgrade / downgrade / re-upgrade 演练尚未执行；演练通过前该初始化闭环视为“仅离线验证”，blocker 未完全移除
 - Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不影响模拟器启动）
-- 退出标准第 1 条（新环境可按命令启动前后端）和第 7 条（Android 冒烟）未满足
+- 退出标准第 1 条（新环境可按命令启动前后端）依赖真实 PostgreSQL 迁移演练，第 7 条（Android 冒烟）未满足
 
 ## Users And Scenarios
 

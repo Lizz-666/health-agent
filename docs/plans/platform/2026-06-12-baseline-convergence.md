@@ -263,7 +263,7 @@ python -m pytest tests -q
 
 ### Task 6: 整理当前文档并完成阶段 0 验收
 
-**Status:** [ ] — 文档整理完成；APK 构建未完成（Gradle 依赖下载停滞）、后端无 DB schema 初始化方式，验收未通过，roadmap 未标记完成
+**Status:** [ ] — 文档整理完成；APK 构建未完成（Gradle 依赖下载停滞）；DB schema 初始化闭环见 Task 7（离线已验证、真实 PostgreSQL 演练待执行）；验收未通过，roadmap 未标记完成
 
 **Files:**
 
@@ -332,6 +332,62 @@ Android 手工流程：
 - 未解决项被列为限制，而不是被标记为完成。
 
 **Suggested commit:** `docs: close phase zero baseline convergence`
+
+### Task 7: 建立 PostgreSQL Alembic schema 初始化闭环
+
+**Status:** [partial] — 离线 migration 验证完成；真实 PostgreSQL upgrade/downgrade/re-upgrade 演练未执行（本机无可丢弃 PostgreSQL），DB 初始化 blocker 未完全移除，roadmap 保持未完成
+
+**Files:**
+
+- Create: `backend/alembic.ini`
+- Create: `backend/alembic/env.py`
+- Create: `backend/alembic/script.py.mako`
+- Create: `backend/alembic/versions/0001_initial_schema.py`
+- Create: `backend/tests/test_migrations.py`
+- Modify: `README.md`
+- Modify: `docs/README.md`
+- Modify: `docs/specs/platform/2026-06-12-baseline-contract.md`
+- Modify: `docs/plans/platform/2026-06-12-baseline-convergence.md`
+
+**Behavior:**
+
+- 使用 Alembic 作为正式 schema 生命周期工具，禁止 FastAPI 启动时 `create_all`。
+- 初始 migration 覆盖 users / verification_codes / posture_assessments，含 PostgreSQL UUID、JSONB、主键、外键、唯一索引（users.phone）、索引、nullable、字段长度和时间默认值；downgrade 反序删除。
+- `env.py` 导入全部模型、支持 online（异步）与 offline 模式、从 `settings.DATABASE_URL` 读取 URL，不打印密码。
+- `alembic.ini` 不含真实凭据。
+- migration 测试通过子进程运行 `alembic ... --sql`，不依赖测试 conftest 的 SQLite monkey patch。
+
+**Tests/Evals:**
+
+```powershell
+cd backend
+python -m alembic heads
+python -m alembic upgrade head --sql
+python -m alembic downgrade head:base --sql
+python -m pytest tests/test_migrations.py -q
+python -m pytest tests -q
+```
+
+真实 PostgreSQL 演练（仅在有可丢弃数据库时执行）：
+
+```powershell
+cd backend
+python -m alembic upgrade head
+python -m alembic current
+python -m alembic check
+python -m alembic downgrade base
+python -m alembic upgrade head
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+**Done when:**
+
+- 单一 head，离线 upgrade/downgrade SQL 可生成且含三表、索引、外键。
+- migration 表集合与 `Base.metadata` 一致。
+- 完整后端测试通过。
+- **移除数据库初始化 blocker 的前提：** 真实 PostgreSQL 上 upgrade → downgrade base → 再 upgrade 全部通过，且 `/health` 与一次合成账号登录成功。未完成前保留 blocker，roadmap 不标记完成。
+
+**Suggested commit:** `feat: add alembic postgresql schema migrations`
 
 ## Claude Code Task Prompt
 
