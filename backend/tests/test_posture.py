@@ -250,9 +250,7 @@ async def test_photo_assess_need_retake_returns_503_without_saving(
 
 
 @pytest.mark.asyncio
-async def test_photo_assess_mild_mapped_to_moderate(
-    client, photo_analysis_enabled
-):
+async def test_photo_assess_mild_mapped_to_moderate(client, photo_analysis_enabled):
     """AI mild must be mapped to moderate for Flutter, not stored as mild or normal."""
     token = await _login_user(client)
     mock_ai_result = {
@@ -284,3 +282,121 @@ async def test_photo_assess_mild_mapped_to_moderate(
         assessment = result.scalar_one()
         assert assessment.result == "moderate"
         assert assessment.ai_response["level"] == "mild"
+
+
+# --- Response shape and serialization tests ---
+
+
+@pytest.mark.asyncio
+async def test_all_issues_serialize_through_detail_model(client):
+    """All 26 knowledge entries must serialize through IssueDetail response model."""
+    token = await _login_user(client)
+    resp = await client.get(
+        "/api/v1/posture/issues", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    issues = resp.json()
+    assert len(issues) == 26
+
+    for issue_summary in issues:
+        detail_resp = await client.get(
+            f"/api/v1/posture/issues/{issue_summary['id']}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert detail_resp.status_code == 200, (
+            f"Issue {issue_summary['id']} failed to serialize"
+        )
+        detail = detail_resp.json()
+        # Verify Flutter-required fields are present
+        assert "id" in detail
+        assert "name_cn" in detail
+        assert "name_en" in detail
+        assert "category" in detail
+        assert "aliases" in detail
+        assert "definition" in detail
+        assert "severity_levels" in detail
+        assert "causes" in detail
+        assert "self_tests" in detail
+        assert "corrections" in detail
+        assert "consequences" in detail
+        assert "red_flags" in detail
+        assert "related_issues" in detail
+
+
+@pytest.mark.asyncio
+async def test_list_response_shape_matches_flutter(client):
+    """List response must have exactly the fields Flutter IssueSummary expects."""
+    token = await _login_user(client)
+    resp = await client.get(
+        "/api/v1/posture/issues", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    for item in resp.json():
+        assert set(item.keys()) == {
+            "id",
+            "name_cn",
+            "category",
+            "aliases",
+            "definition",
+        }
+
+
+@pytest.mark.asyncio
+async def test_detail_self_tests_shape(client):
+    """Self tests in detail response must have Flutter SelfTest fields."""
+    token = await _login_user(client)
+    resp = await client.get(
+        "/api/v1/posture/issues/HN-01",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    detail = resp.json()
+    assert len(detail["self_tests"]) > 0
+    for st in detail["self_tests"]:
+        assert "name" in st
+        assert "steps" in st
+        assert isinstance(st["steps"], list)
+        assert "positive_sign" in st
+        assert "image_key" in st
+        assert "tools_needed" in st
+
+
+@pytest.mark.asyncio
+async def test_history_response_shape(client):
+    """History response must match Flutter AssessmentRecord fields."""
+    token = await _login_user(client)
+    # Create an assessment first
+    await client.post(
+        "/api/v1/posture/assess",
+        json={"issue_id": "HN-01", "test_index": 0, "answer": "positive"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    resp = await client.get(
+        "/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    records = resp.json()
+    assert len(records) >= 1
+    for rec in records:
+        assert set(rec.keys()) == {
+            "id",
+            "issue_id",
+            "issue_name",
+            "method",
+            "result",
+            "created_at",
+        }
+
+
+@pytest.mark.asyncio
+async def test_assess_response_shape(client):
+    """Self-assess response must match Flutter SelfAssessResult fields."""
+    token = await _login_user(client)
+    resp = await client.post(
+        "/api/v1/posture/assess",
+        json={"issue_id": "HN-01", "test_index": 0, "answer": "positive"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert set(data.keys()) == {"id", "issue_id", "result", "suggestion"}
