@@ -1,7 +1,7 @@
 # 文档导航
 
-> 日期：2026-07-10
-> 当前阶段：阶段 0 基线收敛（未完成 — Alembic 迁移仅完成离线验证，真实 PostgreSQL 演练待执行；Android 当前源码验收未完成）
+> 日期：2026-07-11
+> 当前阶段：阶段 0 基线收敛（未完成 — 当前源码 APK 已可构建/安装/启动，但完整业务冒烟依赖真实 PostgreSQL 演练待执行；Alembic 迁移仅完成离线验证）
 
 ## 当前产品文档
 
@@ -46,7 +46,7 @@
 
 ## 当前验证状态
 
-2026-07-10 验证结果：
+2026-07-11 验证结果：
 
 | 验证项 | 结果 |
 | --- | --- |
@@ -56,14 +56,19 @@
 | Flutter analyze | No issues found |
 | Flutter test | 7 passed |
 | Pixel_6 模拟器启动 | 成功（emulator-5554, Android 14 API 34） |
-| 当前源码 APK 构建 | **未完成** — `flutter build apk --debug` 在验证时限内未完成，Gradle 依赖下载停滞 |
-| Android 核心流程验收 | **未执行** — 未生成当前源码 APK |
+| 当前源码 APK 构建 | 成功 — `flutter build apk --debug`，app-debug.apk |
+| 当前源码 APK 安装/启动 | 成功 — `adb install -r` 到 emulator-5554，MainActivity 启动无崩溃，登录页可见 |
+| Android 核心业务流程验收 | **未执行** — 登录→问题→详情→自测→结果→历史依赖真实后端/数据库 |
 
 ## 未解决阻塞项
 
-- **APK 构建未完成**：`flutter build apk --debug` 在验证时限内未完成，Gradle 依赖下载停滞；根因和解决方案待后续任务调查
+- **Android 完整业务冒烟未完成**：当前源码 APK 已成功构建、安装并启动到登录页（无崩溃），但登录→问题→详情→自测→结果→历史流程依赖可连接的真实后端与 PostgreSQL；本机无可丢弃 PostgreSQL，未执行。不得据此判定“Android 核心流程通过”
 - **数据库迁移真实演练待执行**：Alembic 已配置（`alembic.ini` + `env.py` + 初始 migration），离线 SQL 已验证；但真实 PostgreSQL 的 `upgrade head` / `downgrade base` / 再 `upgrade head` 演练尚未执行（本机无可丢弃 PostgreSQL）。演练通过前，数据库初始化 blocker 只降级为“待真实演练”，不完全移除
-- Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不阻塞模拟器启动）
+- Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不阻塞模拟器启动或构建）
+
+### 已解决
+
+- **APK 构建阻塞（原记为“Gradle 依赖下载停滞”）**：根因实为 Windows 未启用 Developer Mode，Flutter 在 Gradle 启动前的插件 symlink 创建阶段报 “Building with plugins requires symlink support” 而中止，Gradle 从未运行。启用 Developer Mode 后 `flutter build apk --debug` 成功（Gradle 完整下载依赖并 assembleDebug）。原“Gradle 依赖下载停滞”描述为误判。
 
 ## 已知限制
 
@@ -80,5 +85,5 @@
 | Dart | 3.12.0 |
 | Java | 21.0.10 |
 | Android SDK | 36.1.0 |
-| 后端测试数 | 69 |
+| 后端测试数 | 81 |
 | Flutter 测试数 | 7 |

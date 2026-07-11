@@ -59,6 +59,16 @@
 - `python -m pytest tests -q` → 81 passed
 - 真实 PostgreSQL upgrade / downgrade / re-upgrade 演练：**未执行**（本机无可丢弃 PostgreSQL，且未安装外部服务）
 
+2026-07-11 Task 8（Android 当前源码 APK 构建阻塞）验证结果：
+
+- 根因：**并非 Gradle 依赖下载停滞**。`flutter build apk --debug -v` 显示构建在 Gradle 启动前中止，报 “Building with plugins requires symlink support / Please enable Developer Mode”。Flutter 在插件 symlink 创建阶段（`flutter_plugins.dart` `_createPlatformPluginSymlinks`）因 Windows 未启用 Developer Mode 而 `throwToolExit`，`assembleDebug` 从未运行。
+- 证据补充：Gradle 9.1.0 发行版已完整缓存（`.ok` 标记存在）；dl.google.com / Maven Central / Gradle Plugin Portal 的 curl HEAD 均可达（含 `--noproxy`）；仓库 Gradle 9.1.0 / AGP 9.0.1 / Kotlin 2.3.20 与 Flutter 3.44.0 模板默认值完全一致（`gradle_utils.dart` `templateDefaultGradleVersion=9.1.0`、`templateAndroidGradlePluginVersion=9.0.1`、`templateKotlinGradlePluginVersion=2.3.20`），非版本不兼容。
+- 处置：启用 Windows Developer Mode（`AllowDevelopmentWithoutDevLicense=1`，通过 UAC 提升，用户批准）。未修改仓库 Android 配置、未硬编码镜像、未写入代理。
+- `flutter build apk --debug` → 成功，Gradle 完整下载依赖并 `assembleDebug`（410.9s），生成 `app/build/app/outputs/flutter-apk/app-debug.apk`。
+- APK：155,855,333 bytes，SHA-256 `b59f29eeea0190c0b51489baf9c4b0335d13bb1b8809b10f4eb4460c0f4dd9b7`，构建时间 2026-07-11 10:03:52 +0800。
+- 安装/启动：`adb install -r` 到 `emulator-5554`（先卸载旧 APK）；`am start com.health.posture_app/.MainActivity` 启动无崩溃；`dumpsys package` `lastUpdateTime=2026-07-11 02:06:37`（本次安装，非 2026-06-10 旧 APK）；截图确认登录页可见（体态分析 / 手机号 / 验证码 / 发送验证 / 登录 / 首次验证将自动注册账号）。
+- 完整业务冒烟（登录→问题→详情→自测→结果→历史）：**未执行**，依赖可连接的真实后端与 PostgreSQL；照片分析保持默认关闭，未传 `PHOTO_ANALYSIS_ENABLED=true`。
+
 已修复的基线缺口（Task 1-5）：
 
 - [x] Flutter API 地址硬编码 → 改为 `--dart-define` 可配置
@@ -70,10 +80,14 @@
 
 未解决的阻塞项：
 
-- `flutter build apk --debug` 在验证时限内未完成，Gradle 依赖下载停滞；未生成当前源码 APK；根因和解决方案待后续任务调查
+- Android 完整业务冒烟未完成：当前源码 APK 已成功构建、安装、启动到登录页（无崩溃），但登录→问题→详情→自测→结果→历史流程依赖可连接的真实后端与 PostgreSQL，本机无可丢弃 PostgreSQL，未执行。不得据此判定“Android 核心流程通过”
 - 数据库 schema 初始化：Alembic 已配置且离线 SQL 已验证，但真实 PostgreSQL 的 upgrade / downgrade / re-upgrade 演练尚未执行；演练通过前该初始化闭环视为“仅离线验证”，blocker 未完全移除
-- Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不影响模拟器启动）
-- 退出标准第 1 条（新环境可按命令启动前后端）依赖真实 PostgreSQL 迁移演练，第 7 条（Android 冒烟）未满足
+- Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不影响模拟器启动或构建）
+- 退出标准第 1 条（新环境可按命令启动前后端）依赖真实 PostgreSQL 迁移演练，第 7 条（Android 冒烟）需完整业务流程真实完成，均未满足
+
+已移除的阻塞项：
+
+- ~~`flutter build apk --debug` 在验证时限内未完成，Gradle 依赖下载停滞~~ → Task 8 定位根因为 Windows 未启用 Developer Mode 导致插件 symlink 创建中止（非 Gradle 下载问题）；启用后当前源码 APK 构建成功并安装启动，该 blocker 移除
 
 ## Users And Scenarios
 

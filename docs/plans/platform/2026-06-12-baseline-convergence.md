@@ -263,7 +263,7 @@ python -m pytest tests -q
 
 ### Task 6: 整理当前文档并完成阶段 0 验收
 
-**Status:** [ ] — 文档整理完成；APK 构建未完成（Gradle 依赖下载停滞）；DB schema 初始化闭环见 Task 7（离线已验证、真实 PostgreSQL 演练待执行）；验收未通过，roadmap 未标记完成
+**Status:** [ ] — 文档整理完成；当前源码 APK 已可构建/安装/启动（见 Task 8），但完整业务冒烟依赖真实 PostgreSQL 未执行；DB schema 初始化闭环见 Task 7（离线已验证、真实 PostgreSQL 演练待执行）；验收未通过，roadmap 未标记完成
 
 **Files:**
 
@@ -388,6 +388,35 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 - **移除数据库初始化 blocker 的前提：** 真实 PostgreSQL 上 upgrade → downgrade base → 再 upgrade 全部通过，且 `/health` 与一次合成账号登录成功。未完成前保留 blocker，roadmap 不标记完成。
 
 **Suggested commit:** `feat: add alembic postgresql schema migrations`
+
+### Task 8: 解决 Android 当前源码 APK 构建阻塞
+
+**Status:** [partial] — 当前源码 APK 已成功构建、安装、启动到登录页（无崩溃）；完整业务冒烟（登录→问题→详情→自测→结果→历史）依赖真实后端/PostgreSQL 未执行，Task 6 与 roadmap 保持未完成
+
+**根因（证据）：**
+
+- 原记录“Gradle 依赖下载停滞”为误判。`flutter build apk --debug -v` 显示构建在 Gradle 启动前中止，报 “Building with plugins requires symlink support / Please enable Developer Mode”。
+- 根因为 Windows 未启用 Developer Mode，Flutter 在插件 symlink 创建阶段 `throwToolExit`，`assembleDebug` 从未运行。
+- 佐证：Gradle 9.1.0 发行版已完整缓存（`.ok`）；dl.google.com / Maven Central / Gradle Plugin Portal 的 curl HEAD 均可达；仓库 Gradle 9.1.0 / AGP 9.0.1 / Kotlin 2.3.20 与 Flutter 3.44.0 模板默认值一致（非版本不兼容）。
+
+**处置：**
+
+- 启用 Windows Developer Mode（`AllowDevelopmentWithoutDevLicense=1`，UAC 提升，用户批准）。
+- 未修改仓库 Android 配置；未硬编码国内镜像；未写入 127.0.0.1/代理端口/凭据；`local.properties` 保持未跟踪。
+
+**验证结果：**
+
+- `flutter build apk --debug` → 成功，Gradle 完整下载依赖并 `assembleDebug`（410.9s）。
+- APK：`app/build/app/outputs/flutter-apk/app-debug.apk`，155,855,333 bytes，SHA-256 `b59f29eeea0190c0b51489baf9c4b0335d13bb1b8809b10f4eb4460c0f4dd9b7`，构建时间 2026-07-11 10:03:52 +0800。
+- `adb install -r` 到 `emulator-5554`（先卸载旧 APK）→ Success；`am start com.health.posture_app/.MainActivity` 无崩溃；`dumpsys package` `lastUpdateTime=2026-07-11 02:06:37`（本次安装）；截图确认登录页可见。
+- `flutter analyze --no-pub` → No issues；`flutter test --no-pub` → 7 passed；`python -m pytest tests -q` → 81 passed。
+
+**Done when（完整验收，尚未满足）：**
+
+- 完整业务流程（登录→问题→详情→自测→结果→历史）在 Android 上对真实后端与 PostgreSQL 真实通过，才可判定“Android 核心流程通过”并推进 Task 6 / roadmap。
+- 照片分析保持默认关闭。
+
+**Suggested commit:** `fix: unblock android apk build via developer mode`
 
 ## Claude Code Task Prompt
 
