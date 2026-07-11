@@ -1,7 +1,7 @@
 # 文档导航
 
 > 日期：2026-07-11
-> 当前阶段：阶段 0 基线收敛（未完成 — 当前源码 APK 已可构建/安装/启动，但完整业务冒烟依赖真实 PostgreSQL 演练待执行；Alembic 迁移仅完成离线验证）
+> 当前阶段：阶段 0 已完成，下一步为阶段 1 规格设计（真实 PostgreSQL 迁移演练、真实后端 API 和 Android 完整业务冒烟全部通过；APK 构建日志无 KGP 兼容性警告）
 
 ## 当前产品文档
 
@@ -52,29 +52,33 @@
 | --- | --- |
 | 后端 pytest | 81 passed |
 | Alembic 离线 upgrade/downgrade SQL | 通过（PostgreSQL 方言，含 3 表、索引、外键） |
-| 真实 PostgreSQL 迁移演练 | **未执行** — 本机无可丢弃 PostgreSQL |
+| 真实 PostgreSQL 迁移演练 | 通过（upgrade/downgrade base/re-upgrade + schema/索引/外键核验） |
 | Flutter analyze | No issues found |
 | Flutter test | 7 passed |
 | Pixel_6 模拟器启动 | 成功（emulator-5554, Android 14 API 34） |
-| 当前源码 APK 构建 | 成功 — `flutter build apk --debug`，app-debug.apk |
-| 当前源码 APK 安装/启动 | 成功 — `adb install -r` 到 emulator-5554，MainActivity 启动无崩溃，登录页可见 |
-| Android 核心业务流程验收 | **未执行** — 登录→问题→详情→自测→结果→历史依赖真实后端/数据库 |
+| 当前源码 APK 构建 | 成功 — `flutter build apk --debug`，app-debug.apk，构建日志无 KGP 兼容性警告 |
+| 真实后端 API 流程 | 通过（health/send-code/verify-login/issues/detail/assess/history，数据真实持久化到 PG） |
+| Android 核心业务流程验收 | 通过（登录→问题列表→详情→图示自测→结果→历史，真实后端 + 真实 PG） |
 
 ## 未解决阻塞项
 
-- **Android 完整业务冒烟未完成**：当前源码 APK 已成功构建、安装并启动到登录页（无崩溃），但登录→问题→详情→自测→结果→历史流程依赖可连接的真实后端与 PostgreSQL；本机无可丢弃 PostgreSQL，未执行。不得据此判定“Android 核心流程通过”
-- **数据库迁移真实演练待执行**：Alembic 已配置（`alembic.ini` + `env.py` + 初始 migration），离线 SQL 已验证；但真实 PostgreSQL 的 `upgrade head` / `downgrade base` / 再 `upgrade head` 演练尚未执行（本机无可丢弃 PostgreSQL）。演练通过前，数据库初始化 blocker 只降级为“待真实演练”，不完全移除
-- Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不阻塞模拟器启动或构建）
+无。阶段 0 验收标准 1-9 全部满足。
 
 ### 已解决
 
-- **APK 构建阻塞（原记为“Gradle 依赖下载停滞”）**：根因实为 Windows 未启用 Developer Mode，Flutter 在 Gradle 启动前的插件 symlink 创建阶段报 “Building with plugins requires symlink support” 而中止，Gradle 从未运行。启用 Developer Mode 后 `flutter build apk --debug` 成功（Gradle 完整下载依赖并 assembleDebug）。原“Gradle 依赖下载停滞”描述为误判。
+- **APK 构建阻塞（原记为“Gradle 依赖下载停滞”）**：根因实为 Windows 未启用 Developer Mode，Flutter 在 Gradle 启动前的插件 symlink 创建阶段报 “Building with plugins requires symlink support” 而中止，Gradle 从未运行。启用 Developer Mode 后 `flutter build apk --debug` 成功。
+- **数据库迁移真实演练**：Task 9 在真实 PostgreSQL（Docker `postgres:16`）上完成 upgrade/downgrade base/re-upgrade 闭环并核验 schema。
+- **Android 完整业务冒烟**：Task 9 在真实后端 + 真实 PG 上完成登录→问题→详情→自测→结果→历史六页流程。
+- **APK 构建 KGP 兼容性警告**：`image_picker_android` 0.8.13+17 会触发 Flutter 的“applies Kotlin Gradle Plugin / Future versions of Flutter will fail to build”警告；通过 `flutter pub upgrade image_picker_android` 升级到 0.8.13+19（仅此一个传递依赖变动），`flutter build apk --debug` 日志中该警告已消失。
 
 ## 已知限制
 
+- Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不阻塞构建或模拟器）
 - 照片分析默认关闭，启用需要先完成隐私门
 - 当前仅支持体态问题浏览、图示自测和评估历史
 - 开发登录依赖后端 DEV_MODE=true 和 SMS 验证码模拟，后端必须使用可连接的数据库运行
+- 详情页首次加载偶现"加载失败"，重试后恢复
+- 历史页登录后首次进入且评估记录为空时不提供下拉刷新入口
 
 ## 运行时版本
 

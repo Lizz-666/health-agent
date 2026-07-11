@@ -263,7 +263,7 @@ python -m pytest tests -q
 
 ### Task 6: 整理当前文档并完成阶段 0 验收
 
-**Status:** [ ] — 文档整理完成；当前源码 APK 已可构建/安装/启动（见 Task 8），但完整业务冒烟依赖真实 PostgreSQL 未执行；DB schema 初始化闭环见 Task 7（离线已验证、真实 PostgreSQL 演练待执行）；验收未通过，roadmap 未标记完成
+**Status:** [x] — 文档整理完成；阶段 0 验收标准 1-9 全部在 Task 9 获得新鲜真实证据（真实 PG 迁移闭环 + 真实后端 API + Android 完整业务冒烟），roadmap 阶段 0 标记完成
 
 **Files:**
 
@@ -335,7 +335,7 @@ Android 手工流程：
 
 ### Task 7: 建立 PostgreSQL Alembic schema 初始化闭环
 
-**Status:** [partial] — 离线 migration 验证完成；真实 PostgreSQL upgrade/downgrade/re-upgrade 演练未执行（本机无可丢弃 PostgreSQL），DB 初始化 blocker 未完全移除，roadmap 保持未完成
+**Status:** [x] — 离线 SQL 验证完成；Task 9 在真实 PostgreSQL 上完成 upgrade/downgrade base/re-upgrade 闭环并核验 schema，DB 初始化 blocker 移除
 
 **Files:**
 
@@ -391,7 +391,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 ### Task 8: 解决 Android 当前源码 APK 构建阻塞
 
-**Status:** [partial] — 当前源码 APK 已成功构建、安装、启动到登录页（无崩溃）；完整业务冒烟（登录→问题→详情→自测→结果→历史）依赖真实后端/PostgreSQL 未执行，Task 6 与 roadmap 保持未完成
+**Status:** [x] — 根因定位为 Windows Developer Mode 未启用；启用后当前源码 APK 构建成功；Task 9 完成完整业务冒烟，APK 构建 blocker 移除
 
 **根因（证据）：**
 
@@ -417,6 +417,51 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 - 照片分析保持默认关闭。
 
 **Suggested commit:** `fix: unblock android apk build via developer mode`
+
+### Task 9: 真实 PostgreSQL 迁移演练 + 后端启动 + Android 核心业务冒烟
+
+**Status:** [x] — 全部通过；阶段 0 验收标准 1-9 满足，roadmap 阶段 0 标记完成
+
+**环境：**
+
+- 临时 PostgreSQL：Docker `postgres:16`，容器 `health-task9-pg`，独立卷 `health-task9-pgdata`，宿主端口 55432，一次性密码仅通过进程环境变量传递，任务后移除。
+- 后端：uvicorn `0.0.0.0:8000`，`DEV_MODE=true`，`PHOTO_ANALYSIS_ENABLED=false`。
+- Android：`emulator-5554`（Pixel_6，Android 14 API 34），当前源码 APK。
+
+**真实迁移闭环：**
+
+- `alembic heads` → 单一 head
+- `alembic upgrade head` → 成功
+- `information_schema` / `pg_catalog` 核验：4 表、3 索引、1 外键、UUID/JSONB 类型、`alembic_version` 正确
+- `alembic downgrade base` → 成功，业务表删除
+- `alembic upgrade head`（再升级）→ 成功，schema 一致
+
+**后端 API 流程：**
+
+- `/health` → 200
+- `/auth/send-code` → 200（验证码入 PG）
+- `/auth/verify-login` → 200（token）
+- `/posture/issues` → 200（26 条）
+- `/posture/issues/HN-01` → 200（13 字段）
+- `/posture/assess` → 200（moderate，入 PG）
+- `/posture/history` → 200（记录可见）
+- PG 行数核验：真实持久化
+
+**Android 业务冒烟：**
+
+- 登录 → 问题列表 → 详情 → 图示自测 → 结果 → 历史，六页全部对真实后端完成；记录持久化到真实 PG。
+
+**Done when（已满足）：**
+
+- 验收标准 1-9 全部满足；Task 6/7/8 标记完成；roadmap 阶段 0 标记完成。
+
+**Review fix（2026-07-11）：**
+
+- `image_picker_android` 0.8.13+17 → 0.8.13+19（`flutter pub upgrade image_picker_android`，仅此一个传递依赖变动；`image_picker` 主依赖保持 1.2.2）。旧版本触发 Flutter KGP 兼容性警告（“applies Kotlin Gradle Plugin / Future versions of Flutter will fail to build”）；升级后 `flutter build apk --debug` 日志中该警告已消失（grep `applies Kotlin Gradle Plugin` / `Future versions of Flutter will fail` / `KGP` 均无匹配）。
+- README 运行时要求补充 PostgreSQL 16；新增 PostgreSQL 准备方式（已有 PG 的建库 SQL 与 Docker `postgres:16` 示例，含明确容器名、命名卷、非默认端口 55432、环境变量密码、清理命令与数据删除风险说明）。
+- 根 README 阶段状态由“阶段 0”改为“阶段 0 已完成，下一步为阶段 1 规格设计”。
+
+**Suggested commit:** `docs: close phase zero with real postgresql and android smoke`
 
 ## Claude Code Task Prompt
 

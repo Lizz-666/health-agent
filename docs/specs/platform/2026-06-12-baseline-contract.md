@@ -80,14 +80,48 @@
 
 未解决的阻塞项：
 
-- Android 完整业务冒烟未完成：当前源码 APK 已成功构建、安装、启动到登录页（无崩溃），但登录→问题→详情→自测→结果→历史流程依赖可连接的真实后端与 PostgreSQL，本机无可丢弃 PostgreSQL，未执行。不得据此判定“Android 核心流程通过”
-- 数据库 schema 初始化：Alembic 已配置且离线 SQL 已验证，但真实 PostgreSQL 的 upgrade / downgrade / re-upgrade 演练尚未执行；演练通过前该初始化闭环视为“仅离线验证”，blocker 未完全移除
-- Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不影响模拟器启动或构建）
-- 退出标准第 1 条（新环境可按命令启动前后端）依赖真实 PostgreSQL 迁移演练，第 7 条（Android 冒烟）需完整业务流程真实完成，均未满足
+无。验收标准 1-9 全部在 2026-07-11 Task 9 中以真实 PostgreSQL、真实后端和 Android 当前源码 APK 获得新鲜证据。
+
+已知限制（非阻塞）：
+
+- Android cmdline-tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不影响构建或模拟器）
+- 详情页首次加载偶现"加载失败"，重试后恢复（客户端首次加载时序问题，非后端问题）
+- 历史页在登录后首次进入且评估记录为空时不提供下拉刷新入口；需重启 App 或切换标签后刷新（客户端 `initState` 仅在 shell 构建时触发一次的时序问题）
+- 照片分析默认关闭，启用需要先完成隐私门
 
 已移除的阻塞项：
 
 - ~~`flutter build apk --debug` 在验证时限内未完成，Gradle 依赖下载停滞~~ → Task 8 定位根因为 Windows 未启用 Developer Mode 导致插件 symlink 创建中止（非 Gradle 下载问题）；启用后当前源码 APK 构建成功并安装启动，该 blocker 移除
+- ~~Android 完整业务冒烟未完成~~ → Task 9 在真实 PostgreSQL + 真实后端上完成完整流程（登录→问题列表→问题详情→图示自测→结果→历史），该 blocker 移除
+- ~~数据库 schema 初始化：Alembic 离线验证，真实 PostgreSQL 演练未执行~~ → Task 9 在真实 PostgreSQL 上完成 upgrade→downgrade base→re-upgrade 闭环并核验 schema/索引/外键，该 blocker 移除
+
+2026-07-11 Task 9（真实 PostgreSQL 迁移演练 + 后端启动 + Android 核心业务冒烟）验证结果：
+
+- 临时 PostgreSQL：Docker `postgres:16` 容器 `health-task9-pg`，独立命名卷 `health-task9-pgdata`，宿主端口 55432，一次性密码仅通过进程环境变量传递；任务结束后容器与卷被移除。
+- 真实迁移闭环（`backend/`，`DATABASE_URL` 指向 55432）：
+  - `alembic heads` → 单一 head `0001_initial_schema`
+  - `alembic upgrade head` → 成功
+  - `information_schema` / `pg_catalog` 核验：`users` / `verification_codes` / `posture_assessments` / `alembic_version` 四表；`ix_users_phone` 唯一索引；`ix_verification_codes_phone`、`ix_posture_assessments_user_id` 非唯一索引；FK `posture_assessments.user_id → users.id`；UUID 与 JSONB 列类型确认；`alembic_version.version_num = 0001_initial_schema`
+  - `alembic downgrade base` → 成功，三张业务表被删除
+  - `alembic upgrade head`（再升级）→ 成功，schema 重新核验一致
+- 真实后端启动（uvicorn 0.0.0.0:8000，`DEV_MODE=true`，`PHOTO_ANALYSIS_ENABLED=false`，真实 PG）：
+  - `GET /health` → 200 `{"status":"ok"}`
+  - `POST /api/v1/auth/send-code` → 200；验证码从 PostgreSQL `verification_codes` 表取出
+  - `POST /api/v1/auth/verify-login` → 200，返回 access/refresh token
+  - `GET /api/v1/posture/issues` → 200，返回 26 条问题
+  - `GET /api/v1/posture/issues/HN-01` → 200，返回完整 13 字段详情
+  - `POST /api/v1/posture/assess` → 200，result=moderate，UUID 记录入库
+  - `GET /api/v1/posture/history` → 200，返回刚才的评估记录
+  - PostgreSQL 行数核验：`users=2`、`posture_assessments=1`、`verification_codes=2`（真实持久化）
+- Android 完整业务冒烟（`emulator-5554`，当前源码 APK SHA-256 `5427f92c332f07aaf21852bc753e9fec7892a0aac7da13e04c5a143aaf72c80a`，`lastUpdateTime=2026-07-11 02:51:45`，真实后端）：
+  - 登录：输入手机号→发送验证→后端写入 PG 验证码→输入验证码→登录成功，新用户入 `users` 表
+  - 问题列表：头颈部区域显示 头部前倾/颈曲变直/斜颈（来自真实 `/posture/issues?category=head_neck`）
+  - 问题详情：头部前倾完整详情（定义、成因、纠正方法、后果、红旗征、开始自测）
+  - 图示自测：靠墙站立测试（阳性征、所需工具）→ 答题页 → 提交"我有这个问题"（`POST /posture/assess` 200）
+  - 结果：需关注、纠正建议、关联问题、安全免责
+  - 历史：评估历史页显示"今天 / 需关注 / 头部前倾 / 自测 / 07:56"（来自真实 `/posture/history`，与 PG 行一致）
+- 自动化测试：`python -m pytest tests -q` → 81 passed；`flutter analyze --no-pub` → No issues；`flutter test --no-pub` → 7 passed
+- 验收标准 1-9 全部满足
 
 ## Users And Scenarios
 
