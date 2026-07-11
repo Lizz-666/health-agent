@@ -106,20 +106,35 @@ health/
 
 ## 已知限制
 
-- Android command-line tools 缺失，license 状态未确认，Android 冒烟未完成
+- 当前源码 APK 已可构建/安装/启动到登录页；完整业务冒烟（登录→问题→详情→自测→结果→历史）依赖真实后端与 PostgreSQL，尚未执行
+- Android command-line tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不阻塞构建或模拟器）
 - 照片分析默认关闭，隐私门和 STS 凭证尚未实现
 - 当前仅有体态问题浏览、图示自测和评估历史功能
 - AI 模型不可用时返回 503，不降级为正常结果
 - Alembic 初始 migration 仅完成离线 SQL 验证；真实 PostgreSQL 的
   upgrade / downgrade / re-upgrade 演练尚未执行（本机无可丢弃 PostgreSQL）
 
+## Windows 构建前置
+
+在 Windows 上首次构建 Android APK 前，必须启用 **开发者模式**（Developer Mode），
+否则 Flutter 在创建插件 symlink 时会中止并提示
+“Building with plugins requires symlink support”，Gradle 不会启动。
+
+```powershell
+start ms-settings:developers   # 打开设置并启用开发者模式
+```
+
+启用后 `flutter build apk --debug` 才能进入 Gradle 构建。
+
 ## 当前测试状态
 
 | 验证项 | 结果 | 日期 |
 | --- | --- | --- |
-| 后端 pytest | 81 passed | 2026-07-10 |
-| Alembic 离线 upgrade/downgrade SQL | 通过 | 2026-07-10 |
+| 后端 pytest | 81 passed | 2026-07-11 |
+| Alembic 离线 upgrade/downgrade SQL | 通过 | 2026-07-11 |
 | 真实 PostgreSQL 迁移演练 | 未执行（无可丢弃 PostgreSQL） | — |
-| Flutter analyze | No issues found | 2026-07-10 |
-| Flutter test | 7 passed | 2026-07-10 |
-| Android 冒烟 | 未执行（环境阻塞） | — |
+| Flutter analyze | No issues found | 2026-07-11 |
+| Flutter test | 7 passed | 2026-07-11 |
+| 当前源码 APK 构建 | 成功（app-debug.apk） | 2026-07-11 |
+| 当前源码 APK 安装/启动 | 成功（emulator-5554，登录页无崩溃） | 2026-07-11 |
+| Android 完整业务冒烟 | 未执行（依赖真实后端/PostgreSQL） | — |
