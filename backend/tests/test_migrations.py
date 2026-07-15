@@ -7,7 +7,7 @@
 
 因此本文件通过 **子进程** 调用 ``python -m alembic ... --sql`` 生成 SQL：
 子进程是全新解释器，不 import 测试 conftest，PostgreSQL 方言类型保持原样。
-在进程内我们只检查子进程输出文本和 ``Base.metadata`` 表名集合，
+在进程内我们只检查子进程输出文本和 ``Base.metadata`` 表名/列属性，
 绝不在被 patch 的进程里渲染 PostgreSQL 类型。
 """
 
@@ -56,13 +56,51 @@ def _offline_downgrade_sql() -> str:
     return proc.stdout
 
 
+# 全部表名（重命名后的 events 表 + 6 个新表 + 平台表）。
+ALL_TABLES = {
+    "users",
+    "verification_codes",
+    "posture_assessment_events",
+    "posture_profile_entries",
+    "posture_user_goals",
+    "posture_safety_signals",
+    "idempotency_records",
+    "posture_purge_tombstones",
+    "purge_operations",
+}
+
+# Phase 1 expand 阶段新增的 6 张表。
+NEW_TABLES = {
+    "posture_profile_entries",
+    "posture_user_goals",
+    "posture_safety_signals",
+    "idempotency_records",
+    "posture_purge_tombstones",
+    "purge_operations",
+}
+
+
+# ---------------------------------------------------------------------------
+# head / 离线渲染基础
+# ---------------------------------------------------------------------------
+
+
 def test_single_head():
-    """Alembic 只有一个 head。"""
+    """Alembic 只有一个 head，且为 0002。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert "0001_initial_schema" in head_lines[0]
+    assert head_lines[0].split()[0] == "0002", head_lines[0]
+
+
+def test_head_chains_to_initial_schema():
+    """0002 直接 revises 0001_initial_schema（链路完整）。"""
+    proc = _run_alembic("history")
+    assert proc.returncode == 0, proc.stderr
+    out = proc.stdout
+    assert "0002" in out
+    assert "0001_initial_schema" in out
 
 
 def test_offline_upgrade_sql_generates():
@@ -77,74 +115,256 @@ def test_offline_downgrade_sql_generates():
     assert sql.strip(), "downgrade SQL is empty"
 
 
-def test_upgrade_sql_contains_tables_indexes_fk():
-    """生成 SQL 包含三张表、关键索引和外键。"""
+# ---------------------------------------------------------------------------
+# 表 / 索引 / 外键（离线 SQL）
+# ---------------------------------------------------------------------------
+
+
+def test_upgrade_sql_contains_all_tables():
+    """upgrade SQL 覆盖所有表（events 由 rename 产生，其余由 CREATE TABLE）。"""
     sql = _offline_upgrade_sql()
 
-    # 三张表
-    assert "CREATE TABLE users" in sql
-    assert "CREATE TABLE verification_codes" in sql
-    assert "CREATE TABLE posture_assessments" in sql
+    # 6 张新表 + users/verification_codes 直接 CREATE TABLE。
+    for table in NEW_TABLES | {"users", "verification_codes"}:
+        assert f"CREATE TABLE {table}" in sql, f"missing CREATE TABLE {table}"
 
-    # 关键索引
-    assert "ix_users_phone" in sql
-    assert "ix_verification_codes_phone" in sql
-    assert "ix_posture_assessments_user_id" in sql
+    # posture_assessment_events 由 posture_assessments 重命名产生。
+    assert "CREATE TABLE posture_assessments" in sql  # 来自 0001
+    assert (
+        "ALTER TABLE posture_assessments RENAME TO posture_assessment_events"
+        in sql
+    ), "missing rename to posture_assessment_events"
 
-    # 外键
-    assert "REFERENCES users" in sql
 
-    # PostgreSQL 专有类型（证明未走 SQLite monkey patch）
+def test_upgrade_sql_contains_indexes_and_fk():
+    """关键索引与外键存在于离线 SQL。"""
+    sql = _offline_upgrade_sql()
+
+    # 平台表索引（不变）。
+    assert "CREATE UNIQUE INDEX ix_users_phone ON users (phone)" in sql
+    assert (
+        "CREATE INDEX ix_verification_codes_phone ON verification_codes (phone)"
+        in sql
+    )
+
+    # 重命名后 events 表的 user_id 索引（新名字）。
+    assert (
+        "CREATE INDEX ix_posture_assessment_events_user_id "
+        "ON posture_assessment_events (user_id)" in sql
+    )
+    assert "CREATE UNIQUE INDEX ix_posture_assessment_events_user_id" not in sql
+
+    # 旧索引名在 0002 中被删除（round-trip 一致性）。
+    assert "DROP INDEX ix_posture_assessments_user_id" in sql
+
+    # 关键外键：events.user_id -> users.id（来自 0001，rename 后保留）。
+    assert "FOREIGN KEY(user_id) REFERENCES users (id)" in sql
+
+    # PostgreSQL 专有类型（证明未走 SQLite monkey patch）。
     assert "UUID" in sql
     assert "JSONB" in sql
 
 
+def test_upgrade_sql_six_new_tables_present():
+    """Phase 1 expand 新增的 6 张表全部存在。"""
+    sql = _offline_upgrade_sql()
+    for table in NEW_TABLES:
+        assert f"CREATE TABLE {table}" in sql, f"missing new table {table}"
+
+
 def test_downgrade_sql_drops_all_tables_reverse_order():
-    """downgrade 反序删除三张表。"""
+    """downgrade 反序删除全部 9 张表，并恢复 rename。"""
     sql = _offline_downgrade_sql()
+
+    # 6 张新表先被删除。
+    for table in NEW_TABLES:
+        assert f"DROP TABLE {table}" in sql, f"missing DROP TABLE {table}"
+
+    # rename 被还原：events -> assessments。
+    assert (
+        "ALTER TABLE posture_assessment_events RENAME TO posture_assessments"
+        in sql
+    ), "missing rename back to posture_assessments"
+
+    # 0001 的 downgrade 删除原始 3 表。
     for table in ("posture_assessments", "verification_codes", "users"):
         assert f"DROP TABLE {table}" in sql, f"missing DROP TABLE {table}"
 
-    # 依赖反序：子表 posture_assessments 必须先于父表 users 删除。
+    # 依赖反序：子表先于父表。
+    # 新表先于 posture_assessments（0002 downgrade 先于 0001 downgrade）。
+    assert sql.index("DROP TABLE posture_profile_entries") < sql.index(
+        "DROP TABLE posture_assessments"
+    )
     assert sql.index("DROP TABLE posture_assessments") < sql.index("DROP TABLE users")
+
+    # 旧索引名在 downgrade 末尾被恢复。
+    assert "CREATE INDEX ix_posture_assessments_user_id" in sql
+
+
+def test_downgrade_drops_new_columns_and_restores_rename():
+    """downgrade 删除 expand 阶段新增列并恢复 rename 与旧索引名。"""
+    sql = _offline_downgrade_sql()
+    for col in ("source", "severity", "lifecycle", "content_version", "ai_model_meta"):
+        assert f"DROP COLUMN {col}" in sql, f"missing DROP COLUMN {col}"
+
+
+# ---------------------------------------------------------------------------
+# metadata 一致性（进程内读取属性，不渲染 PG 类型）
+# ---------------------------------------------------------------------------
 
 
 def test_migration_tables_match_base_metadata():
-    """migration 表集合与 Base.metadata 表集合一致。
-
-    只读取 Base.metadata 的表名集合（不渲染类型），因此即使 conftest 的
-    monkey patch 已生效，也不会污染断言。
-    """
+    """migration 表集合与 Base.metadata 表集合一致。"""
     from app.db.base import Base
     import app.auth.models  # noqa: F401
     import app.posture.models  # noqa: F401
 
     metadata_tables = set(Base.metadata.tables.keys())
-    assert metadata_tables == {
-        "users",
-        "verification_codes",
-        "posture_assessments",
-    }
+    assert metadata_tables == ALL_TABLES
 
-    # migration 覆盖的表集合（从离线 SQL 提取）应等于 metadata 表集合。
     sql = _offline_upgrade_sql()
-    migration_tables = {t for t in metadata_tables if f"CREATE TABLE {t}" in sql}
-    assert migration_tables == metadata_tables
+    # 直接 CREATE TABLE 的表。
+    created = {t for t in metadata_tables if f"CREATE TABLE {t}" in sql}
+    # events 表由 rename 产生。
+    renamed_ok = (
+        "CREATE TABLE posture_assessments" in sql
+        and "ALTER TABLE posture_assessments RENAME TO posture_assessment_events"
+        in sql
+    )
+    assert created | (
+        {"posture_assessment_events"} if renamed_ok else set()
+    ) == metadata_tables
+
+
+def test_assessment_event_columns_nullable_in_metadata():
+    """expand 阶段新增列在 ORM 元数据中均为 nullable；severity 永久 nullable。"""
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+
+    events = Base.metadata.tables["posture_assessment_events"]
+    for col in ("source", "severity", "lifecycle", "content_version", "ai_model_meta"):
+        assert events.c[col].nullable is True, f"{col} must be nullable"
+
+    # 旧列保持原状（NOT NULL 未被收紧/放松）。
+    for col in ("method", "result", "issue_id", "user_id"):
+        assert events.c[col].nullable is False, f"{col} should remain NOT NULL"
+
+
+def test_assessment_event_columns_nullable_in_offline_sql():
+    """新增列在离线 SQL 中不带 NOT NULL。"""
+    sql = _offline_upgrade_sql()
+    # severity 是永久 nullable 的代表；绝不能出现 NOT NULL。
+    assert "severity VARCHAR(20) NOT NULL" not in sql
+    assert "severity VARCHAR(20)" in sql
+    # source 为 VARCHAR(20) 判别列（self_test/ai_photo），ai_model_meta 为 JSONB；均 nullable。
+    assert "ADD COLUMN source VARCHAR(20)" in sql
+    assert "source VARCHAR(20) NOT NULL" not in sql
+    assert "ADD COLUMN ai_model_meta JSONB" in sql
+    assert "ai_model_meta JSONB NOT NULL" not in sql
+
+
+def test_assessment_alias_points_to_renamed_table():
+    """PostureAssessment 别名指向重命名后的 events 模型（service.py 兼容契约）。"""
+    from app.posture.models import (
+        PostureAssessment,
+        PostureAssessmentEvent,
+    )
+
+    assert PostureAssessment is PostureAssessmentEvent
+    assert PostureAssessment.__tablename__ == "posture_assessment_events"
+
+
+# ---------------------------------------------------------------------------
+# purge_operations: user_id nullable + ON DELETE SET NULL
+# ---------------------------------------------------------------------------
+
+
+def test_purge_operations_user_id_nullable_in_metadata():
+    """purge_operations.user_id 必须为 nullable FK。"""
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+
+    purge = Base.metadata.tables["purge_operations"]
+    assert purge.c.user_id.nullable is True, "purge_operations.user_id must be nullable"
+
+
+def test_purge_operations_user_id_on_delete_set_null_in_sql():
+    """purge_operations.user_id 外键带 ON DELETE SET NULL。"""
+    sql = _offline_upgrade_sql()
+    assert (
+        "FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE SET NULL" in sql
+    ), "purge_operations.user_id FK must be ON DELETE SET NULL"
+
+
+# ---------------------------------------------------------------------------
+# tombstone: object_delete_status 仅完成态（CHECK）
+# ---------------------------------------------------------------------------
+
+
+_TOMBSTONE_COMPLETED = (
+    "oss_deleted",
+    "oss_not_applicable",
+    "oss_deleted_or_not_found",
+)
+
+
+def test_tombstone_check_constraint_in_sql():
+    """posture_purge_tombstones 含 CHECK：object_delete_status 仅完成态。"""
+    sql = _offline_upgrade_sql()
+    assert (
+        "ck_posture_purge_tombstones_object_delete_status_completed" in sql
+    ), "missing tombstone CHECK constraint name"
+    for value in _TOMBSTONE_COMPLETED:
+        assert "'{}'".format(value) in sql, f"missing completed value {value} in CHECK"
+
+
+def test_tombstone_check_excludes_pending_failed():
+    """CHECK 不允许 pending/failed 状态。"""
+    sql = _offline_upgrade_sql()
+    # 找到 tombstone 的 CHECK 子句文本。
+    check_marker = "object_delete_status IN ("
+    idx = sql.find(check_marker)
+    assert idx != -1, "tombstone CHECK not found"
+    # 截取 CHECK 子句片段（到下一个右括号）。
+    fragment = sql[idx : sql.find(")", idx) + 1]
+    for forbidden in ("pending", "failed", "oss_failed_retry_pending"):
+        assert forbidden not in fragment, (
+            f"forbidden status '{forbidden}' must not be allowed by tombstone CHECK"
+        )
+
+
+def test_tombstone_has_no_linkable_columns():
+    """tombstone 表不得含 user_id / issue_id / event_id / 健康载荷列。"""
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+
+    tomb = Base.metadata.tables["posture_purge_tombstones"]
+    cols = set(tomb.c.keys())
+    assert cols == {
+        "receipt_id",
+        "deleted_at",
+        "purge_reason",
+        "policy_version",
+        "object_delete_status",
+    }
+    for forbidden in ("user_id", "issue_id", "event_id", "source"):
+        assert forbidden not in cols, f"tombstone must not carry {forbidden}"
+
+
+# ---------------------------------------------------------------------------
+# 其它原有不变性
+# ---------------------------------------------------------------------------
 
 
 def test_offline_sql_independent_of_conftest_sqlite_patch():
-    """migration 文件不依赖测试 conftest 的 SQLite monkey patch。
-
-    子进程未加载 conftest，因此 PostgreSQL 方言类型未被替换。
-    如果曾误用被 patch 的类型，SQLite 分支会输出 CHAR(36) / JSON，
-    而不是 UUID / JSONB。断言这些 SQLite 产物不出现。
-    """
+    """migration 文件不依赖测试 conftest 的 SQLite monkey patch。"""
     sql = _offline_upgrade_sql()
     assert "UUID" in sql
     assert "JSONB" in sql
-    # SQLite patch 的痕迹不应出现在 PostgreSQL 离线 SQL 中。
     assert "CHAR(36)" not in sql
-    # JSONB 存在即证明未降级为 SQLite 的 JSON；确保没有裸 " JSON " 列类型。
     assert " JSON," not in sql and " JSON\n" not in sql
 
 
@@ -158,25 +378,19 @@ def test_env_does_not_leak_password_in_offline_output():
 
 
 def test_url_with_percent_escaped_password_succeeds():
-    """DATABASE_URL 含百分号编码密码 (p%25%40ss) 时 alembic 仍成功且不泄露密码。
-
-    覆盖 ConfigParser 插值问题：``%`` 必须被转义为 ``%%`` 才能写入 Alembic Config。
-    """
+    """DATABASE_URL 含百分号编码密码 (p%25%40ss) 时 alembic 仍成功且不泄露密码。"""
     percent_url = "postgresql+asyncpg://user:p%25%40ss@localhost:5432/posture_app"
     proc = _run_alembic("upgrade", "head", "--sql", database_url=percent_url)
 
-    # 命令必须成功。
     assert proc.returncode == 0, (
         f"alembic upgrade --sql failed with percent-encoded password:\n"
         f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )
 
-    # stdout 和 stderr 都不得包含密码或凭据片段。
     combined = (proc.stdout + "\n" + proc.stderr).lower()
     for secret in ("password", "p%25%40ss", "p@ss", "p%40ss"):
         assert secret.lower() not in combined, f"leaked secret fragment: {secret}"
 
-    # 仍生成有效的 schema SQL。
     assert "CREATE TABLE users" in proc.stdout
 
 
@@ -186,11 +400,7 @@ def test_url_with_percent_escaped_password_succeeds():
 def test_users_phone_unique_index_only():
     """upgrade SQL 对 users.phone 只创建一次唯一索引，且无 UNIQUE (phone) 约束。"""
     sql = _offline_upgrade_sql()
-
-    # 唯一索引恰好出现一次。
     assert sql.count("CREATE UNIQUE INDEX ix_users_phone") == 1
-
-    # 不得出现表级 UNIQUE (phone) 约束。
     assert "UNIQUE (phone)" not in sql
 
 
@@ -205,12 +415,8 @@ def test_orm_users_has_no_unique_constraint():
 
     constraint_types = {type(c) for c in users.constraints}
     assert PrimaryKeyConstraint in constraint_types
-    assert UniqueConstraint not in constraint_types, (
-        "users should not declare a table-level UniqueConstraint; "
-        "phone uniqueness comes from the unique index"
-    )
+    assert UniqueConstraint not in constraint_types
 
-    # 恰好一个索引，名为 ix_users_phone 且 unique=True。
     indexes = list(users.indexes)
     assert len(indexes) == 1
     idx = indexes[0]
@@ -218,25 +424,167 @@ def test_orm_users_has_no_unique_constraint():
     assert idx.unique is True
 
 
-def test_index_names_uniqueness_and_fk():
-    """按三张表比较索引名称、唯一性与关键外键（不只比较表名）。"""
+def test_new_models_unique_constraints():
+    """新表的唯一约束按规格定义。"""
+    from sqlalchemy import UniqueConstraint
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+
+    def uniq_cols(table_name):
+        t = Base.metadata.tables[table_name]
+        return {
+            tuple(c.name for c in uc.columns)
+            for uc in t.constraints
+            if isinstance(uc, UniqueConstraint)
+        }
+
+    assert ("user_id", "issue_id") in uniq_cols("posture_profile_entries")
+    assert ("user_id", "operation", "idempotency_key") in uniq_cols(
+        "idempotency_records"
+    )
+
+
+# --- 索引集合一致性：metadata vs offline SQL（防 SQLite/PG 漂移） ---
+
+
+def test_metadata_indexes_match_offline_sql():
+    """Base.metadata 的索引名 + 唯一约束名集合与 offline upgrade SQL 完全一致。
+
+    migration 用 ``op.create_index`` / ``sa.UniqueConstraint`` 定义权威索引集；
+    models.py 的 ``index=True`` / ``Index(...)`` / ``UniqueConstraint(...)``
+    必须产生完全相同的集合，否则 SQLite ``create_all`` 测试 schema 与真实 PG
+    迁移结果会漂移。仅比较 posture 相关表（不含 users/verification_codes/
+    alembic_version，它们由 0001 定义且已有专门测试覆盖）。
+    """
+    import re
+
+    from sqlalchemy import UniqueConstraint
+
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+
+    posture_tables = {
+        "posture_assessment_events",
+        "posture_profile_entries",
+        "posture_user_goals",
+        "posture_safety_signals",
+        "idempotency_records",
+        "posture_purge_tombstones",
+        "purge_operations",
+    }
+
+    # 1. Base.metadata 中的索引名 + 命名 UNIQUE 约束名。
+    metadata_names = set()
+    for tname in posture_tables:
+        table = Base.metadata.tables[tname]
+        for idx in table.indexes:
+            assert idx.name, f"index on {tname} has no name"
+            metadata_names.add(idx.name)
+        for cons in table.constraints:
+            if isinstance(cons, UniqueConstraint) and cons.name:
+                metadata_names.add(cons.name)
+
+    # 2. offline upgrade SQL 中的 CREATE [UNIQUE] INDEX 名（限定 posture 表）
+    #    + 命名 UNIQUE 约束名（全 SQL 中仅这两张 posture 表声明了命名 UNIQUE）。
     sql = _offline_upgrade_sql()
+    sql_names = set()
+    for m in re.finditer(r"CREATE (?:UNIQUE )?INDEX (\w+) ON (\w+)", sql):
+        if m.group(2) in posture_tables:
+            sql_names.add(m.group(1))
+    for m in re.finditer(r"CONSTRAINT (\w+) UNIQUE \(", sql):
+        sql_names.add(m.group(1))
 
-    # users.phone: 唯一索引。
-    assert "CREATE UNIQUE INDEX ix_users_phone ON users (phone)" in sql
-
-    # verification_codes.phone: 非唯一索引。
-    assert (
-        "CREATE INDEX ix_verification_codes_phone ON verification_codes (phone)" in sql
+    assert metadata_names == sql_names, (
+        "index/unique-constraint drift between Base.metadata and migration SQL:\n"
+        f"  only in metadata: {sorted(metadata_names - sql_names)}\n"
+        f"  only in migration SQL: {sorted(sql_names - metadata_names)}"
     )
-    assert "CREATE UNIQUE INDEX ix_verification_codes_phone" not in sql
 
-    # posture_assessments.user_id: 非唯一索引。
-    assert (
-        "CREATE INDEX ix_posture_assessments_user_id ON posture_assessments (user_id)"
-        in sql
+
+# ---------------------------------------------------------------------------
+# profile backfill projection regression (review blockers fix)
+#
+# Two bugs were fixed in migration 0002's posture_profile_entries backfill:
+#   1. ``COUNT(DISTINCT severity)`` is NULL-blind in PostgreSQL, so a
+#      (null + moderate) pair was misjudged as confirmed/moderate. The fix
+#      counts nulls explicitly via ``FILTER (WHERE severity IS NULL)``.
+#   2. The old query aggregated ALL active history per (user_id, issue_id)
+#      instead of only the LATEST active event PER SOURCE. The fix uses a
+#      ``ROW_NUMBER() OVER (PARTITION BY ...)`` window CTE so same-source
+#      older rows never participate.
+# These tests pin the fixed SQL shape and guard against regression.
+# ---------------------------------------------------------------------------
+
+# Substrings that MUST be present in the fixed upgrade SQL.
+_PROFILE_BACKFILL_PRESENT_NEEDLES = (
+    "ROW_NUMBER()",                       # latest-per-source window function
+    "PARTITION BY",                       # partition by (user, issue, source)
+    "FILTER (WHERE severity IS NULL)",    # explicit null-aware severity count
+    "ranked_events",                      # the window CTE
+    "latest_per_source",                  # the rn = 1 projection
+    "null_cnt",                           # null count consumed by certainty/combined
+)
+
+
+@pytest.mark.parametrize("needle", _PROFILE_BACKFILL_PRESENT_NEEDLES)
+def test_profile_backfill_uses_latest_per_source_and_null_aware(needle):
+    """Fixed backfill: latest-per-source window + null-aware combination."""
+    sql = _offline_upgrade_sql()
+    assert needle in sql, (
+        f"profile backfill regression: expected {needle!r} in upgrade SQL"
     )
-    assert "CREATE UNIQUE INDEX ix_posture_assessments_user_id" not in sql
 
-    # 关键外键：posture_assessments.user_id -> users.id。
-    assert "FOREIGN KEY(user_id) REFERENCES users (id)" in sql
+
+# Substrings that MUST NOT appear (the old broken logic).
+_PROFILE_BACKFILL_ABSENT_SUBSTRINGS = (
+    # Old logic grouped over ALL active history with the legacy alias and
+    # judged certainty by COUNT(DISTINCT severity) alone (NULL-blind).
+    "GROUP BY pae.user_id, pae.issue_id",
+    "WHEN COUNT(DISTINCT pae.severity) = 1 THEN 'confirmed'",
+)
+
+
+@pytest.mark.parametrize("forbidden", _PROFILE_BACKFILL_ABSENT_SUBSTRINGS)
+def test_profile_backfill_broken_logic_is_gone(forbidden):
+    """Old NULL-blind / all-history backfill logic must no longer render."""
+    sql = _offline_upgrade_sql()
+    assert forbidden not in sql, (
+        f"profile backfill regression: forbidden old logic {forbidden!r} "
+        f"is still present in upgrade SQL"
+    )
+
+
+def test_profile_backfill_certainty_references_null_count():
+    """certainty must NOT be decided by COUNT(DISTINCT severity) alone.
+
+    The certainty CASE must reference the null count (null_cnt) or a NULL
+    severity filter, so that a (null + moderate) pair resolves to
+    'provisional' rather than being misjudged as 'confirmed'.
+    """
+    sql = _offline_upgrade_sql()
+    idx = sql.lower().find("as certainty")
+    assert idx != -1, "could not locate 'AS certainty' in upgrade SQL"
+    # Inspect the CASE expression preceding 'AS certainty'.
+    region = sql[max(0, idx - 600):idx]
+    assert ("null_cnt" in region) or ("severity is null" in region.lower()), (
+        "certainty CASE must reference the null count / a NULL severity "
+        "filter, not DISTINCT severity alone"
+    )
+
+
+def test_profile_backfill_conflict_sets_certainty_conflict():
+    """Non-null source disagreement must become certainty='conflict'.
+
+    A prior review fix set has_conflict=true but still left certainty as
+    'provisional' for mild+moderate. Downstream priority/UI logic routes
+    conflict and provisional differently, so the migration must pin both.
+    """
+    sql = _offline_upgrade_sql()
+    idx = sql.lower().find("as certainty")
+    assert idx != -1, "could not locate 'AS certainty' in upgrade SQL"
+    region = sql[max(0, idx - 700):idx]
+
+    assert "g.distinct_non_null >= 2" in region
+    assert "THEN 'conflict'" in region
