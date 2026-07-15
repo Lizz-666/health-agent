@@ -19,7 +19,20 @@
         "steps": ["背靠墙站立", "后脑勺、上背、臀部贴墙", "观察后脑勺是否能自然贴墙"],
         "positive_sign": "后脑勺无法自然贴墙",
         "image_key": "assets/images/tests/hn01_wall_test.png",
-        "tools_needed": "无"
+        "tools_needed": "无",
+        "preparation": "背靠平整墙面站立，脱鞋，双脚距墙约10厘米，臀部和上背自然贴墙。",
+        "correct_posture": "自然收下巴、目视前方，颈深屈肌轻发力，在不仰头代偿的前提下让后脑勺轻贴墙面，耳垂大致对齐肩峰。",
+        "common_errors": ["强行仰头让后脑勺贴墙", "挺胸过度导致腰部反弓"],
+        "stop_conditions": ["出现手臂放射痛、麻木或握力下降", "颈部剧烈疼痛或头晕"],
+        "content_version": "phase1-v1",
+        "source": {
+          "identifier": "10.54393/pbmj.v7i10.1141",
+          "type": "L5",
+          "version": "2024",
+          "reviewed_at": "2026-07-15",
+          "scope": "成人头部前倾体态筛查",
+          "license": "CC-BY-4.0"
+        }
       },
       {
         "name": "侧面拍照法",

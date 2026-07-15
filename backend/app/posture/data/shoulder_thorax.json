@@ -18,7 +18,20 @@
         "steps": ["自然站立放松", "双臂自然下垂", "观察手掌拇指的朝向"],
         "positive_sign": "双手拇指指向大腿内侧甚至后方",
         "image_key": "assets/images/tests/st04_thumb_test.png",
-        "tools_needed": "无"
+        "tools_needed": "无",
+        "preparation": "自然放松站立，双臂垂于体侧，不刻意挺胸或夹背，目视前方。",
+        "correct_posture": "肩胛骨轻收下沉，双手拇指自然指向正前方或略朝外，胸廓保持中立不上挺。",
+        "common_errors": ["测试时刻意挺胸夹背使拇指转向前方", "耸肩或前探头部代偿"],
+        "stop_conditions": ["出现持续肩痛或上举受限", "肩部弹响伴疼痛"],
+        "content_version": "phase1-v1",
+        "source": {
+          "identifier": "10.3390/life10080139",
+          "type": "L4",
+          "version": "2020",
+          "reviewed_at": "2026-07-15",
+          "scope": "成人圆肩体态筛查",
+          "license": "CC-BY-4.0"
+        }
       }
     ],
     "corrections": [
@@ -167,7 +180,20 @@
         "steps": ["背靠墙站立", "后脑勺、上背、臀部贴墙", "观察上背与头部离墙程度"],
         "positive_sign": "上背明显离墙无法贴住",
         "image_key": "assets/images/tests/st08_wall_test.png",
-        "tools_needed": "无"
+        "tools_needed": "无",
+        "preparation": "背靠平整墙面站立，双脚距墙约10厘米，臀部和后脑勺尝试自然贴墙。",
+        "correct_posture": "肩胛骨与臀部贴墙，收下巴使后脑勺轻贴墙面，上背部主动挺展开，不靠仰头代偿。",
+        "common_errors": ["仰头代偿让头部贴墙", "只挺胸而不伸展胸椎"],
+        "stop_conditions": ["青少年僵硬性驼背、伴疼痛或进行性加重", "胸背部持续剧痛需排查结构性病变"],
+        "content_version": "phase1-v1",
+        "source": {
+          "identifier": "10.1007/978-3-030-80356-8_21",
+          "type": "L3",
+          "version": "2022",
+          "reviewed_at": "2026-07-15",
+          "scope": "成人驼背体态筛查",
+          "license": "publisher-restricted"
+        }
       }
     ],
     "corrections": [

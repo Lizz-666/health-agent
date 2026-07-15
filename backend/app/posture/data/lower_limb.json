@@ -206,7 +206,20 @@
         ],
         "positive_sign": "足中部内侧印迹几乎填满",
         "image_key": "assets/images/tests/ll21_wet_foot.png",
-        "tools_needed": "纸+水"
+        "tools_needed": "纸+水",
+        "preparation": "在平坦地面铺一张深色纸或纸板，光脚，脚底沾适量清水后自然踩上承重。",
+        "correct_posture": "双脚均匀承重站立后抬起，观察足印；正常足弓区足印内侧应有明显缺口，足印不过度填满。",
+        "common_errors": ["踩纸时踮脚或抬趾改变足弓", "单脚承重造成足印失真"],
+        "stop_conditions": ["僵硬性扁平足足弓无法恢复", "单侧突发塌陷伴疼痛需就医"],
+        "content_version": "phase1-v1",
+        "source": {
+          "identifier": "10.1016/j.joca.2013.02.356",
+          "type": "L5",
+          "version": "2013",
+          "reviewed_at": "2026-07-15",
+          "scope": "成人扁平足体态筛查",
+          "license": "publisher-restricted"
+        }
       }
     ],
     "corrections": [
