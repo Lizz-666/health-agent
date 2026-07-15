@@ -83,7 +83,20 @@
         "steps": ["贴墙站立", "测量腰后空隙"],
         "positive_sign": "空隙明显大于一掌厚",
         "image_key": "assets/images/tests/ps13_wall_test.png",
-        "tools_needed": "无"
+        "tools_needed": "无",
+        "preparation": "背靠平整墙面站立，双脚自然分开，臀部和上背贴墙，骨盆放松不刻意收腹或翘臀。",
+        "correct_posture": "骨盆处于中立位，腰后空隙约一掌厚（可平插入手掌），腹部轻收，不塌腰翘臀。",
+        "common_errors": ["刻意翘臀或挺腹使腰后空隙人为增大", "收腹过度造成假阴性"],
+        "stop_conditions": ["出现腰部剧烈疼痛或下肢麻木", "腰部无法缓解的持续酸痛"],
+        "content_version": "phase1-v1",
+        "source": {
+          "identifier": "10.22376/ijpbs.2017.8.3.b574-579",
+          "type": "L5",
+          "version": "2017",
+          "reviewed_at": "2026-07-15",
+          "scope": "成人骨盆前倾体态筛查",
+          "license": "publisher-restricted"
+        }
       }
     ],
     "corrections": [

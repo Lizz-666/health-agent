@@ -1,7 +1,8 @@
+import re
 from typing import List, Optional
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field
-from datetime import datetime
+from datetime import date, datetime
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class PostureLevel(str, Enum):
@@ -9,6 +10,91 @@ class PostureLevel(str, Enum):
     mild = "mild"
     moderate = "moderate"
     severe = "severe"
+
+
+class EvidenceLevel(str, Enum):
+    L1 = "L1"
+    L2 = "L2"
+    L3 = "L3"
+    L4 = "L4"
+    L5 = "L5"
+
+
+# --- Structured source provenance ---
+
+_DOI_RE = re.compile(r"^(?:doi:\s*)?10\.\d{4,9}/\S+$", re.IGNORECASE)
+_URL_RE = re.compile(r"^https?://\S+$", re.IGNORECASE)
+_VAGUE_VERSIONS = {"最新版", "新版", "最新", "latest", "latest edition"}
+
+
+def _is_valid_isbn(value: str) -> bool:
+    raw = re.sub(r"^isbn[-:]?\s*", "", value, flags=re.IGNORECASE)
+    core = raw.replace("-", "").replace(" ", "")
+    if len(core) == 10 and re.fullmatch(r"\d{9}[\dXx]", core):
+        return True
+    if len(core) == 13 and core.isdigit() and core.startswith(("978", "979")):
+        return True
+    return False
+
+
+class Source(BaseModel):
+    """结构化来源对象：仅接受可验证的 DOI / ISBN / URL，拒绝裸字符串与模糊书名。"""
+
+    identifier: str = Field(
+        ..., description="可验证来源标识符：DOI、ISBN 或官方指南 URL"
+    )
+    type: EvidenceLevel = Field(
+        ...,
+        description="引用层级（L1 机构指南 / L2 教科书 / L3 综述 / L4 RCT / L5 横断面）",
+    )
+    version: str = Field(
+        ..., description="来源具体版本（版次/年份），不接受‘最新版’等模糊表述"
+    )
+    reviewed_at: date = Field(..., description="内容核验日期")
+    scope: str = Field(..., description="适用范围，如‘成人颈部体态筛查’")
+    license: str = Field(
+        ..., description="内容引用与再分发许可；记录真实许可，不得虚构"
+    )
+
+    @field_validator("identifier")
+    @classmethod
+    def _validate_identifier(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("identifier 不能为空")
+        if not (_DOI_RE.match(v) or _is_valid_isbn(v) or _URL_RE.match(v)):
+            raise ValueError(
+                "identifier 必须是合法的 DOI、ISBN 或 URL，不接受模糊书名字符串"
+            )
+        return v
+
+    @field_validator("version")
+    @classmethod
+    def _validate_version(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("version 不能为空")
+        if v.lower() in _VAGUE_VERSIONS:
+            raise ValueError("version 不得使用模糊表述（如‘最新版’/‘latest’）")
+        return v
+
+    @field_validator("scope")
+    @classmethod
+    def _validate_scope(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("scope 不能为空")
+        return v
+
+    @field_validator("license")
+    @classmethod
+    def _validate_license(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("license 不能为空")
+        if "internal-summary" in v.lower():
+            raise ValueError("license 不得使用虚构许可名称（如 *-internal-summary）")
+        return v
 
 
 # --- Nested structured models for IssueDetail ---
@@ -25,6 +111,47 @@ class SelfTestSchema(BaseModel):
     positive_sign: str
     image_key: str
     tools_needed: str
+    preparation: str = ""
+    correct_posture: str = ""
+    common_errors: List[str] = Field(default_factory=list)
+    stop_conditions: List[str] = Field(default_factory=list)
+    safety_notes: List[str] = Field(default_factory=list)
+    content_version: Optional[str] = None
+    source: Optional[Source] = None
+
+    @model_validator(mode="after")
+    def _enforce_extended_quality_gate(self):
+        # An entry "opts into" the extended content set when ANY of the
+        # extended fields is present/non-empty. Legacy entries (all of these
+        # absent/empty) load with no extra requirements.
+        extended = (
+            bool(self.preparation and self.preparation.strip())
+            or bool(self.correct_posture and self.correct_posture.strip())
+            or len(self.common_errors) > 0
+            or len(self.stop_conditions) > 0
+            or bool(self.content_version and self.content_version.strip())
+            or self.source is not None
+        )
+        if not extended:
+            return self
+        # Extended entries must be complete and source-backed; reject loudly.
+        if not (self.preparation and self.preparation.strip()):
+            raise ValueError(
+                "扩展条目（extended self_test）必须提供 preparation（测试前准备说明）"
+            )
+        if not (self.correct_posture and self.correct_posture.strip()):
+            raise ValueError(
+                "扩展条目（extended self_test）必须提供 correct_posture（正确姿势说明）"
+            )
+        if not any(e and str(e).strip() for e in self.common_errors):
+            raise ValueError("扩展条目 common_errors 必须至少含 1 条非空项")
+        if not any(e and str(e).strip() for e in self.stop_conditions):
+            raise ValueError("扩展条目 stop_conditions 必须至少含 1 条非空项")
+        if not (self.content_version and self.content_version.strip()):
+            raise ValueError("扩展条目必须提供 content_version")
+        if self.source is None:
+            raise ValueError("扩展条目必须提供结构化 source（不接受裸字符串）")
+        return self
 
 
 class Correction(BaseModel):
@@ -44,6 +171,26 @@ class RelatedIssueRef(BaseModel):
     id: str
     weight: float
     relation: str
+
+
+class KnowledgeIssue(BaseModel):
+    """知识库加载校验契约：加载时校验每条问题，含每个自测的结构化 source。"""
+
+    id: str
+    name_cn: str
+    name_en: str
+    category: str
+    aliases: List[str]
+    definition: str
+    severity_levels: List[str]
+    causes: List[Cause]
+    self_tests: List[SelfTestSchema]
+    corrections: List[Correction]
+    consequences: List[Consequence]
+    red_flags: List[str]
+    related_issues: List[RelatedIssueRef]
+
+    model_config = ConfigDict(extra="ignore")
 
 
 # --- Response models ---
