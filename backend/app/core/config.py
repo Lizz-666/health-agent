@@ -30,6 +30,22 @@ class Settings(BaseSettings):
     # 照片分析门禁：默认关闭，需显式启用
     PHOTO_ANALYSIS_ENABLED: bool = False
 
+    # 照片隐私门数据生命周期配置（规格 §13.3/§13.4）
+    # 注意：这些配置项本身不满足隐私门条件，条件需要可验证的实现证据。
+    PHOTO_RETENTION_DAYS: int = 90
+    PHOTO_CONSENT_REQUIRED: bool = True
+
+    # Purge 应用层加密密钥（规格 §6.7）：hex 编码的 32 字节 AES-256 密钥。
+    # 用于加密 purge_operations.encrypted_object_keys（photo_keys）。密钥不入库、
+    # 不入日志。调用 purge 时必须配置；生产环境无默认值，留空则 purge 拒绝执行。
+    PURGE_ENCRYPTION_KEY: str = ""
+
+    # Hardening fix #7: versioned key ring (JSON map: {"v1": "<hex>", "v2": "<hex>"}).
+    # When set, takes precedence over PURGE_ENCRYPTION_KEY for new encryptions.
+    # Decrypt reads key_version from blob header and selects the corresponding key.
+    PURGE_ENCRYPTION_KEYS: str = ""  # JSON string, e.g. '{"v1":"<64hex>","v2":"<64hex>"}'
+    PURGE_ACTIVE_KEY_VERSION: str = "v1"
+
     # 开发管理员账号（仅 DEV_MODE=True 时可用）
     DEV_ADMIN_PHONE: str = ""
     DEV_ADMIN_PASSWORD: str = ""

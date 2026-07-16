@@ -615,6 +615,8 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 
 ## Task 6.5: 安全信号闭环与版本化风险分类
 
+> **状态：实现完成、review 修复中**（非最终完成）。代码（`safety.py` / `risk_rules.py` / 端点）已实现并有测试覆盖；`reclassify_and_resolve` 成功路径暂未启用（需可持久化的 follow-up 结构化事件 + 服务端生成的 `profile_version`）；review 修复仍在进行，验收/合并状态以 `docs/agent/ACTIVE_TASKS.md` 为准。
+
 **目标：** 实现结构化安全信号输入、版本化风险分类、写入入口和资格失效闭环。Phase 1 实现，不推迟。
 
 **非目标：** 不实现签到集成（Phase 2）；不实现完整受限模式策略（Phase 3）；不实现 Agent 对话。
@@ -703,15 +705,16 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 
 - 写入 pain 信号 → 相关问题 certainty→provisional（如有 related_issue_id）
 - 写入 pain 信号 → risk_tier 可能升级
-- 写入 acute_trauma 信号 → risk_tier=red_flag
-- 写入多个信号触发红旗（规则综合判定，非仅 severity_hint）
+- 写入 acute_trauma 信号 → risk_tier=restricted（`RST-acute-trauma`，product-policy，**任意 body_region** 均触发受限；空/肢端区域同样 restricted，见 §12.6。Phase 1 不产生 red_flag）
+- 写入 severe numbness/weakness（head_neck/cervical/upper_back）→ restricted（`RST-severe-neuro`）；**dizziness 不触发** restricted 之外的升级
+- 写入多个信号触发受限（规则综合判定，非仅 severity_hint）
 - 写入信号后旧 suggestion_id 失效（priorities 返回新 ID）
 - 写入信号后 confirm_posture_goals 返回 409 stale_priority
-- 写入红旗信号后 confirm_posture_goals 返回 409 red_flag_blocked
-- 验证 **不使用** severity=severe + 知识库 red_flags 推断红旗
-- **恢复测试**：red_flag 状态下用户点击"已就医" → 维持 red_flag（拒绝自动恢复）
-- **恢复测试**：red_flag 状态下用户提供新结构化信息 → 重新分类 → 信号 resolved → risk_tier 降级
-- **恢复测试**：30 天后 red_flag 不自动恢复（删除时间经过自动恢复语义）
+- 受限（restricted）信号阻止普通自动建议路径（Phase 1 实际阻断 tier；`red_flag_blocked` 路径保留给未来 red_flag，当前不产生）
+- 验证 **不使用** severity=severe + 知识库 red_flags 推断红旗（红旗只能由结构化信号 + 版化规则综合判定）
+- **恢复测试**：restricted 状态下用户点击"已就医" → 维持 restricted（拒绝自动恢复）
+- **恢复测试**：restricted 状态下用户提供新结构化信息 → 重新分类 → 信号 resolved → risk_tier 降级
+- **恢复测试**：30 天后 restricted 不自动恢复（删除时间经过自动恢复语义）
 - 恶意/模糊输入（矛盾信号、空字段、非法枚举）→ 400 拒绝写入
 - idempotency_key 去重
 - risk_version 正确记录
@@ -724,13 +727,13 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 **验收条件：**
 
 - 安全信号写入端点实现且有测试
-- 风险分类版本化（risk_version）
-- 每条红旗规则有结构化来源和真实许可
+- 风险分类版本化（risk_version，当前 `2026-07-16-v4`）
+- Phase 1 无 clinical-source 红旗规则；所有受限规则为 product-policy，每条 product-policy 规则有 policy_id/version/rationale/owner（无虚构 DOI）
 - 新安全信号使旧 suggestion_id 失效（全链路测试）
-- 红旗由安全信号触发（非 severity+red_flags 推断）
-- 红旗阻止目标确认
-- **恢复规则实现**：仅通过新的结构化信息重新分类解除，拒绝时间经过/用户确认/声称已就医自动恢复
-- 安全案例矩阵全部通过（普通/谨慎/受限/红旗/恶意/降级恢复）
+- 红旗不由 severity+知识库 red_flags 推断（仅结构化信号 + 版本化规则）；Phase 1 实际阻断 tier 为 restricted，red_flag tier 保留
+- 受限（restricted）阻止普通自动建议/目标确认路径
+- **恢复规则实现**：仅通过新的结构化信息重新分类解除 restricted/red_flag，拒绝时间经过/用户确认/声称已就医自动恢复
+- 安全案例矩阵全部通过（普通/谨慎/受限/恶意/降级恢复；红旗 tier Phase 1 不产生）
 - report_safety_signal Tool 契约定义（见 Task 7）
 
 **Suggested commit:** `feat: safety signal closed loop with versioned risk classification and recovery rules`
@@ -924,6 +927,8 @@ Flutter 模型对应后端新 API：
 
 ## Task 9: 隐私门实现
 
+> **状态：实现完成、review 修复中**（非最终完成）。隐私门（`privacy_gate.py`，Phase 1 硬拒绝）与 purge 执行流程（`purge.py` 状态机、tombstone、加密 keyring、retry lease）已实现并有测试覆盖；review 修复仍在进行，验收/合并状态以 `docs/agent/ACTIVE_TASKS.md` 为准。
+
 **目标：** 实现照片隐私门的检查点和启用条件验证逻辑。
 
 **非目标：** 不启用照片分析；不实现真实 STS；不实现同意 UX（Phase 1 仅预留检查点）。
@@ -1026,6 +1031,7 @@ PHOTO_CONSENT_REQUIRED=true
 - OSS 删除失败时 purge_operations 进入 failed_oss_retry，encrypted_object_keys 保留（pending/failed 状态保留可关联字段用于重试）
 - 超过最大重试次数时 purge_operations 进入 failed_permanent 并告警（**不写 tombstone**，不对外声明已完全删除）
 - encrypted_object_keys 不进入日志或 tombstone
+- OSS 结果仅持久化聚合完成态，不得把原始对象 key 作为 JSON 字段名或值明文写入 purge_operations
 - purge_operations.encrypted_object_keys 在 OSS 全部确认删除后立即清除（在 DB 删除之前）
 - **completed 后 purge_operations 无可关联字段残留**：completed 后 user_id、target_event_ids、target_signal_ids、encrypted_object_keys 全部为 null 或行已删除（见规格 §6.7.3）
 - **completed 后无 user_id、event_id、signal_id、photo key 残留**（purge_operations 行或 scrub 后）
@@ -1033,6 +1039,8 @@ PHOTO_CONSENT_REQUIRED=true
 - idempotency_records 到期清理（expires_at 后删除，非仅标记）
 - 已 purge 数据的 idempotency result_ref 查询返回 410 Gone
 - 用户删除账号时 idempotency_records 级联删除
+- scoped purge 无符合范围的 ai_photo 事件时返回幂等 no-op，不写 tombstone
+- 初始 `freezing` / `oss_deleting` / `db_deleting` 阶段崩溃后可由 lease worker 恢复；原 worker 仍存活时不得重复删除 OSS
 
 **Flutter 测试：** 无
 
@@ -1192,9 +1200,9 @@ python -m pytest tests -q
   → 验证相关条目 certainty→provisional
   → 验证旧 suggestion_id 失效
   → 验证 confirm 返回 409 stale_priority
-  → 报告红旗信号（acute_trauma）
-  → 验证 risk_tier=red_flag
-  → 验证 confirm 返回 409 red_flag_blocked
+  → 报告 acute_trauma 安全信号
+  → 验证 risk_tier=restricted（product-policy，Phase 1 不自动产生 red_flag）
+  → 验证条目进入 provisional/retest_required，不进入普通候选
   → 删除评估事件
   → 验证原始健康数据已删除（仅保留 tombstone）
   → purge 执行流程验证（photo_keys 保护→OSS 删除验证→立即清除 encrypted_object_keys→DB 删除→completed tombstone→completed 后清理 purge_operations 可关联字段）

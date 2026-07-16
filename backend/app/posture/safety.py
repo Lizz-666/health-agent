@@ -446,12 +446,8 @@ async def record_safety_signal(
     try:
         await acquire_user_transaction_lock(db, user_id)
 
-        try:
-            from app.posture.purge import is_user_write_frozen
-            _write_frozen = await is_user_write_frozen(db, user_id)
-        except ImportError:
-            _write_frozen = False
-        if _write_frozen:
+        from app.posture.purge import is_user_write_frozen
+        if await is_user_write_frozen(db, user_id):
             raise AppException(
                 409,
                 "用户数据正在清除中，写入已冻结，请稍后重试",

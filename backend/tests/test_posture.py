@@ -253,10 +253,20 @@ async def test_photo_assess_need_retake_returns_503_without_saving(
 
 
 @pytest.mark.asyncio
-async def test_photo_assess_mild_mapped_to_moderate(client, photo_analysis_enabled):
-    """AI mild must be mapped to moderate for Flutter, not stored as mild or normal."""
+async def test_photo_assess_mild_mapped_to_moderate(client):
+    """AI mild must be mapped to moderate for Flutter, not stored as mild or normal.
+
+    The HTTP photo-assess path is now privacy-gated (hard-rejected in Phase 1
+    even with PHOTO_ANALYSIS_ENABLED=true), so the mild->moderate mapping is
+    verified at the service layer rather than through the gated endpoint.
+    """
+    from app.core.security import decode_token
+    from tests.conftest import TestSession
+    from app.posture import service
+
     token = await _login_user(client)
-    mock_ai_result = {
+    user_id = decode_token(token)["sub"]
+    ai_result = {
         "level": "mild",
         "confidence": 0.7,
         "evidence": ["slight forward head position"],
@@ -264,27 +274,19 @@ async def test_photo_assess_mild_mapped_to_moderate(client, photo_analysis_enabl
         "need_retake": False,
         "retake_reason": "",
     }
-    with patch(
-        "app.posture.ai_service.analyze_posture_photo",
-        new_callable=AsyncMock,
-        return_value=mock_ai_result,
-    ):
-        resp = await client.post(
-            "/api/v1/posture/assess/photo",
-            json={"issue_id": "HN-01", "photo_keys": ["fake-key.jpg"]},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        assert resp.status_code == 200
-        # Flutter sees "moderate", not "mild" or "normal"
-        assert resp.json()["result"] == "moderate"
-
-    from tests.conftest import TestSession
-
     async with TestSession() as db:
-        result = await db.execute(select(PostureAssessment))
-        assessment = result.scalar_one()
+        result = await service.save_photo_assessment(
+            db, user_id, "HN-01", ["fake-key.jpg"], ai_result
+        )
+        # Flutter sees "moderate", not "mild" or "normal"
+        assert result["result"] == "moderate"
+
+        assessment = (
+            await db.execute(select(PostureAssessment))
+        ).scalar_one()
         assert assessment.result == "moderate"
         assert assessment.ai_response["level"] == "mild"
+
 
 
 # --- Response shape and serialization tests ---

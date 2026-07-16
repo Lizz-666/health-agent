@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.exceptions import NotFound, BadRequest, AppException
-from app.core.photo_gate import require_photo_analysis
+from app.core.privacy_gate import require_photo_privacy
 from app.posture import service
 from app.posture.schemas import (
     SelfAssessRequest,
@@ -71,7 +71,7 @@ async def self_assess(
 @router.post(
     "/assess/photo",
     response_model=SelfAssessResponse,
-    dependencies=[Depends(require_photo_analysis)],
+    dependencies=[Depends(require_photo_privacy)],
 )
 async def photo_assess(
     request: Request,

@@ -345,13 +345,14 @@ purge 不在单次事务中完成，而是通过持久化 `purge_operations` 表
 **状态机：**
 
 ```text
-[创建] ──→ pending ──→ oss_deleting ──→ db_deleting ──→ completed
-                           │                  │
-                           └─失败─→ failed_oss_retry ─→ oss_deleting
-                                              │
-                                              └─失败─→ failed_db_retry ─→ db_deleting
-                                                              │
-                                                     超过 max_attempts ─→ failed_permanent（告警）
+[创建] ──→ freezing ──→ oss_deleting ──→ db_deleting ──→ completed
+             │               │                  │
+             └─租约超时──────┴─→ retrying_oss   └─→ retrying_db
+                             │                  │
+                             └─失败─→ failed_oss_retry
+                                                └─失败─→ failed_db_retry
+                                                             │
+                                                    超过 max_attempts ─→ failed_permanent（告警）
 ```
 
 **执行顺序：**
@@ -382,6 +383,7 @@ purge 不在单次事务中完成，而是通过持久化 `purge_operations` 表
 - 超过最大重试次数：进入 `failed_permanent`，触发告警
 - 不允许"部分清理完成"状态对外可见（用户视角：删除请求已接受；后台保证最终一致）
 - 清理操作幂等（重复执行不报错，已删除对象返回成功）
+- `freezing` / `oss_deleting` / `db_deleting` 也必须携带可恢复租约；进程在初始执行任一阶段崩溃后，worker 可按对应 OSS/DB 阶段恢复，不得永久冻结
 - `failed_permanent` 状态需人工介入
 
 > **关键：** 不得在持久化重试能力建立前删除唯一的对象定位信息。tombstone 只能在相关数据库健康数据已删除、OSS 已删除或确认 404 后标记 completed。不得声称后台仍有待删除对象时"删除已完全完成"。
@@ -623,10 +625,10 @@ idempotency_records 纳入以下场景的清理：
 | `id` | UUID PK | 否 | purge operation ID |
 | `user_id` | UUID FK → users.id | 是 | 发起 purge 的用户。**pending/failed 状态保留**用于重试和人工修复；**completed 后必须置 null 或删除整行**（见 §6.7.3），不得保留可关联字段。FK 为 nullable（ON DELETE SET NULL），确保账号删除时 user 行删除不被 NOT NULL FK 阻塞 |
 | `trigger` | String(30) | 否 | `user_delete` / `retention_expired` / `consent_withdrawn` / `account_deletion` |
-| `status` | String(30) | 否 | `pending` / `oss_deleting` / `db_deleting` / `completed` / `failed_oss_retry` / `failed_db_retry` / `failed_permanent` |
+| `status` | String(30) | 否 | `freezing` / `oss_deleting` / `db_deleting` / `retrying_oss` / `retrying_db` / `completed` / `failed_oss_retry` / `failed_db_retry` / `failed_decrypt` / `failed_permanent` / `cancelled` |
 | `encrypted_object_keys` | BYTEA | 是 | 待删除的 OSS 对象 key（应用层加密，OSS 全部确认删除后 **立即清除此列**，见 §6.7 步骤 4） |
 | `target_event_ids` | JSONB | 是 | 待 purge 的 assessment event IDs。**pending/failed 状态保留**用于重试；**completed 后必须置 null 或随行删除**（见 §6.7.3） |
-| `target_signal_ids` | JSONB | 是 | 待 purge 的 safety signal IDs。同上 completed 后清理规则 |
+| `target_signal_ids` | JSONB | 是 | OSS 前为待 purge 的 safety signal ID 列表；OSS 完成、DB 待重试时可暂存 `{signal_ids, oss_outcome}` 最小 envelope。不得写入对象 key 或健康载荷；completed 后清理 |
 | `attempt_count` | Integer | 否 | 当前重试次数 |
 | `max_attempts` | Integer | 否 | 最大重试次数（默认 OSS:10, DB:5） |
 | `next_retry_at` | DateTime(tz) | 是 | 下次重试时间（指数退避） |
@@ -1126,13 +1128,15 @@ async def report_safety_signal(
 ```json
 {
   "signal_type": "pain|numbness|weakness|dizziness|acute_trauma|other",
-  "body_region": "head_neck|shoulder_thorax|pelvis_spine|lower_limb|compound|null",
+  "body_region": "head_neck|cervical|upper_back|thoracic|lower_back|shoulder_thorax|pelvis_spine|lower_limb|compound|null",
   "related_issue_id": "HN-01|null",
   "severity_hint": "mild|moderate|severe|null",
   "reported_at": "2026-07-11T...",
   "idempotency_key": "client-uuid"
 }
 ```
+
+> `body_region` 枚举值与 `schemas.BodyRegion` 及 `service._VALID_BODY_REGIONS` 完全一致：`head_neck / cervical / upper_back / thoracic / lower_back / shoulder_thorax / pelvis_spine / lower_limb / compound`（外加 `null`）。红旗规则按 region 限定（见 §12.6）。
 
 > `severity_hint` 是用户主观描述，仅作为风险分类输入之一，**不单独**作为医学升级判定依据。红旗判定必须由版本化规则（§12.6）综合多个信号决定。
 
@@ -1143,6 +1147,13 @@ async def report_safety_signal(
 - 每个档案条目携带当前 `risk_tier` 和 `risk_version`
 - 风险分类结果：`normal` / `cautious` / `restricted` / `red_flag`
 - 每条规则必须关联权威来源、版本、reviewed_at 和适用范围（详见 §12.6）
+
+**风险作用域（global-first 算法，统一函数 `compute_profile_risk`）：**
+
+- 写入/重算安全信号时调用统一函数 `compute_profile_risk(db, user_id, issue_id)`（`safety.py`），它 **先做全局分类**（覆盖该用户全部 active 信号）。
+- 若全局分类为 `red_flag` → **短路**：对任意 `issue_id` 都返回该 red_flag（该用户所有 profile entry 的 `risk_tier` 均降为 `red_flag`，global scope）。这保证某 issue 的信号触发的红旗不会被另一个 issue 的局部重投影覆盖。
+- 否则按 issue 作用域分类（仅 `related_issue_id == issue_id` 或 `related_issue_id IS NULL` 的全局信号参与），`cautious`/`restricted`/`normal` 只影响对应 issue 的 profile entry。
+- 这避免了"按写入顺序跨 issue 误升级"。`service._recompute_and_upsert_profile` 与 `safety.record_safety_signal` 均复用此函数，而非各自手写风险叠加。
 
 **安全信号生命周期：**
 
@@ -1225,12 +1236,18 @@ async def report_safety_signal(
 | --- | --- | --- | --- |
 | **普通** | 无安全信号，confirmed 非 normal 评估 | normal | 进入 normal_candidates |
 | **谨慎** | 单个 mild pain 信号，无其他风险 | cautious | 保守参数，仍可生成建议 |
-| **受限** | 多个 moderate 信号或已知慢性病史 | restricted | 阻止普通自动建议，仅教育和体态辅助 |
-| **红旗** | acute_trauma 信号，或 severity_hint=severe 的麻木/无力/眩晕 | red_flag | 阻止优先级和目标确认，引导就医 |
+| **受限** | 多个 moderate 信号、单个 severe 非神经症状、`acute_trauma`（任意 body_region）、或 head_neck/cervical/upper_back 区域 `severity_hint=severe` 的 `numbness`/`weakness`（**不含 dizziness**） | restricted | 阻止普通自动建议，仅教育和体态辅助（product-policy，非临床主张） |
+| **红旗** | Phase 1 **不自动产生** red_flag（无 clinical-source 红旗规则）。`acute_trauma` 与 severe neuro 均为 `restricted`（product-policy）。`red_flag` tier 保留给未来结构化输入。 | （Phase 1 不产生） | 当前不阻断；保留 tier 定义与 startup guard 供未来启用 |
 | **恶意/模糊输入** | 矛盾信号（同一时刻 pain+no_pain）、空字段、非法枚举、超长字符串 | 拒绝写入（400） | 不创建安全信号，返回校验错误 |
 | **降级恢复尝试** | red_flag 状态下用户点击"已就医"按钮 | 维持 red_flag | 拒绝自动恢复，要求结构化重新分类 |
 
 > 恶意/模糊输入案例必须验证服务端校验在写入前拒绝，不产生部分状态。
+
+> **红旗边界（与 §12.6 一致，risk_version `2026-07-16-v4`）：** Phase 1 **没有任何自动临床红旗规则**。原 `RF-acute-trauma` / `RF-severe-neuro` 已降级为 product-policy `restricted`（`RST-acute-trauma` / `RST-severe-neuro`，无 DOI）。
+> - `acute_trauma`（任意 body_region）与 head_neck/cervical/upper_back 区域 severe `numbness`/`weakness` → **restricted**（product-policy），**不**判 red_flag；
+> - `dizziness` 任何严重度 **不**判 red_flag；Phase 1 未建立足以支持该临床推断的结构化输入与来源规则；
+> - `severity_hint` 单独 **不**推断任何红旗（§12.2 红旗推断禁止规则）。
+> `red_flag` tier 的枚举/排序/startup guard 仍保留，但 Phase 1 无规则产生它，预留给未来经核验的结构化输入。`restricted`/`cautious` 的解除仍只能通过新的结构化信息重新分类（§12.2 恢复规则）。
 
 ### 12.6 风险规则来源与许可
 
@@ -1259,6 +1276,45 @@ async def report_safety_signal(
 - 格式校验仅确认标识符结构合法
 - 内容准确性、引用恰当性和许可合规性必须由人工审查
 - 规则上线前必须记录 `reviewed_at` 和审查者标识（个人开发阶段为开发者本人）
+
+**两层来源区分（hardening v3 → v4 更新，risk_version `2026-07-16-v4`）：**
+
+- `clinical-source`：红旗规则由经过验证的临床文献支撑（DOI/ISBN/URL）。**Phase 1 无任何 clinical-source 规则在册** —— startup guard 仍强制"任何 red_flag 规则必须携带 clinical-source provenance"，因此当前没有规则能产生 `red_flag`。原 v3 的 `RF-severe-neuro` / `RF-acute-trauma` 已在 v4 **降级为 product-policy `restricted`**（重命名为 `RST-severe-neuro` / `RST-acute-trauma`，无 DOI），原因：单人结构化自报不足以做临床红旗主张。
+  - 历史背景：`RST-severe-neuro`（原 RF-severe-neuro）仅 numbness/weakness 触发；dizziness 不在此 product-policy 规则输入范围内，body_region 限定 head_neck/cervical/upper_back。
+  - `RST-acute-trauma`（原 RF-acute-trauma）任意 body_region 的 `acute_trauma` 均触发 restricted（空 body_region 亦触发 restricted，不再有"仅脊柱区域"的红旗限定）。
+- `product-policy`：受限规则为保守产品资质门槛，非临床主张。Phase 1 所有受限规则（含原 RF-* 降级项）均为 product-policy。
+
+> **`red_flag` tier 状态：** 枚举、`_TIER_ORDER` 排序与 startup guard 保留，但 Phase 1 无规则产生它。`red_flag` 预留给未来经核验的 clinical-source 结构化输入；在启用前，`restricted`（product-policy）是 acute_trauma / severe neuro 的实际阻断 tier。
+
+**reclassify_and_resolve 成功路径暂停：** 成功路径（将信号标记为 resolved）暂未启用，需要可持久化的 follow-up 结构化事件和服务端生成的 profile_version。验证/拒绝路径保持活跃。
+
+---
+
+### 12.7 Purge 范围与冻结补充
+
+**3 种 purge 作用域：**
+
+1. `account_deletion`：全量级联删除（事件、信号、档案、目标、幂等记录、OSS 对象）
+2. `consent_withdrawn`：仅删除 `source='ai_photo'` 的事件及其 OSS 对象（**按 `source` 字段选取**，而非 photo_keys 是否非空）。Scoped purge 删除事件后对受影响的 `(user_id, issue_id)` 复用共享投影函数重建：先调 `service.project_profile` 从剩余 active 事件重建投影，再叠加 safety-aware 覆盖（`safety.has_active_signals_for_issue`，存在 active 信号时强制 `certainty=provisional`、`combined_severity=null`）。风险 tier 本身在写入/重算路径由统一函数 `compute_profile_risk`（global-first，见 §12.2）推导，而非手写 overlay；若某 issue 已无任何事件，则删除对应 profile entry。
+3. `retention_expired`：同 consent_withdrawn，但仅选取 `created_at < 过期截止日` 的 ai_photo 事件
+
+Scoped purge 若没有任何符合范围的 ai_photo 事件，必须返回幂等 no-op，不写 completed tombstone，也不得改动 self_test 事件或档案。
+
+**Profile FK 解除与重建：** 在删除事件前，将任何引用被删事件的 `latest_photo_event_id` 置为 NULL。删除后从剩余 active 事件重建投影（调用 `project_profile`）。若某 issue 已无任何事件，则删除对应 profile entry。
+
+**冻结释放条件：** 仅 `completed` 和 `cancelled` 状态释放写冻结。`failed_permanent` / `failed_decrypt` 维持冻结（需人工介入）。非终态 purge 存在时，新 `run_purge` 调用返回 409（retry 仅通过 worker claim 路径）。
+
+**AEAD AAD 绑定：** `encrypted_object_keys` 使用 AES-256-GCM 加密，AAD = `operation_id:user_id:trigger:key_version`。错误 AAD 导致解密失败（GCM 性质），确保密文无法在不同操作间移用。
+
+**版本化密钥环（keyring）实际行为：**
+
+- **加密**：始终使用 `PURGE_ACTIVE_KEY_VERSION` 指向的密钥（`PURGE_ENCRYPTION_KEYS` JSON map 中的当前激活版本）；key_version 与密文一同写入 blob header（`kv_len(2B) || key_version || nonce || ciphertext+tag`）。
+- **解密**：从 blob header 读取 `key_version`，从 keyring 中选取对应历史密钥；找不到该版本 → fail closed（`InvalidTag` → `failed_decrypt`，数据保留、不写 tombstone）。这使密钥轮换后旧密文仍可解密。
+- **向后兼容**：当 keyring 为空（未配置 `PURGE_ENCRYPTION_KEYS`）时回退到单密钥模式（`PURGE_ENCRYPTION_KEY`），仅作为兼容路径，新部署应使用版本化 keyring。
+
+**幂等：** 若幂等记录指向已被 purge 的信号，返回 HTTP 410（Gone）。`request_hash`（`safety._hash_request`）覆盖信号身份字段（`signal_type` / `body_region` / `related_issue_id` / `severity_hint`）**以及 `reported_at`**（UTC 归一化的 ISO-8601 字符串；服务端生成时为 `null`），**故意排除** `idempotency_key`（它是查找键，不是请求身份）。因此：相同 `idempotency_key` + 相同身份（含相同 `reported_at`）→ 重放（重新基于当前 active 信号集分类）；相同 `idempotency_key` + **不同** `reported_at`（或其它身份字段）→ 400 `idempotency_key_conflict`。非法 `reported_at`（未来 >5s 或早于一年前）在写入前被 400 拒绝，不静默回退到 `now`。
+
+**Recoverable lease（hardening fix #4）：** 初始执行的 `freezing` / `oss_deleting` / `db_deleting` 与失败重试都设置 `next_retry_at = now + 5min`。Worker claim（`run_due_purge_jobs`）时按持久化状态映射为 `retrying_oss` 或 `retrying_db` 并刷新租约，随后提交释放 SKIP LOCKED 行。恢复执行获取同一用户级 advisory transaction lock，并在锁内刷新状态；若原 worker 仍存活，后继 worker 等待锁并在刷新后返回幂等 no-op，不重复执行 OSS。若 worker 崩溃，lease 到期后可由其他 worker按持久化阶段恢复。
 
 ---
 

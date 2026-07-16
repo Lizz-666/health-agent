@@ -1589,3 +1589,486 @@ def test_body_region_filter_acute_trauma_extremity_is_restricted():
     assert result.risk_tier != "red_flag"
     assert result.risk_tier == "restricted"
     assert result.rule_id == "RST-acute-trauma"
+
+
+# ===========================================================================
+# Fix #6 Regression tests: risk isolation + global signals + scoped purge
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_two_issues_moderate_signals_no_cross_escalation():
+    """Fix #6: Two issues with one moderate signal each — neither escalates the other."""
+    from app.posture import safety
+
+    async with TestSession() as db:
+        from tests.test_privacy_gate import _make_user
+        user_id = await _make_user(db)
+        uid_str = str(user_id)
+        # Two profile entries
+        db.add_all([
+            PostureProfileEntry(
+                user_id=user_id, issue_id="HN-01",
+                combined_severity="moderate", certainty="confirmed",
+                sources={}, has_conflict=False,
+                risk_tier="normal", risk_version=RISK_VERSION,
+            ),
+            PostureProfileEntry(
+                user_id=user_id, issue_id="ST-04",
+                combined_severity="moderate", certainty="confirmed",
+                sources={}, has_conflict=False,
+                risk_tier="normal", risk_version=RISK_VERSION,
+            ),
+        ])
+        await db.commit()
+
+    # Signal for HN-01
+    async with TestSession() as db:
+        await safety.record_safety_signal(
+            db, str(user_id),
+            {"signal_type": "pain", "body_region": "head_neck",
+             "related_issue_id": "HN-01", "severity_hint": "moderate"},
+            idempotency_key="iso-hn-1",
+        )
+    # Signal for ST-04
+    async with TestSession() as db:
+        await safety.record_safety_signal(
+            db, str(user_id),
+            {"signal_type": "pain", "body_region": "upper_back",
+             "related_issue_id": "ST-04", "severity_hint": "moderate"},
+            idempotency_key="iso-st-1",
+        )
+
+    # Check isolation: each issue should be downgraded independently
+    from sqlalchemy import select as sa_select
+    async with TestSession() as db:
+        hn = (await db.execute(
+            sa_select(PostureProfileEntry).where(
+                PostureProfileEntry.user_id == user_id,
+                PostureProfileEntry.issue_id == "HN-01",
+            )
+        )).scalar_one()
+        st = (await db.execute(
+            sa_select(PostureProfileEntry).where(
+                PostureProfileEntry.user_id == user_id,
+                PostureProfileEntry.issue_id == "ST-04",
+            )
+        )).scalar_one()
+        # Both should be downgraded by their own signal but NOT escalated
+        # to restricted by the combination (each issue sees only its own signal)
+        assert hn.certainty == "provisional"
+        assert st.certainty == "provisional"
+
+
+@pytest.mark.asyncio
+async def test_global_signal_affects_new_profile_for_any_issue():
+    """Fix #6: Global cautious signal (no related_issue_id) → new profile provisional/null."""
+    from app.posture import safety, service
+
+    async with TestSession() as db:
+        from tests.test_privacy_gate import _make_user
+        user_id = await _make_user(db)
+        uid_str = str(user_id)
+        await db.commit()
+
+    # Record a global signal (no related_issue_id)
+    async with TestSession() as db:
+        await safety.record_safety_signal(
+            db, uid_str,
+            {"signal_type": "pain", "body_region": "head_neck",
+             "related_issue_id": None, "severity_hint": "mild"},
+            idempotency_key="global-sig-1",
+        )
+
+    # Now save a self-assessment — the profile should get provisional override
+    async with TestSession() as db:
+        result = await service.save_self_assessment(db, uid_str, "HN-01", "positive", 0)
+
+    # Profile should be provisional because of global signal
+    from sqlalchemy import select as sa_select
+    async with TestSession() as db:
+        profile = (await db.execute(
+            sa_select(PostureProfileEntry).where(
+                PostureProfileEntry.user_id == _uuid.UUID(uid_str),
+                PostureProfileEntry.issue_id == "HN-01",
+            )
+        )).scalar_one()
+        assert profile.certainty == "provisional"
+        assert profile.combined_severity is None
+
+
+@pytest.mark.asyncio
+async def test_scoped_purge_maintains_correct_risk_after_photo_deletion():
+    """Fix #6: Scoped purge (consent_withdrawn) deletes photo events →
+    remaining profile maintains correct risk_tier/risk_version/certainty."""
+    from app.posture import purge, safety
+    from app.posture.models import PostureAssessmentEvent
+    from sqlalchemy import select as sa_select
+
+    async with TestSession() as db:
+        from tests.test_privacy_gate import _make_user
+        user_id = await _make_user(db)
+        uid_str = str(user_id)
+        # Create a self-test event (will survive purge)
+        self_evt = PostureAssessmentEvent(
+            user_id=user_id, issue_id="HN-01", method="self_test",
+            result="moderate", source="self_test", severity="moderate",
+            lifecycle="active",
+        )
+        # Create a photo event (will be purged)
+        photo_evt = PostureAssessmentEvent(
+            user_id=user_id, issue_id="HN-01", method="ai_photo",
+            result="moderate", source="ai_photo", severity="moderate",
+            lifecycle="active", photo_keys=["fix6-photo.jpg"],
+        )
+        db.add_all([self_evt, photo_evt])
+        await db.flush()
+        # Profile
+        db.add(PostureProfileEntry(
+            user_id=user_id, issue_id="HN-01",
+            combined_severity="moderate", certainty="confirmed",
+            sources={}, has_conflict=False,
+            risk_tier="cautious", risk_version=RISK_VERSION,
+            latest_photo_event_id=photo_evt.id,
+            latest_self_test_event_id=self_evt.id,
+        ))
+        # Active signal for this issue
+        db.add(PostureSafetySignal(
+            user_id=user_id, signal_type="pain", body_region="head_neck",
+            related_issue_id="HN-01", severity_hint="mild",
+            reported_at=datetime.now(timezone.utc), lifecycle="active",
+            invalidates_until=datetime.now(timezone.utc) + timedelta(days=30),
+        ))
+        await db.commit()
+
+    store = purge.FakeObjectStore()
+    store.add_existing("fix6-photo.jpg")
+    key = "0123456789abcdef" * 4
+
+    async with TestSession() as db:
+        result = await purge.run_purge(
+            db, user_id, store, trigger="consent_withdrawn", encryption_key=key
+        )
+    assert result.status == "completed"
+
+    # Verify profile maintained correct state
+    async with TestSession() as db:
+        profile = (await db.execute(
+            sa_select(PostureProfileEntry).where(
+                PostureProfileEntry.user_id == user_id,
+                PostureProfileEntry.issue_id == "HN-01",
+            )
+        )).scalar_one()
+        # Safety-aware rebuild: signal present → provisional/None
+        assert profile.certainty == "provisional"
+        assert profile.combined_severity is None
+        assert profile.latest_photo_event_id is None
+        # The scoped purge must use the authoritative profile+risk recompute,
+        # not preserve stale values from the pre-purge profile row.
+        assert profile.risk_tier == "cautious"
+        assert profile.risk_version == RISK_VERSION
+
+
+# ===========================================================================
+# P1-4: unified compute_profile_risk — global red_flag survives issue-scoped
+# writes; cautious/restricted never cross-escalate across issues.
+# ===========================================================================
+
+
+def _make_active_signal(user_id, **overrides):
+    """Build an active PostureSafetySignal row for direct DB seeding."""
+    base = dict(
+        user_id=user_id,
+        signal_type="pain",
+        body_region="head_neck",
+        related_issue_id="HN-01",
+        severity_hint="mild",
+        reported_at=datetime.now(timezone.utc),
+        lifecycle="active",
+        invalidates_until=datetime.now(timezone.utc) + timedelta(days=30),
+    )
+    base.update(overrides)
+    return PostureSafetySignal(**base)
+
+
+@pytest.mark.asyncio
+async def test_p14_compute_profile_risk_global_red_flag_short_circuits(monkeypatch):
+    """P1-4: compute_profile_risk returns red_flag for ANY issue when the global
+    classification is red_flag — even an issue that has no own signals.
+
+    Phase 1 ships no auto red_flag rule, so the global red_flag is simulated by
+    monkeypatching risk_rules.classify (the function references it via the
+    module, so the patch is honoured). With the OLD issue-scoped behaviour this
+    would have returned ``normal`` for ST-04 → ST-04 overwritten on re-project.
+    """
+    from app.posture import safety
+    from tests.test_privacy_gate import _make_user
+
+    async with TestSession() as db:
+        user_id = await _make_user(db)
+        uid = str(user_id)
+        db.add(_make_active_signal(user_id, signal_type="acute_trauma",
+                                   related_issue_id="HN-01", severity_hint=None))
+        await db.commit()
+
+    monkeypatch.setattr(risk_rules, "classify", _fake_red_flag_classify)
+
+    async with TestSession() as db:
+        # ST-04 has NO own signal, yet the global red_flag short-circuits.
+        st = await safety.compute_profile_risk(db, uid, "ST-04")
+        assert st.risk_tier == "red_flag"
+        # HN-01 (has its own signal) is also red_flag via the global set.
+        hn = await safety.compute_profile_risk(db, uid, "HN-01")
+        assert hn.risk_tier == "red_flag"
+
+
+@pytest.mark.asyncio
+async def test_p14_compute_profile_risk_issue_scoped_no_cross_escalation():
+    """P1-4: without a global red_flag, compute_profile_risk uses issue-scoped
+    classification — HN-01's restricted signals do NOT escalate ST-04."""
+    from app.posture import safety
+    from tests.test_privacy_gate import _make_user
+
+    async with TestSession() as db:
+        user_id = await _make_user(db)
+        uid = str(user_id)
+        # HN-01: two moderate → restricted (real classify)
+        db.add(_make_active_signal(user_id, signal_type="pain", severity_hint="moderate"))
+        db.add(_make_active_signal(user_id, signal_type="numbness", severity_hint="moderate"))
+        await db.commit()
+
+    async with TestSession() as db:
+        hn = await safety.compute_profile_risk(db, uid, "HN-01")
+        assert hn.risk_tier == "restricted"
+        st = await safety.compute_profile_risk(db, uid, "ST-04")
+        assert st.risk_tier == "normal"  # unaffected by HN-01's signals
+
+
+@pytest.mark.asyncio
+async def test_p14_save_assessment_for_unrelated_issue_preserves_global_red_flag(monkeypatch):
+    """P1-4 (the reported bug): after a red_flag signal on HN-01, saving an
+    assessment for ST-04 must KEEP ST-04 red_flag — the re-project must not
+    overwrite it to normal. Exercises both the CREATE and UPDATE re-project
+    paths through ``service.save_self_assessment``."""
+    from app.posture import safety, service
+    from tests.test_privacy_gate import _make_user
+
+    monkeypatch.setattr(risk_rules, "classify", _fake_red_flag_classify)
+
+    async with TestSession() as db:
+        user_id = await _make_user(db)
+        uid = str(user_id)
+        await db.commit()
+
+    # Record a red_flag signal for HN-01 (simulated via monkeypatched classify).
+    async with TestSession() as db:
+        await safety.record_safety_signal(
+            db, uid,
+            {"signal_type": "acute_trauma", "body_region": "head_neck",
+             "related_issue_id": "HN-01", "severity_hint": None},
+            idempotency_key="p14-rf-hn",
+        )
+
+    # CREATE path: first ST-04 assessment → profile created with red_flag
+    # (compute_profile_risk short-circuits on the global red_flag).
+    async with TestSession() as db:
+        await service.save_self_assessment(db, uid, "ST-04", "positive", 0)
+
+    async with TestSession() as db:
+        st = (await db.execute(
+            select(PostureProfileEntry).where(
+                PostureProfileEntry.user_id == _uuid.UUID(uid),
+                PostureProfileEntry.issue_id == "ST-04",
+            )
+        )).scalar_one()
+        assert st.risk_tier == "red_flag"
+        assert st.certainty == "provisional"
+        assert st.combined_severity is None
+
+    # UPDATE path: a second ST-04 assessment re-projects → must STAY red_flag
+    # (this is exactly the overwrite-to-normal bug P1-4 fixes).
+    async with TestSession() as db:
+        await service.save_self_assessment(db, uid, "ST-04", "negative", 0)
+
+    async with TestSession() as db:
+        st = (await db.execute(
+            select(PostureProfileEntry).where(
+                PostureProfileEntry.user_id == _uuid.UUID(uid),
+                PostureProfileEntry.issue_id == "ST-04",
+            )
+        )).scalar_one()
+        assert st.risk_tier == "red_flag"
+        assert st.certainty == "provisional"
+        assert st.combined_severity is None
+
+
+@pytest.mark.asyncio
+async def test_p14_global_red_flag_forces_provisional_on_unrelated_issue(monkeypatch):
+    """P1-4 step 7: an active global red_flag forces certainty=provisional +
+    combined_severity=null on the unrelated issue's profile during re-project."""
+    from app.posture import safety, service
+    from tests.test_privacy_gate import _make_user
+
+    monkeypatch.setattr(risk_rules, "classify", _fake_red_flag_classify)
+
+    async with TestSession() as db:
+        user_id = await _make_user(db)
+        uid = str(user_id)
+        await db.commit()
+
+    async with TestSession() as db:
+        await safety.record_safety_signal(
+            db, uid,
+            {"signal_type": "acute_trauma", "body_region": "head_neck",
+             "related_issue_id": "HN-01", "severity_hint": None},
+            idempotency_key="p14-prov",
+        )
+
+    async with TestSession() as db:
+        await service.save_self_assessment(db, uid, "ST-04", "positive", 0)
+
+    async with TestSession() as db:
+        st = (await db.execute(
+            select(PostureProfileEntry).where(
+                PostureProfileEntry.user_id == _uuid.UUID(uid),
+                PostureProfileEntry.issue_id == "ST-04",
+            )
+        )).scalar_one()
+        assert st.risk_tier == "red_flag"
+        assert st.certainty == "provisional"
+        assert st.combined_severity is None
+
+
+# ===========================================================================
+# P1-5: strict service-layer input validation (called directly, not via HTTP).
+# ===========================================================================
+
+
+async def _p15_make_user() -> str:
+    from tests.test_privacy_gate import _make_user
+
+    async with TestSession() as db:
+        user_id = await _make_user(db)
+        await db.commit()
+    return str(user_id)
+
+
+async def _p15_count(table):
+    async with TestSession() as db:
+        return len((await db.execute(select(table))).scalars().all())
+
+
+async def _p15_record(uid, signal, key):
+    from app.posture import safety
+
+    async with TestSession() as db:
+        return await safety.record_safety_signal(db, uid, signal, idempotency_key=key)
+
+
+def _p15_signal(**overrides):
+    s = {
+        "signal_type": "pain",
+        "body_region": "head_neck",
+        "related_issue_id": "HN-01",
+        "severity_hint": "mild",
+    }
+    s.update(overrides)
+    return s
+
+
+@pytest.mark.asyncio
+async def test_p15_service_rejects_invalid_body_region():
+    uid = await _p15_make_user()
+    with pytest.raises(AppException) as exc:
+        await _p15_record(uid, _p15_signal(body_region="not-a-region"), "p15-br")
+    assert exc.value.status_code == 400
+    assert await _p15_count(PostureSafetySignal) == 0
+    assert await _p15_count(IdempotencyRecord) == 0
+
+
+@pytest.mark.asyncio
+async def test_p15_service_rejects_invalid_severity_hint():
+    uid = await _p15_make_user()
+    with pytest.raises(AppException) as exc:
+        await _p15_record(uid, _p15_signal(severity_hint="catastrophic"), "p15-sev")
+    assert exc.value.status_code == 400
+    assert await _p15_count(PostureSafetySignal) == 0
+    assert await _p15_count(IdempotencyRecord) == 0
+
+
+@pytest.mark.asyncio
+async def test_p15_service_rejects_invalid_reported_at_string():
+    """Invalid reported_at must be rejected (400), NOT silently replaced."""
+    uid = await _p15_make_user()
+    with pytest.raises(AppException) as exc:
+        await _p15_record(uid, _p15_signal(reported_at="not-a-date"), "p15-baddate")
+    assert exc.value.status_code == 400
+    assert await _p15_count(PostureSafetySignal) == 0
+    assert await _p15_count(IdempotencyRecord) == 0
+
+
+@pytest.mark.asyncio
+async def test_p15_service_rejects_future_reported_at():
+    uid = await _p15_make_user()
+    future = (datetime.now(timezone.utc) + timedelta(days=10)).isoformat()
+    with pytest.raises(AppException) as exc:
+        await _p15_record(uid, _p15_signal(reported_at=future), "p15-future")
+    assert exc.value.status_code == 400
+    assert await _p15_count(PostureSafetySignal) == 0
+    assert await _p15_count(IdempotencyRecord) == 0
+
+
+@pytest.mark.asyncio
+async def test_p15_service_rejects_too_old_reported_at():
+    uid = await _p15_make_user()
+    old = (datetime.now(timezone.utc) - timedelta(days=400)).isoformat()
+    with pytest.raises(AppException) as exc:
+        await _p15_record(uid, _p15_signal(reported_at=old), "p15-old")
+    assert exc.value.status_code == 400
+    assert await _p15_count(PostureSafetySignal) == 0
+    assert await _p15_count(IdempotencyRecord) == 0
+
+
+@pytest.mark.asyncio
+async def test_p15_missing_reported_at_deduplicates_same_key_same_fields():
+    """Missing reported_at → server generates; request_hash uses null → two calls
+    with the same key + same fields are deduplicated (not a conflict)."""
+    uid = await _p15_make_user()
+    signal = _p15_signal()  # no reported_at
+    r1 = await _p15_record(uid, signal, "p15-dedup")
+    r2 = await _p15_record(uid, signal, "p15-dedup")
+    assert r1["signal_id"] == r2["signal_id"]
+    assert r2["status"] == "deduplicated"
+    assert await _p15_count(PostureSafetySignal) == 1
+
+
+@pytest.mark.asyncio
+async def test_p15_same_key_different_reported_at_is_conflict():
+    """reported_at is part of request_hash: same key + different reported_at →
+    different hash → 400 idempotency_key_conflict."""
+    uid = await _p15_make_user()
+    t1 = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    t2 = (datetime.now(timezone.utc) - timedelta(minutes=4)).isoformat()
+    r1 = await _p15_record(uid, _p15_signal(reported_at=t1), "p15-conflict")
+    assert r1["status"] == "recorded"
+    with pytest.raises(AppException) as exc:
+        await _p15_record(uid, _p15_signal(reported_at=t2), "p15-conflict")
+    assert exc.value.status_code == 400
+    assert exc.value.code == "idempotency_key_conflict"
+    # only the first signal exists
+    assert await _p15_count(PostureSafetySignal) == 1
+
+
+@pytest.mark.asyncio
+async def test_p15_provided_reported_at_normalized_and_stored():
+    """A valid provided reported_at is normalised to UTC, persisted, and the
+    signal's invalidates_until is derived from it."""
+    uid = await _p15_make_user()
+    t = (datetime.now(timezone.utc) - timedelta(minutes=3)).isoformat()
+    r = await _p15_record(uid, _p15_signal(reported_at=t), "p15-stored")
+    assert r["status"] == "recorded"
+    async with TestSession() as db:
+        sig = (await db.execute(select(PostureSafetySignal))).scalar_one()
+        assert sig.reported_at is not None
+        # invalidates_until == reported_at + 30d window
+        assert sig.invalidates_until >= sig.reported_at

@@ -349,10 +349,7 @@ async def _assert_not_frozen(db: AsyncSession, user_id: str) -> None:
     §6.7). Hardening fix #4: NO defensive import wrapping — if the purge module
     fails to load or the freeze query fails, the exception propagates (503).
     """
-    try:
-        from app.posture.purge import is_user_write_frozen
-    except ImportError:
-        return
+    from app.posture.purge import is_user_write_frozen
     if await is_user_write_frozen(db, user_id):
         raise AppException(
             409,
