@@ -235,21 +235,16 @@ async def _resolve_risk_overlay(
     Hardening fix #5 / P1-4: the unified global-first / issue-scoped function
     prevents cross-issue escalation while preserving a global red_flag.
     """
-    try:
-        from app.posture import safety
-    except ImportError:
-        safety = None
+    from app.posture import safety
 
-    if safety is not None:
-        signals = await safety.load_active_signals(db, user_id)
-        if signals:
-            # P1-4: use the unified global-first / issue-scoped recompute so a
-            # global red_flag is never overwritten by an issue-scoped re-project.
-            classification = await safety.compute_profile_risk(db, user_id, issue_id)
-            return classification.risk_tier, classification.risk_version
+    signals = await safety.load_active_signals(db, user_id)
+    if signals:
+        # P1-4: use the unified global-first / issue-scoped recompute so a
+        # global red_flag is never overwritten by an issue-scoped re-project.
+        classification = await safety.compute_profile_risk(db, user_id, issue_id)
+        return classification.risk_tier, classification.risk_version
 
-    # No active signals (or safety module unavailable): preserve on UPDATE,
-    # seed the normal baseline on CREATE.
+    # No active signals: preserve on UPDATE, seed the normal baseline on CREATE.
     if existing is not None:
         return existing.risk_tier, existing.risk_version
     return RISK_TIER_NORMAL, RISK_VERSION
@@ -302,12 +297,8 @@ async def _recompute_and_upsert_profile(
     # Active safety signals force certainty=provisional + combined_severity=null
     # for this issue (spec §12.2 / review fix #3).
     # Hardening fix #4: NO defensive except/pass — propagate on failure.
-    try:
-        from app.posture.safety import has_active_signals_for_issue
-        _has_active_signals = await has_active_signals_for_issue(db, user_id, issue_id)
-    except ImportError:
-        _has_active_signals = False
-    if _has_active_signals:
+    from app.posture.safety import has_active_signals_for_issue
+    if await has_active_signals_for_issue(db, user_id, issue_id):
         fields["certainty"] = CERTAINTY_PROVISIONAL
         fields["combined_severity"] = None
 

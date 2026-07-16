@@ -1,7 +1,7 @@
 import re
 from typing import List, Optional
 from enum import Enum
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -274,3 +274,85 @@ class AssessmentRecord(BaseModel):
     method: str
     result: str
     created_at: datetime
+
+
+# --- Safety signal request/response models (Task 6.5, spec §12.2) ---
+
+
+class SignalType(str, Enum):
+    pain = "pain"
+    numbness = "numbness"
+    weakness = "weakness"
+    dizziness = "dizziness"
+    acute_trauma = "acute_trauma"
+    other = "other"
+
+
+class BodyRegion(str, Enum):
+    head_neck = "head_neck"
+    cervical = "cervical"
+    upper_back = "upper_back"
+    thoracic = "thoracic"
+    lower_back = "lower_back"
+    shoulder_thorax = "shoulder_thorax"
+    pelvis_spine = "pelvis_spine"
+    lower_limb = "lower_limb"
+    compound = "compound"
+
+
+class SeverityHint(str, Enum):
+    mild = "mild"
+    moderate = "moderate"
+    severe = "severe"
+
+
+class SafetySignalRequest(BaseModel):
+    # spec §12.2 / §12.5: reject unknown fields and guard DB column lengths /
+    # implausible timestamps before any write (malicious/ambiguous input case).
+    model_config = ConfigDict(extra="forbid")
+
+    signal_type: SignalType  # enum enforces DB String(30) value set
+    body_region: Optional[BodyRegion] = None  # enum enforces DB String(30)
+    related_issue_id: Optional[str] = Field(default=None, max_length=20)
+    severity_hint: Optional[SeverityHint] = None  # enum enforces DB String(20)
+    reported_at: Optional[datetime] = None
+    idempotency_key: str = Field(..., min_length=1, max_length=64)
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def _reject_blank_idempotency_key(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("idempotency_key 不能为空白")
+        return v
+
+    @field_validator("reported_at")
+    @classmethod
+    def _reported_at_must_be_plausible(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is None:
+            return v
+        now = datetime.now(timezone.utc)
+        aware = v if v.tzinfo is not None else v.replace(tzinfo=timezone.utc)
+        # Allow a tiny clock-skew tolerance but reject future timestamps.
+        if aware > now + timedelta(seconds=5):
+            raise ValueError("reported_at 不能晚于当前时间")
+        if aware < now - timedelta(days=365):
+            raise ValueError("reported_at 不能早于一年前")
+        return v
+
+
+class RiskClassificationModel(BaseModel):
+    risk_tier: str
+    risk_version: str
+    rule_id: str
+    reason: str
+    sources: List[dict] = Field(default_factory=list)
+
+
+class SafetySignalResponse(BaseModel):
+    signal_id: str
+    status: str  # "recorded" | "deduplicated"
+    lifecycle: str  # "active" | "resolved"
+    risk_tier: str
+    risk_version: str
+    invalidates_until: datetime
+    classification: RiskClassificationModel
