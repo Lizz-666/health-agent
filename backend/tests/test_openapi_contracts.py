@@ -18,6 +18,8 @@ POSTURE_ROUTES = [
     ("post", "/api/v1/posture/safety-signals"),
     ("get", "/api/v1/posture/profile"),
     ("get", "/api/v1/posture/profile/{issue_id}"),
+    ("get", "/api/v1/posture/priorities"),
+    ("post", "/api/v1/posture/goals/confirm"),
 ]
 
 
@@ -94,6 +96,8 @@ def test_list_routes_have_array_item_schema(method, path, openapi_schema):
         ("post", "/api/v1/posture/safety-signals"),
         ("get", "/api/v1/posture/profile"),
         ("get", "/api/v1/posture/profile/{issue_id}"),
+        ("get", "/api/v1/posture/priorities"),
+        ("post", "/api/v1/posture/goals/confirm"),
     ],
 )
 def test_detail_routes_have_component_ref(method, path, openapi_schema):

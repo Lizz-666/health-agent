@@ -411,3 +411,110 @@ class PostureProfileResponse(BaseModel):
     evaluated_issues: List[PostureProfileEntryResponse]
     unevaluated_categories: List[str]
     summary: PostureProfileSummary
+
+
+# --- Priority & goal confirmation models (Phase 1 Task 6, spec §9.2 /
+# §10.6 / §10.7) -----------------------------------------------------------
+
+
+class NormalCandidate(BaseModel):
+    """One ranked normal-candidate issue (spec §9.2 ``normal_candidates``)."""
+
+    issue_id: str
+    issue_name: str
+    suggested_rank: int
+    severity: Optional[str] = None
+    reasons: List[str]
+    relation_type: Optional[str] = None
+    association_weight: Optional[float] = None
+
+
+class RetestItem(BaseModel):
+    """A provisional/conflict (non-safety-blocked) issue routed to retest."""
+
+    issue_id: str
+    issue_name: str
+    certainty: str
+    reason: str
+
+
+class SafetyBlockedItem(BaseModel):
+    """A restricted/red_flag issue (spec §12.4 safety_blocked).
+
+    ``risk_tier`` is always returned so restricted vs red_flag stay
+    semantically distinct; restricted wording is a product-policy gate, NOT a
+    clinical red flag (spec §12.6).
+    """
+
+    issue_id: str
+    issue_name: str
+    risk_tier: str
+    reason: str
+    next_action: str
+
+
+class PrioritySuggestionsResponse(BaseModel):
+    """Response of ``GET /api/v1/posture/priorities`` (spec §9.2 / §10.6).
+
+    ``suggestion_id`` / ``profile_version`` / ``rule_version`` /
+    ``risk_version`` are all server-generated; the client echoes them back on
+    confirm for the optimistic lock (spec §10.0).
+    """
+
+    suggestion_id: str
+    profile_version: str
+    rule_version: str
+    risk_version: str
+    generated_at: datetime
+    normal_candidates: List[NormalCandidate]
+    retest_required: List[RetestItem]
+    safety_blocked: List[SafetyBlockedItem]
+    disclaimer: str
+
+
+class GoalInput(BaseModel):
+    """A single goal in a confirm request."""
+
+    issue_id: str
+    priority_rank: int = Field(ge=1)
+
+
+class ConfirmGoalsRequest(BaseModel):
+    """Request body for ``POST /api/v1/posture/goals/confirm`` (spec §9.2 /
+    §10.7).
+
+    ``extra="forbid"`` rejects a client-supplied
+    ``priority_context_snapshot``: the context snapshot is NEVER accepted from
+    the client (spec §10.0). Structural goal validation (1-3 distinct current
+    candidates, unique consecutive ranks 1..N) is enforced in the service
+    layer, surfacing as 400 ``invalid_goal``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    suggestion_id: str
+    profile_version: str
+    goals: List[GoalInput]
+    idempotency_key: str = Field(..., min_length=1, max_length=64)
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def _reject_blank_idempotency_key(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("idempotency_key 不能为空白")
+        return v
+
+
+class ConfirmedGoal(BaseModel):
+    issue_id: str
+    priority_rank: int
+    confirmed_at: datetime
+
+
+class ConfirmedGoalsResponse(BaseModel):
+    """Response of confirm (spec §9.2). ``can_generate_plan`` only signals
+    that the precondition holds; Phase 1 does not generate a training plan."""
+
+    confirmed_goals: List[ConfirmedGoal]
+    can_generate_plan: bool
+    risk_version: str

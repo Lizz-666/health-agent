@@ -1,12 +1,16 @@
 from typing import Optional, List, Tuple, Dict, Any
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
+import hashlib
+import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, update
 from app.posture.models import (
     PostureAssessment,
     PostureAssessmentEvent,
     PostureProfileEntry,
+    PostureUserGoal,
+    IdempotencyRecord,
 )
 from app.posture.knowledge import get_issue_by_id, get_all_issues
 from app.posture.user_lock import acquire_user_transaction_lock
@@ -639,3 +643,324 @@ async def get_user_profile(db: AsyncSession, user_id: str) -> dict:
             "total_provisional": total_provisional,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Priority suggestions read + goal confirmation (Phase 1 Task 6, spec §9.2 /
+# §10.6 / §10.7 / §12.3 / §12.4)
+# ---------------------------------------------------------------------------
+
+# Idempotency operation name stored in idempotency_records (spec §8.5). The
+# confirm path uses the SAME unified idempotency table as the other
+# side-effect tools; no separate idempotency module is introduced.
+_IDEMPOTENCY_OPERATION_CONFIRM = "confirm_goals"
+_IDEMPOTENCY_TTL = timedelta(hours=24)
+
+MIN_GOALS = 1
+MAX_GOALS = 3
+
+
+async def get_priority_suggestions(
+    db: AsyncSession, user_id: str, *, now: Optional[datetime] = None
+) -> dict:
+    """Read-only deterministic priority suggestions (spec §10.6).
+
+    Thin wrapper around ``priority.build_priority_suggestions`` so the router
+    layer depends on the service module only. Performs NO writes and NO plan
+    generation.
+    """
+    from app.posture import priority
+
+    return await priority.build_priority_suggestions(db, user_id, now=now)
+
+
+def _hash_confirm_request(
+    suggestion_id: str, profile_version: str, goals: List[Any]
+) -> str:
+    """Stable sha256 over the confirm request identity (spec §8.5).
+
+    Goals are normalised by ``priority_rank`` so re-ordering the JSON array
+    does not change the hash. ``idempotency_key`` is intentionally excluded
+    (it is the lookup key, not request identity), mirroring ``safety``.
+    """
+    identity = {
+        "suggestion_id": suggestion_id,
+        "profile_version": profile_version,
+        "goals": sorted(
+            [
+                {"issue_id": g.issue_id, "priority_rank": g.priority_rank}
+                for g in goals
+            ],
+            key=lambda x: x["priority_rank"],
+        ),
+    }
+    payload = json.dumps(identity, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _to_aware_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+async def _replay_confirm_batch(
+    db: AsyncSession, user_id: str, anchor_id: str
+) -> dict:
+    """Rebuild the FIRST confirmed batch from its anchor goal id.
+
+    Restores the complete first batch even if it was later superseded; does
+    NOT re-check staleness or re-write. If the anchor was purged (cascade
+    delete removed the goal rows) the replay surfaces HTTP 410 (spec §10.0 /
+    §8.5).
+    """
+    anchor = await db.get(PostureUserGoal, UUID(anchor_id))
+    if anchor is None or anchor.user_id != UUID(user_id):
+        raise AppException(
+            410, "幂等记录指向的目标批次已被清除", "idempotency_result_gone"
+        )
+    result = await db.execute(
+        select(PostureUserGoal)
+        .where(
+            PostureUserGoal.user_id == UUID(user_id),
+            PostureUserGoal.confirmed_at == anchor.confirmed_at,
+        )
+        .order_by(PostureUserGoal.priority_rank.asc())
+    )
+    batch = list(result.scalars().all())
+    confirmed = [
+        {
+            "issue_id": g.issue_id,
+            "priority_rank": g.priority_rank,
+            "confirmed_at": _to_aware_utc(g.confirmed_at),
+        }
+        for g in batch
+    ]
+    return {
+        "confirmed_goals": confirmed,
+        "can_generate_plan": True,
+        "risk_version": anchor.risk_version,
+    }
+
+
+async def _next_goal_batch_time(
+    db: AsyncSession, user_id: str, requested: datetime
+) -> datetime:
+    """Return a per-user monotonically unique confirmation batch timestamp.
+
+    Batch replay uses ``(user_id, confirmed_at)`` to recover every row that
+    belongs to the anchor goal. The user transaction lock serializes writers,
+    while this helper makes the timestamp itself unique even when two requests
+    observe the same wall-clock instant or a test injects a frozen clock.
+    """
+    latest = await db.scalar(
+        select(PostureUserGoal.confirmed_at)
+        .where(PostureUserGoal.user_id == UUID(user_id))
+        .order_by(PostureUserGoal.confirmed_at.desc())
+        .limit(1)
+    )
+    requested_utc = _to_aware_utc(requested)
+    if latest is None:
+        return requested_utc
+    latest_utc = _to_aware_utc(latest)
+    if requested_utc <= latest_utc:
+        return latest_utc + timedelta(microseconds=1)
+    return requested_utc
+
+
+async def confirm_posture_goals(
+    db: AsyncSession,
+    user_id: str,
+    suggestion_id: str,
+    profile_version: str,
+    goals: List[Any],
+    idempotency_key: str,
+    *,
+    now: Optional[datetime] = None,
+) -> dict:
+    """Confirm 1-3 of the user's current normal-candidate goals (spec §10.7).
+
+    Write path (spec §10.7 / plan Task 6): user transaction lock -> purge
+    freeze check -> idempotency resolution -> recompute (reload profile +
+    reload signals + reclassify) -> stale check -> goal qualification ->
+    supersede prior goals -> write the new batch -> persist idempotency
+    record.
+
+    Server control values (``suggestion_id`` / ``profile_version`` /
+    ``rule_version`` / ``risk_version``) are regenerated server-side and used
+    as the optimistic lock; a client-supplied ``priority_context_snapshot``
+    is rejected earlier by the request schema (``extra="forbid"``).
+
+    Batch semantics (spec §10.0): every goal in one batch shares the same
+    server ``confirmed_at``; the idempotency record's ``result_ref`` points
+    at the batch's anchor goal (rank 1) so a replay can restore the full
+    first batch.
+    """
+    from app.posture import priority, risk_rules
+
+    clock = _to_aware_utc(now) if now is not None else datetime.now(timezone.utc)
+    request_hash = _hash_confirm_request(suggestion_id, profile_version, goals)
+
+    try:
+        await _acquire_user_lock(db, user_id)
+        await _assert_not_frozen(db, user_id)
+
+        # --- Idempotency resolution (unified idempotency_records) ---
+        existing = await db.execute(
+            select(IdempotencyRecord).where(
+                IdempotencyRecord.user_id == UUID(user_id),
+                IdempotencyRecord.operation == _IDEMPOTENCY_OPERATION_CONFIRM,
+                IdempotencyRecord.idempotency_key == idempotency_key,
+            )
+        )
+        record = existing.scalar_one_or_none()
+        if record is not None:
+            if _to_aware_utc(record.expires_at) > clock:
+                if record.request_hash == request_hash:
+                    # Same key + same request -> replay the FIRST batch. No
+                    # writes; the user lock is transaction-scoped so end the
+                    # read transaction explicitly instead of holding it.
+                    response = await _replay_confirm_batch(
+                        db, user_id, record.result_ref
+                    )
+                    await db.rollback()
+                    return response
+                # Same key + DIFFERENT request -> reject.
+                raise AppException(
+                    400,
+                    "idempotency_key 已用于不同的请求",
+                    "idempotency_key_conflict",
+                )
+            # Expired record no longer blocks; remove it and proceed.
+            await db.delete(record)
+            await db.flush()
+
+        # --- Recompute (safety gate): reload profile + signals + reclassify.
+        # Read-only; build_priority_suggestions persists nothing.
+        current = await priority.build_priority_suggestions(db, user_id, now=clock)
+
+        # --- Stale check BEFORE goal qualification (spec §10.7) ---
+        if (
+            current["suggestion_id"] != suggestion_id
+            or current["profile_version"] != profile_version
+        ):
+            raise AppException(
+                409,
+                "优先级建议已过期，请重新获取（档案或安全信号已变化）",
+                "stale_priority",
+            )
+
+        candidate_ids = {c["issue_id"] for c in current["normal_candidates"]}
+        safety_blocked_map = {
+            item["issue_id"]: item["risk_tier"]
+            for item in current["safety_blocked"]
+        }
+
+        # --- Goal qualification ---
+        _validate_goal_structure(goals)
+        for g in goals:
+            issue = get_issue_by_id(g.issue_id)
+            if issue is None:
+                raise AppException(404, "体态问题不存在", "issue_not_found")
+            if g.issue_id in candidate_ids:
+                continue
+            if g.issue_id in safety_blocked_map:
+                tier = safety_blocked_map[g.issue_id]
+                if tier == "red_flag":
+                    raise AppException(
+                        409, "红旗条目阻止目标确认", "red_flag_blocked"
+                    )
+                raise AppException(
+                    409,
+                    "受限安全信号条目阻止普通目标确认",
+                    "restricted_blocked",
+                )
+            raise AppException(
+                400,
+                "目标问题不在当前候选列表中（未评估/normal/provisional/conflict）",
+                "invalid_goal",
+            )
+
+        # --- Supersede prior active goals, then write the new batch ---
+        batch_confirmed_at = await _next_goal_batch_time(db, user_id, clock)
+        await db.execute(
+            update(PostureUserGoal)
+            .where(
+                PostureUserGoal.user_id == UUID(user_id),
+                PostureUserGoal.superseded_at.is_(None),
+            )
+            .values(superseded_at=batch_confirmed_at)
+        )
+
+        goals_sorted = sorted(goals, key=lambda g: g.priority_rank)
+        new_goals: List[PostureUserGoal] = []
+        for g in goals_sorted:
+            goal = PostureUserGoal(
+                user_id=UUID(user_id),
+                issue_id=g.issue_id,
+                priority_rank=g.priority_rank,
+                confirmed_at=batch_confirmed_at,
+                suggestion_id=suggestion_id,
+                profile_version=profile_version,
+                rule_version=priority.PRIORITY_RULE_VERSION,
+                risk_version=risk_rules.RISK_VERSION,
+            )
+            db.add(goal)
+            new_goals.append(goal)
+        await db.flush()  # populate ids
+
+        anchor = new_goals[0]  # rank-1 goal is the batch anchor
+        db.add(
+            IdempotencyRecord(
+                user_id=UUID(user_id),
+                operation=_IDEMPOTENCY_OPERATION_CONFIRM,
+                idempotency_key=idempotency_key,
+                request_hash=request_hash,
+                status="completed",
+                result_ref=str(anchor.id),
+                expires_at=clock + _IDEMPOTENCY_TTL,
+            )
+        )
+
+        await db.commit()
+    except AppException:
+        await db.rollback()
+        raise
+    except Exception:
+        await db.rollback()
+        raise
+
+    confirmed = [
+        {
+            "issue_id": g.issue_id,
+            "priority_rank": g.priority_rank,
+            "confirmed_at": _to_aware_utc(g.confirmed_at),
+        }
+        for g in new_goals
+    ]
+    return {
+        "confirmed_goals": confirmed,
+        "can_generate_plan": True,
+        "risk_version": risk_rules.RISK_VERSION,
+    }
+
+
+def _validate_goal_structure(goals: List[Any]) -> None:
+    """Structural checks that surface as 400 ``invalid_goal`` (spec §9.3 /
+    §10.7): 1-3 goals, distinct issue_ids, ranks unique and exactly the
+    consecutive set ``1..N``. Called AFTER the stale check per §10.7 ordering."""
+    if not isinstance(goals, list) or len(goals) < MIN_GOALS or len(goals) > MAX_GOALS:
+        raise AppException(
+            400, "需确认 1-3 个目标", "invalid_goal"
+        )
+    issue_ids = [g.issue_id for g in goals]
+    if len(set(issue_ids)) != len(issue_ids):
+        raise AppException(400, "目标问题不能重复", "invalid_goal")
+    ranks = [g.priority_rank for g in goals]
+    if len(set(ranks)) != len(ranks):
+        raise AppException(400, "priority_rank 不能重复", "invalid_goal")
+    expected = set(range(1, len(goals) + 1))
+    if set(ranks) != expected:
+        raise AppException(
+            400, "priority_rank 必须唯一且连续为 1..N", "invalid_goal"
+        )

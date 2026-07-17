@@ -19,6 +19,9 @@ from app.posture.schemas import (
     SafetySignalResponse,
     PostureProfileResponse,
     PostureProfileEntryResponse,
+    PrioritySuggestionsResponse,
+    ConfirmGoalsRequest,
+    ConfirmedGoalsResponse,
 )
 from app.posture.knowledge import get_issue_by_id
 from app.posture import safety
@@ -196,3 +199,54 @@ async def get_profile_entry(
             404, "当前用户尚未评估该体态问题", "profile_entry_not_found"
         )
     return service.build_profile_entry_detail(entry, issue)
+
+
+@router.get("/priorities", response_model=PrioritySuggestionsResponse)
+async def get_priorities(
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Current user's deterministic priority suggestions (spec §9.2 / §10.6).
+
+    Read-only: recomputes risk classification, returns three buckets
+    (normal_candidates / retest_required / safety_blocked) plus the
+    server-generated suggestion_id / profile_version / rule_version /
+    risk_version used by the confirm optimistic lock. Identity comes only
+    from the JWT (no user_id param) so the query is always caller-scoped.
+    Performs no writes and never auto-creates a plan.
+    """
+    return await service.get_priority_suggestions(db, user_id)
+
+
+@router.post("/goals/confirm", response_model=ConfirmedGoalsResponse)
+async def confirm_goals(
+    request: Request,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Confirm 1-3 of the current normal-candidate goals (spec §9.2 / §10.7).
+
+    Body is parsed manually so a bad payload / unknown field (including a
+    client-supplied ``priority_context_snapshot``) surfaces as 400 rather than
+    422, mirroring the safety-signals error style. The server regenerates the
+    control values and uses them as the optimistic lock; restricted/red_flag
+    goals are rejected with their own 409 codes.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise BadRequest("请求体JSON格式错误")
+
+    try:
+        req = ConfirmGoalsRequest.model_validate(body)
+    except ValidationError:
+        raise BadRequest("目标确认请求参数错误")
+
+    return await service.confirm_posture_goals(
+        db,
+        user_id,
+        req.suggestion_id,
+        req.profile_version,
+        req.goals,
+        req.idempotency_key,
+    )
