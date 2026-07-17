@@ -305,6 +305,35 @@ async def test_entry_detail_found(client):
 
 
 @pytest.mark.asyncio
+async def test_entry_detail_conflict_state_exposed(client):
+    """GET /profile/{issue_id} on a conflict entry must expose the conflict
+    faithfully: certainty=conflict, has_conflict=true, combined_severity=null,
+    both sources present, and no related_priority / leaked payload fields."""
+    from app.core.security import decode_token
+
+    token = await _login_user(client)
+    user_id = decode_token(token)["sub"]
+    await _assess_self(client, token, "HN-01", answer="positive")
+    async with TestSession() as db:
+        await service.save_photo_assessment(
+            db, user_id, "HN-01", ["fake.jpg"], _ai_result("severe")
+        )
+
+    resp = await client.get("/api/v1/posture/profile/HN-01", headers=_headers(token))
+    assert resp.status_code == 200
+    entry = resp.json()
+    assert set(entry.keys()) == ENTRY_KEYS
+    assert entry["certainty"] == "conflict"
+    assert entry["has_conflict"] is True
+    assert entry["combined_severity"] is None  # never auto-merged
+    assert "related_priority" not in entry  # out of scope (Task 6)
+    assert len(entry["sources"]) == 2
+    assert {s["source"] for s in entry["sources"]} == {"self_test", "ai_photo"}
+    for src in entry["sources"]:
+        assert set(src.keys()) == SOURCE_KEYS  # no photo_keys / raw ai_response
+
+
+@pytest.mark.asyncio
 async def test_entry_detail_issue_not_found(client):
     token = await _login_user(client)
     resp = await client.get(
