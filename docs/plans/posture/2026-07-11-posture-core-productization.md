@@ -788,6 +788,7 @@ Task 6 不抽取或重构 `safety.py` 的既有幂等流程，也不新建通用
 - Create: `backend/app/posture/tool_contracts.py`（仅 Tool 业务 I/O TypedDict / Pydantic 契约）
 - Create: `backend/app/core/actor_context.py`（服务端 ActorContext 定义）
 - Create: `backend/app/upload/ownership.py`（PhotoOwnershipVerifier 协议 + Phase 1 fail-closed 默认实现）
+- Modify: `backend/app/posture/service.py`（仅新增照片分析的统一幂等编排；Tool 不直接 ORM）
 - Modify: `backend/app/posture/router.py`（REST 端点改为调用 Tool 函数，注入 ActorContext）
 - Create: `backend/tests/test_posture_tools.py`
 
@@ -836,6 +837,9 @@ Task 6 不抽取或重构 `safety.py` 的既有幂等流程，也不新建通用
 - 无可信 ownership backend 时返回 PhotoOwnershipUnavailable；Phase 1 隐私门应更早
   PhotoAnalysisDisabled，且不得探测对象、创建幂等记录/事件或调用模型
 - idempotency_key 去重验证（统一幂等表）
+- 照片分析的幂等检查必须在模型调用前完成，由 service 层持有用户事务锁并编排
+  `检查/重放 -> 模型调用 -> 评估事件/档案投影/idempotency_record`；Tool 层不得为此直接查询
+  `idempotency_records`。Phase 1 不抽取或重构 `safety.py` / `confirm_posture_goals` 的既有幂等流程
 
 **migration 和兼容策略：** idempotency_records 表在 Task 1 migration 中创建。不创建新 migration。
 
