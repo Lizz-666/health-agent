@@ -1194,6 +1194,56 @@ async def test_concurrent_write_blocked_while_frozen():
 
 
 @pytest.mark.asyncio
+async def test_real_run_purge_freezing_phase_keeps_reclaimable_lease(monkeypatch):
+    """If run_purge crashes after step 1 commit but before OSS deletion, the
+    persisted freezing operation must remain worker-reclaimable."""
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        user_id = await _make_user(db)
+        await _seed_full_dataset(db, user_id)
+        await db.commit()
+
+    real_delete_oss = purge._delete_oss_objects
+
+    async def _crash_before_oss(db, op, object_store, photo_keys):
+        raise RuntimeError("crash after freezing commit")
+
+    monkeypatch.setattr(purge, "_delete_oss_objects", _crash_before_oss)
+    async with TestSession() as db:
+        with pytest.raises(RuntimeError, match="crash after freezing commit"):
+            await purge.run_purge(
+                db, user_id, purge.FakeObjectStore(), trigger="user_delete"
+            )
+
+    async with TestSession() as db:
+        op = (
+            await db.execute(
+                select(PurgeOperation).where(PurgeOperation.user_id == user_id)
+            )
+        ).scalar_one()
+        assert op.status == "freezing"
+        assert op.next_retry_at is not None
+        assert await purge.is_user_write_frozen(db, user_id) is True
+        op.next_retry_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        await db.commit()
+
+    monkeypatch.setattr(purge, "_delete_oss_objects", real_delete_oss)
+    store = purge.FakeObjectStore()
+    store.add_existing(f"posture_photos/{user_id}/aaa.jpg")
+    store.add_existing(f"posture_photos/{user_id}/bbb.jpg")
+    async with TestSession() as db:
+        results = await purge.run_due_purge_jobs(db, store)
+
+    assert [result.status for result in results] == ["completed"]
+    async with TestSession() as db:
+        op = (await db.execute(select(PurgeOperation))).scalar_one()
+        assert op.status == "completed"
+        assert op.user_id is None
+        assert op.next_retry_at is None
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("initial_status", ["freezing", "oss_deleting", "db_deleting"])
 async def test_interrupted_initial_phase_is_reclaimed(initial_status):
     from tests.conftest import TestSession

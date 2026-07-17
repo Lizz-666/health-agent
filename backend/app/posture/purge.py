@@ -1057,7 +1057,9 @@ async def run_purge(
         op.encrypted_object_keys = None
     op.target_event_ids = event_ids or None
     op.target_signal_ids = signal_ids or None
-    op.next_retry_at = None
+    # Keep the initial freezing lease. If the process crashes after this commit
+    # but before publishing oss_deleting, run_due_purge_jobs can reclaim the
+    # operation and resume from the persisted freezing phase.
     await db.commit()
     steps.append("freeze_and_collect_photo_keys")
     logger.info(
