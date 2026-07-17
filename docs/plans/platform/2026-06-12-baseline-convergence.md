@@ -268,21 +268,14 @@ python -m pytest tests -q
 **Files:**
 
 - Create: `docs/README.md`
-- Modify: `docs/plans/2026-06-01-backend-revised.md`
-- Modify: `docs/plans/2026-06-01-posture-app-plan-v2.md`
-- Modify: `docs/plans/2026-06-04-ui-redesign-glassmorphism.md`
-- Modify: `docs/specs/2026-06-01-backend-implementation-status.md`
-- Modify: `docs/specs/2026-06-01-posture-frontend-design.md`
-- Modify: `docs/specs/2026-06-04-ui-redesign-spec.md`
-- Modify: `docs/specs/2026-06-10-home-redesign.md`
+- Delete: 2026-06-01 至 2026-06-10 的早期计划、规格和状态记录（已被当前文档覆盖，且含旧 agent 指令噪音）
 - Modify: `docs/specs/platform/2026-06-12-baseline-contract.md`
 - Modify only after all evidence passes: `docs/product/roadmap.md`
 
 **Behavior:**
 
 - `docs/README.md` 指明当前产品、安全、规格和计划入口。
-- 旧计划和旧状态文档顶部标记“历史资料，不代表当前完成状态”。
-- 不移动或删除历史文件。
+- 已被覆盖的旧计划、旧状态和旧 UI 规格从工作树移除，需要追溯时查看 git 历史。
 - 记录最终运行版本、测试数量、Android 冒烟结果和已知限制。
 - 只有全部退出标准有新鲜证据时，才在路线图中标记阶段 0 完成。
 

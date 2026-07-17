@@ -25,24 +25,7 @@
 
 ## 历史资料
 
-以下文档记录了早期开发过程，不代表当前完成状态或当前架构决策。保留用于追溯历史上下文。
-
-### 历史计划
-
-| 文档 | 原始日期 | 内容 |
-| --- | --- | --- |
-| [plans/2026-06-01-backend-revised.md](plans/2026-06-01-backend-revised.md) | 2026-06-01 | 后端 API 初始实施计划 |
-| [plans/2026-06-01-posture-app-plan-v2.md](plans/2026-06-01-posture-app-plan-v2.md) | 2026-06-01 | Flutter 前端初始实施计划 |
-| [plans/2026-06-04-ui-redesign-glassmorphism.md](plans/2026-06-04-ui-redesign-glassmorphism.md) | 2026-06-04 | UI 重设计实施计划（已执行） |
-
-### 历史规格与状态
-
-| 文档 | 原始日期 | 内容 |
-| --- | --- | --- |
-| [specs/2026-06-01-backend-implementation-status.md](specs/2026-06-01-backend-implementation-status.md) | 2026-06-01 | 后端 MVP 进展与踩坑记录 |
-| [specs/2026-06-01-posture-frontend-design.md](specs/2026-06-01-posture-frontend-design.md) | 2026-06-01 | 体态模块 Flutter 前端设计 |
-| [specs/2026-06-04-ui-redesign-spec.md](specs/2026-06-04-ui-redesign-spec.md) | 2026-06-04 | UI Glassmorphism 重设计规格 |
-| [specs/2026-06-10-home-redesign.md](specs/2026-06-10-home-redesign.md) | 2026-06-10 | 首页重构和搜索增强规格 |
+2026-06-01 至 2026-06-10 的早期计划、规格和状态记录已被当前产品文档、阶段 0 基线文档、阶段 1 体态核心产品化文档和代码实现覆盖。为减少模型检索噪音和旧 agent 指令误读，这批历史文件已从工作树移除；需要追溯时查看 git 历史。
 
 ## 当前验证状态
 
