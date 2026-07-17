@@ -356,3 +356,58 @@ class SafetySignalResponse(BaseModel):
     risk_version: str
     invalidates_until: datetime
     classification: RiskClassificationModel
+
+
+# --- Profile response models (Phase 1 Task 4, spec §9.2) ---
+
+
+class ProfileSource(BaseModel):
+    """One contributing assessment source for a profile entry.
+
+    Mirrors the structured content actually stored in
+    ``posture_profile_entries.sources`` (built by ``project_profile``):
+    only ``source`` / ``event_id`` / ``severity`` / ``created_at``. It never
+    carries ``photo_keys``, photo URLs or the raw ``ai_response`` (privacy:
+    spec §9.2 / Task 4 source-leakage rule).
+    """
+
+    source: str
+    event_id: str
+    severity: Optional[str] = None
+    created_at: str
+
+
+class PostureProfileEntryResponse(BaseModel):
+    """A single evaluated issue in the profile (list item AND single-entry
+    detail share this shape).
+
+    ``related_priority`` is intentionally absent: it belongs to the priorities
+    feature (Task 6, out of scope for Task 4).
+    """
+
+    issue_id: str
+    issue_name: str
+    category: str
+    combined_severity: Optional[str] = None
+    certainty: str
+    has_conflict: bool
+    sources: List[ProfileSource]
+    risk_tier: str
+    risk_version: str
+    updated_at: datetime
+
+
+class PostureProfileSummary(BaseModel):
+    """Counts keyed by the ``certainty`` field (matches the spec §9.2 example
+    arithmetic: 3 evaluated / 0 conflict / 0 provisional == 3 confirmed)."""
+
+    total_evaluated: int
+    total_conflict: int
+    total_provisional: int
+
+
+class PostureProfileResponse(BaseModel):
+    user_id: str
+    evaluated_issues: List[PostureProfileEntryResponse]
+    unevaluated_categories: List[str]
+    summary: PostureProfileSummary

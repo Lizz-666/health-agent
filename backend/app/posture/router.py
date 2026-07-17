@@ -17,6 +17,8 @@ from app.posture.schemas import (
     AssessmentRecord,
     SafetySignalRequest,
     SafetySignalResponse,
+    PostureProfileResponse,
+    PostureProfileEntryResponse,
 )
 from app.posture.knowledge import get_issue_by_id
 from app.posture import safety
@@ -156,3 +158,41 @@ async def report_safety_signal(
     return await safety.record_safety_signal(
         db, user_id, signal, signal_req.idempotency_key
     )
+
+
+@router.get("/profile", response_model=PostureProfileResponse)
+async def get_profile(
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Current user's full posture profile (spec §9.2).
+
+    Returns evaluated issues, the complementary unevaluated categories and a
+    certainty-keyed summary. Identity comes only from the JWT -- there is no
+    ``user_id`` query parameter, so the query is always scoped to the caller
+    and one user can never read another user's profile.
+    """
+    return await service.get_user_profile(db, user_id)
+
+
+@router.get("/profile/{issue_id}", response_model=PostureProfileEntryResponse)
+async def get_profile_entry(
+    issue_id: str,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """One issue's profile entry for the current user (spec §9.2).
+
+    - unknown ``issue_id`` -> 404 ``issue_not_found``
+    - known issue but the caller has no entry -> 404 ``profile_entry_not_found``
+      (does not reveal whether any other user has data for this issue)
+    """
+    issue = get_issue_by_id(issue_id)
+    if issue is None:
+        raise AppException(404, "体态问题不存在", "issue_not_found")
+    entry = await service.get_user_profile_entry(db, user_id, issue_id)
+    if entry is None:
+        raise AppException(
+            404, "当前用户尚未评估该体态问题", "profile_entry_not_found"
+        )
+    return service.build_profile_entry_detail(entry, issue)

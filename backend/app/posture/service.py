@@ -538,3 +538,104 @@ async def get_user_history(
             }
         )
     return output
+
+
+# ---------------------------------------------------------------------------
+# Profile reads (Phase 1 Task 4, spec §9.2)
+# ---------------------------------------------------------------------------
+
+
+def _all_knowledge_categories() -> List[str]:
+    """Distinct categories present in the shipped knowledge base, sorted for
+    deterministic output."""
+    return sorted({i["category"] for i in get_all_issues()})
+
+
+def build_profile_entry_detail(entry: PostureProfileEntry, issue: dict) -> dict:
+    """Build the response dict for one profile entry.
+
+    ``sources`` is passed through verbatim from the stored projection (built by
+    ``project_profile``): it only ever carries ``source`` / ``event_id`` /
+    ``severity`` / ``created_at`` -- never ``photo_keys``, photo URLs or the
+    raw ``ai_response`` (privacy: spec §9.2 / Task 4 source-leakage rule).
+    """
+    return {
+        "issue_id": entry.issue_id,
+        "issue_name": issue["name_cn"],
+        "category": issue["category"],
+        "combined_severity": entry.combined_severity,
+        "certainty": entry.certainty,
+        "has_conflict": entry.has_conflict,
+        "sources": entry.sources or [],
+        "risk_tier": entry.risk_tier,
+        "risk_version": entry.risk_version,
+        "updated_at": entry.updated_at,
+    }
+
+
+async def get_user_profile_entry(
+    db: AsyncSession, user_id: str, issue_id: str
+) -> Optional[PostureProfileEntry]:
+    """Return the current user's profile entry for one issue, or None.
+
+    Scoped strictly to ``user_id`` (taken from the JWT) -- there is no
+    ``user_id`` query parameter, so one user can never address another user's
+    row (spec §9.2 / Task 4 cross-user isolation rule).
+    """
+    return await db.scalar(
+        select(PostureProfileEntry).where(
+            PostureProfileEntry.user_id == UUID(user_id),
+            PostureProfileEntry.issue_id == issue_id,
+        )
+    )
+
+
+async def get_user_profile(db: AsyncSession, user_id: str) -> dict:
+    """Build the full profile response for the current user.
+
+    Loads all of the user's profile entries, enriches each with its knowledge
+    issue name/category, derives the evaluated categories and the complementary
+    unevaluated categories, and the certainty-keyed summary counts. Read-only:
+    no writes, no commit, no risk overlay re-evaluation.
+    """
+    result = await db.execute(
+        select(PostureProfileEntry)
+        .where(PostureProfileEntry.user_id == UUID(user_id))
+        .order_by(PostureProfileEntry.issue_id.asc())
+    )
+    entries = result.scalars().all()
+
+    evaluated_issues: List[dict] = []
+    evaluated_categories: set = set()
+    total_conflict = 0
+    total_provisional = 0
+
+    for entry in entries:
+        issue = get_issue_by_id(entry.issue_id)
+        # A profile entry should always reference a shipped knowledge issue.
+        # If the catalog ever drops an evaluated issue, skip it rather than
+        # exposing an unrepresentable / partial row.
+        if issue is None:
+            continue
+        evaluated_categories.add(issue["category"])
+        if entry.certainty == CERTAINTY_CONFLICT:
+            total_conflict += 1
+        elif entry.certainty == CERTAINTY_PROVISIONAL:
+            total_provisional += 1
+        evaluated_issues.append(build_profile_entry_detail(entry, issue))
+
+    all_categories = _all_knowledge_categories()
+    unevaluated_categories = [
+        c for c in all_categories if c not in evaluated_categories
+    ]
+
+    return {
+        "user_id": user_id,
+        "evaluated_issues": evaluated_issues,
+        "unevaluated_categories": unevaluated_categories,
+        "summary": {
+            "total_evaluated": len(evaluated_issues),
+            "total_conflict": total_conflict,
+            "total_provisional": total_provisional,
+        },
+    }

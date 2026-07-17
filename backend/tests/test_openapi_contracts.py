@@ -1,6 +1,6 @@
 """OpenAPI schema contract tests for posture routes.
 
-Asserts that all 6 posture routes expose non-empty response schemas,
+Asserts that all posture routes expose non-empty response schemas,
 preventing regressions to unconstrained object responses.
 """
 
@@ -15,6 +15,9 @@ POSTURE_ROUTES = [
     ("post", "/api/v1/posture/assess"),
     ("post", "/api/v1/posture/assess/photo"),
     ("get", "/api/v1/posture/history"),
+    ("post", "/api/v1/posture/safety-signals"),
+    ("get", "/api/v1/posture/profile"),
+    ("get", "/api/v1/posture/profile/{issue_id}"),
 ]
 
 
@@ -88,6 +91,9 @@ def test_list_routes_have_array_item_schema(method, path, openapi_schema):
         ("get", "/api/v1/posture/issues/{issue_id}"),
         ("post", "/api/v1/posture/assess"),
         ("post", "/api/v1/posture/assess/photo"),
+        ("post", "/api/v1/posture/safety-signals"),
+        ("get", "/api/v1/posture/profile"),
+        ("get", "/api/v1/posture/profile/{issue_id}"),
     ],
 )
 def test_detail_routes_have_component_ref(method, path, openapi_schema):

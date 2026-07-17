@@ -22,6 +22,7 @@
 | Phase 1 Task 6.5 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | 结构化安全信号分类 + risk_rules + safety-signals 端点；safety.py 的 purge 导入仍为防御式（purge 未存在）；依赖 Task 2 的 service 投影 |
 | Phase 1 Task 9 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | 隐私门 photo→privacy_gate + crash-safe purge + 配置/路由/conftest 条件补丁；移除全部防御式导入，恢复 service/safety 为直接导入，恢复完整 test_posture_safety.py |
 | Phase 1 integration | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | Task 2/6.5/9 以干净可审计的 5-commit 链提交并已本地 fast-forward 到 main；最新 reviewer fix 为 `64afd6b`；尚未 push/PR，未标记 Phase 1 完成；参考 worktree（`codex/phase1-integration`）仅作历史最终态参照，不得修改 |
+| Phase 1 Task 4 | OpenCode (impl) + Codex review | `codex/phase1-task4-profile-api` / `health-worktrees/phase1-task4-profile-api` | `552fb41` | `committed` | 体态档案读取 API：GET /profile + GET /profile/{issue_id}（spec §9.2）；JWT-only 跨用户隔离（无 user_id 参数）；sources 只透传 profile 投影结构化内容，不暴露 photo_keys/原始 ai_response；未实现 priorities 与 related_priority（属 Task 6）；Codex 已检查真实 diff 并重跑验证，等待集成到 main |
 
 ## Phase 1 Integration — Clean Chain Verification
 
