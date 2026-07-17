@@ -33,7 +33,7 @@
 - 关联图谱不表述为病因
 - 新安全信号使旧优先级失效（Phase 1 实现，不推迟）
 - 红旗由结构化安全信号触发（非 severity+red_flags 推断）
-- 红旗阻止目标确认
+- restricted/red_flag 均阻止普通目标确认，且两者语义分开
 - normal 不进入改善目标候选
 - provisional/conflict 进入重测路径
 - purged 实际删除原始健康数据（非仅标记）
@@ -526,23 +526,25 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 - Modify: `backend/app/posture/router.py`（2 新端点）
 - Modify: `backend/app/posture/schemas.py`（优先级和目标 models）
 - Modify: `backend/app/posture/service.py`（目标写入）
-- Modify: `backend/app/posture/models.py`（PostureUserGoal model）
 - Create: `backend/tests/test_posture_priority.py`
+- Modify: `backend/tests/test_openapi_contracts.py`（新增路由的 schema/ref 契约）
+
+`PostureUserGoal` 已由 Task 1 完整创建；本 Task 不修改 `models.py`，不新增 migration。
 
 **数据/API 契约：**
 
 按规格 §9.2 和 §12.4 定义：
 
-- `GET /api/v1/posture/priorities` → `PrioritySuggestionsResponse`（含 suggestion_id、profile_version、rule_version、risk_version、normal_candidates、retest_required、red_flag_blocked）
+- `GET /api/v1/posture/priorities` → `PrioritySuggestionsResponse`（含 suggestion_id、profile_version、rule_version、risk_version、normal_candidates、retest_required、safety_blocked）
 - `POST /api/v1/posture/goals/confirm` → `ConfirmedGoalsResponse`
 
 **优先级资格规则（确定性，规格 §12.4）：**
 
-- `certainty=confirmed` + severity 非 normal + 非红旗 → `normal_candidates`
+- `risk_tier=restricted/red_flag` → `safety_blocked`，且该路由优先于 certainty
+- `certainty=confirmed` + severity 非 normal + `risk_tier=normal/cautious` → `normal_candidates`
 - `certainty=confirmed` + severity=normal → **排除**（normal 不进入改善目标候选）
 - `certainty=provisional` → `retest_required`（重测或专业评估路径）
 - `certainty=conflict` → `retest_required`
-- `risk_tier=red_flag` → `red_flag_blocked`（停止/就医路径）
 - 未评估 → 排除
 
 **服务端控制值（规格 §10.0）：**
@@ -553,24 +555,43 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 
 **优先级权重（仅 normal_candidates 排序）：**
 
-1. 严重度权重：severe(4) > moderate(3) > mild(2)
-2. 关联强度加分：与已确认问题 weight≥0.9 的问题 +2 分
-3. 来源多样性加分：多来源 +1 分
+1. 严重度基础分：severe=300、moderate=200、mild=100
+2. 关联强度加分：与另一条 confirmed 非 normal 候选存在显式有向边且 weight≥0.9，+20
+3. 来源多样性加分：两个不同 source，+2
 4. 时间衰减：超过 30 天的评估 -1 分
 
-排序后取前 N（建议 1-3），标注理由。
+按 `score DESC, latest_event_at DESC, issue_id ASC` 排序，取前 3 条并标注理由。
+严重度百位分保证次级加分不能反超一个严重度等级。关联只表示可能共存，不解释为病因。
+
+**版本与失效：**
+
+- `PRIORITY_RULE_VERSION = "2026-07-17-v1"`，独立于
+  `risk_rules.RISK_VERSION = "2026-07-16-v4"`，不得混用
+- `profile_version` 为当前用户全部档案资格字段 + active 安全信号的 canonical JSON
+  SHA-256；排序稳定、时间统一 UTC，不包含 generated_at
+- `suggestion_id` 由 user_id、profile_version、两个规则版本和
+  `priority_context_digest` 确定性生成
+- `priority_context_digest` 至少覆盖当前知识关联和每条候选的
+  `older_than_30_days` 派生位，确保知识变化或跨过 30 天边界会使旧 suggestion 失效
 
 **安全与隐私要求：**
 
 - 优先级是建议，不自动创建计划
 - 关联图谱标注"可能关联"
-- 红旗问题进入 red_flag_blocked（标注"建议先就医"）
+- restricted/red_flag 进入 safety_blocked，并显式返回 risk_tier；restricted 不得使用
+  临床红旗文案
 - normal 不进入候选
-- provisional/conflict 进入 retest_required
+- 非安全阻断条目的 provisional/conflict 进入 retest_required
 - 每次调用重新计算（安全门）：重读档案 + 安全信号 + 重新风险分类
-- 确认时执行资格前置检查（规格 §10.7）：重读档案 → 重新风险分类 → 校验 suggestion_id/profile_version → 拒绝红旗/provisional/conflict/normal/未评估
+- 确认时执行资格前置检查（规格 §10.7）：重读档案 → 重新风险分类 →
+  校验 suggestion_id/profile_version → 拒绝 restricted/red_flag/provisional/conflict/
+  normal/未评估/非当前候选
 - 过期 suggestion_id/profile_version 返回 409 stale_priority
+- restricted 阻止返回 409 restricted_blocked
 - 红旗阻止返回 409 red_flag_blocked
+- goals 必须为当前 normal_candidates 中 1–3 个不同 issue，priority_rank 唯一且连续 1..N
+- 幂等记录 result_ref 指向确认批次锚点 goal ID；同批 goals 使用同一 confirmed_at，
+  重放恢复首次完整批次，即使后来已 supersede
 
 **migration 和兼容策略：** 依赖 Task 1（goals 表）
 
@@ -583,18 +604,25 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 - normal 问题排除（不进入候选）
 - provisional 问题进入 retest_required
 - conflict 问题进入 retest_required
-- 红旗问题进入 red_flag_blocked
+- restricted/red_flag 优先进入 safety_blocked，且 risk_tier 和文案正确
 - 多问题正确排序（权重公式）
 - 关联强度加分正确
+- 双来源加分、超过 30 天衰减和稳定破同分正确
+- 跨过 30 天边界后旧 suggestion_id 失效
 - 确认目标成功（suggestion_id/profile_version 匹配）
+- goals 为空、超过 3 个、issue 重复、rank 重复/不连续、非当前候选均返回 400
 - 确认 normal 问题返回 400 invalid_goal
 - 确认 provisional/conflict 问题返回 400
+- 确认 restricted 问题返回 409 restricted_blocked
 - 确认红旗问题返回 409 red_flag_blocked
 - suggestion_id 不匹配返回 409 stale_priority
 - profile_version 不匹配返回 409 stale_priority
 - 新评估后旧 suggestion_id 失效
 - 新安全信号后旧 suggestion_id 失效
 - 不接受客户端自报 priority_context_snapshot
+- 相同幂等 key + 相同请求返回首次确认批次且不重复写；相同 key + 不同请求返回 400
+- 幂等请求哈希按 `priority_rank` 规范化 goals；锚点 goal 已被 purge 时重放返回 410
+- 新端点 OpenAPI request/response component ref 存在
 
 **Flutter 测试：** 无
 
@@ -603,11 +631,11 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 **验收条件：**
 
 - 优先级引擎是确定性的（相同输入相同 suggestion_id）
-- 资格矩阵正确执行（normal/provisional/conflict/红旗 路由正确）
+- 资格矩阵正确执行（restricted/red_flag 安全阻断优先；normal/provisional/conflict 路由正确）
 - 不自动创建训练计划
 - 安全门（重新计算 + 重新风险分类）有测试
 - 确认端点使用服务端生成的 suggestion_id/profile_version
-- 红旗阻止目标确认
+- restricted/red_flag 均阻止目标确认，且错误语义不混淆
 
 **Suggested commit:** `feat: deterministic priority engine with qualification rules and user goal confirmation`
 
@@ -652,7 +680,7 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 
 **版本化风险分类（规格 §12.2 和 §12.6）：**
 
-- 规则版本化为 `risk_version`（如 `2026-07-11-v1`）
+- 规则版本化为 `risk_version`（当前 `2026-07-16-v4`）
 - 规则由版本化代码实现（`risk_rules.py`），不依赖 Prompt
 - 风险分类结果：`normal` / `cautious` / `restricted` / `red_flag`
 - 每个档案条目携带当前 `risk_tier` 和 `risk_version`
@@ -710,7 +738,8 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 - 写入多个信号触发受限（规则综合判定，非仅 severity_hint）
 - 写入信号后旧 suggestion_id 失效（priorities 返回新 ID）
 - 写入信号后 confirm_posture_goals 返回 409 stale_priority
-- 受限（restricted）信号阻止普通自动建议路径（Phase 1 实际阻断 tier；`red_flag_blocked` 路径保留给未来 red_flag，当前不产生）
+- 受限（restricted）信号进入 `safety_blocked` 并阻止普通自动建议/目标确认；
+  red_flag 使用同一分区但保留独立风险等级与升级文案
 - 验证 **不使用** severity=severe + 知识库 red_flags 推断红旗（红旗只能由结构化信号 + 版化规则综合判定）
 - **恢复测试**：restricted 状态下用户点击"已就医" → 维持 restricted（拒绝自动恢复）
 - **恢复测试**：restricted 状态下用户提供新结构化信息 → 重新分类 → 信号 resolved → risk_tier 降级
@@ -792,7 +821,7 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 - Tool 不绕过照片门
 - 照片门关闭时 `analyze_posture_photo` 返回 `PhotoAnalysisDisabled`（硬拒绝，非配置布尔值）
 - `suggest_posture_priorities` 每次重新计算 + 重新风险分类（安全门）
-- `confirm_posture_goals` 执行前重新风险分类，红旗阻止
+- `confirm_posture_goals` 执行前重新风险分类，restricted/red_flag 均阻止
 - `report_safety_signal` 写入触发风险分类重算
 - 审计字段不含照片 URL、原始模型响应或健康档案
 - photo_keys 所有权校验（PhotoOwnershipDenied 错误）
@@ -817,7 +846,7 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 - 过期 idempotency_records 清理后，相同 key 可重新使用
 - 照片门关闭时 `analyze_posture_photo` 硬拒绝
 - `suggest_posture_priorities` 安全门（重新计算 + 重新风险分类）
-- `confirm_posture_goals` 资格前置检查 + 红旗阻止
+- `confirm_posture_goals` 资格前置检查 + restricted/red_flag 阻止
 - `report_safety_signal` 写入触发风险分类重算
 - suggestion_id/profile_version 服务端生成
 - 不接受客户端 priority_context_snapshot
@@ -868,7 +897,7 @@ Flutter 模型对应后端新 API：
 
 - `PostureProfile`：evaluated_issues、unevaluated_categories、summary
 - `PostureProfileEntry`：issue_id、combined_severity（**可空**）、certainty、sources、has_conflict、risk_tier
-- `PrioritySuggestions`：suggestion_id、profile_version、rule_version、risk_version、normal_candidates、retest_required、red_flag_blocked
+- `PrioritySuggestions`：suggestion_id、profile_version、rule_version、risk_version、normal_candidates、retest_required、safety_blocked
 - `PrioritySuggestion`：issue_id、suggested_rank、reasons、association_weight
 - `SafetySignal`：signal_type、body_region、related_issue_id、severity_hint
 
@@ -877,7 +906,7 @@ Flutter 模型对应后端新 API：
 - 冲突状态显式标注"来源不一致，无合并结论"（combined_severity=null 时）
 - 未评估区域引导前往自测
 - 优先级建议标注"仅供参考"
-- 红旗问题标注就医引导
+- restricted 显示有限教育/专业评估提示；red_flag 显示停止规划和升级指引
 - provisional 条目标注"建议重新评估"
 - 安全信号报告入口（Phase 1 最小实现）
 - 结果页保留免责声明
@@ -896,8 +925,8 @@ Flutter 模型对应后端新 API：
 - 档案页渲染已评估和未评估区域
 - 冲突条目有冲突标识（combined_severity=null 显示"无合并结论"）
 - provisional 条目标注
-- 红旗条目标注就医引导
-- 优先级列表渲染（normal_candidates、retest_required、red_flag_blocked 分区）
+- restricted/red_flag 按各自 risk_tier 渲染不同安全提示
+- 优先级列表渲染（normal_candidates、retest_required、safety_blocked 分区）
 - 目标确认交互（回传 suggestion_id/profile_version）
 - 自测扩展字段（停止条件、正确姿势）渲染
 
@@ -914,7 +943,7 @@ Flutter 模型对应后端新 API：
 
 - 档案页区分已评估/未评估
 - 冲突条目有显式 UI 标识（combined_severity=null）
-- 优先级建议三路分区（normal_candidates、retest_required、red_flag_blocked）
+- 优先级建议三路分区（normal_candidates、retest_required、safety_blocked）
 - 目标确认回传服务端生成的 suggestion_id/profile_version
 - 安全信号报告入口可用
 - 自测页展示停止条件和正确姿势
@@ -1193,7 +1222,7 @@ python -m pytest tests -q
   → 查看档案（已评估/未评估，combined_severity 可空）
   → 完成第二个问题自测
   → 产生冲突场景（combined_severity=null）
-  → 获取优先级建议（三路分区：normal_candidates、retest_required、red_flag_blocked）
+  → 获取优先级建议（三路分区：normal_candidates、retest_required、safety_blocked）
   → 确认目标（回传 suggestion_id/profile_version）
   → 验证"生成计划"前置条件
   → 报告安全信号（pain）
@@ -1202,7 +1231,7 @@ python -m pytest tests -q
   → 验证 confirm 返回 409 stale_priority
   → 报告 acute_trauma 安全信号
   → 验证 risk_tier=restricted（product-policy，Phase 1 不自动产生 red_flag）
-  → 验证条目进入 provisional/retest_required，不进入普通候选
+  → 验证条目优先进入 safety_blocked，不因 provisional 降级到 retest_required
   → 删除评估事件
   → 验证原始健康数据已删除（仅保留 tombstone）
   → purge 执行流程验证（photo_keys 保护→OSS 删除验证→立即清除 encrypted_object_keys→DB 删除→completed tombstone→completed 后清理 purge_operations 可关联字段）

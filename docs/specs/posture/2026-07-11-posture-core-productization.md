@@ -727,8 +727,10 @@ idempotency_records 纳入以下场景的清理：
 
 - `normal` severity 条目 **不进入** 改善目标候选
 - `provisional` / `conflict` 条目进入 **重测或专业评估路径**（不进入普通优先级排序）
-- 红旗条目（`risk_tier=red_flag`）进入 **停止/就医路径**
-- 仅 `certainty=confirmed` 且 severity 非 `normal` 且非红旗的条目可进入普通优先级排序
+- `risk_tier=restricted` / `red_flag` 的条目优先进入 **安全阻断路径**，不得因同时为
+  `provisional` 而降级到普通重测路径
+- 仅 `certainty=confirmed`、severity 非 `normal` 且 `risk_tier=normal/cautious`
+  的条目可进入普通优先级排序
 
 **响应（200）：**
 
@@ -736,8 +738,8 @@ idempotency_records 纳入以下场景的清理：
 {
   "suggestion_id": "srv-generated-uuid",
   "profile_version": "hash-of-current-profile",
-  "rule_version": "2026-07-11-v1",
-  "risk_version": "2026-07-11-v1",
+  "rule_version": "2026-07-17-v1",
+  "risk_version": "2026-07-16-v4",
   "generated_at": "...",
   "normal_candidates": [
     {
@@ -755,10 +757,12 @@ idempotency_records 纳入以下场景的清理：
       "reason": "来源不一致（conflict），建议重新评估或咨询专业人士"
     }
   ],
-  "red_flag_blocked": [
+  "safety_blocked": [
     {
       "issue_id": "SC-10",
-      "reason": "存在红旗安全信号，建议先就医评估"
+      "risk_tier": "restricted",
+      "reason": "存在受限安全信号，当前不进入普通自动建议路径",
+      "next_action": "仅提供健康教育，并建议按需寻求专业评估"
     }
   ],
   "disclaimer": "优先级属于建议，关联图谱仅用于排查参考，不作为病因认定。"
@@ -775,7 +779,7 @@ idempotency_records 纳入以下场景的清理：
 2. 重新执行风险分类（使用最新安全信号）
 3. 校验 `suggestion_id` 与当前服务端生成的 ID 匹配
 4. 校验 `profile_version` 与当前档案版本匹配
-5. 拒绝红旗、provisional、conflict、normal 和未评估条目
+5. 拒绝 restricted、red_flag、provisional、conflict、normal 和未评估条目
 6. 通过后写入 goals
 
 **请求：**
@@ -794,6 +798,10 @@ idempotency_records 纳入以下场景的清理：
 
 > 客户端 **不接受** 自报的 `priority_context_snapshot`。`suggestion_id`、`profile_version`、`rule_version` 均由服务端在 priorities 响应中生成，客户端回传用于乐观锁校验。
 
+> `goals` 必须包含 1–3 个当前 `normal_candidates` 中的不同 issue；`priority_rank`
+> 必须唯一且连续为 `1..N`。用户可在候选范围内调整顺序，但不能确认未出现在当前候选列表中的
+> 条目。
+
 **响应（200）：**
 
 ```json
@@ -802,7 +810,7 @@ idempotency_records 纳入以下场景的清理：
     {"issue_id": "HN-01", "priority_rank": 1, "confirmed_at": "..."}
   ],
   "can_generate_plan": true,
-  "risk_version": "2026-07-11-v1"
+  "risk_version": "2026-07-16-v4"
 }
 ```
 
@@ -812,11 +820,12 @@ idempotency_records 纳入以下场景的清理：
 
 | 状态码 | code | 场景 |
 | --- | --- | --- |
-| 400 | `invalid_goal` | 确认未评估、normal、provisional、conflict 或红旗问题为目标 |
+| 400 | `invalid_goal` | goals 数量/排名非法，或确认未评估、normal、provisional、conflict、非当前候选条目 |
 | 401 | — | 未认证 |
 | 403 | — | 跨用户访问 |
 | 404 | `issue_not_found` | 问题 ID 不存在 |
 | 409 | `stale_priority` | suggestion_id 或 profile_version 不匹配（有新评估或安全信号） |
+| 409 | `restricted_blocked` | 受限条目阻止普通目标确认 |
 | 409 | `red_flag_blocked` | 红旗条目阻止目标确认 |
 | 503 | `photo_analysis_disabled` | 照片分析未启用 |
 | 503 | `model_unavailable` | AI 模型不可用 |
@@ -850,6 +859,9 @@ Tools 是内部应用层类型化函数，不暴露独立 HTTP 路由。REST API
 - 相同组合 + 相同 `request_hash` → 返回首次结果（不重复执行副作用）
 - 相同组合 + **不同** `request_hash` → 拒绝（400 `idempotency_key_conflict`）
 - 业务表（如 assessment_events）不重复设置幂等列
+- `confirm_posture_goals` 的 `result_ref` 指向该次确认批次的锚点 goal ID；同批 goals
+  使用同一个服务端 `confirmed_at`。重放必须按锚点恢复首次确认的完整批次，即使该批次后来
+  已被 supersede，也不得返回后续确认结果或重复写入
 
 **优先级确认的服务端控制值：**
 
@@ -984,13 +996,13 @@ async def suggest_posture_priorities(
 | 属性 | 说明 |
 | --- | --- |
 | 输入 | `actor` |
-| 输出 | `PrioritySuggestions`，含 `suggestion_id`（服务端生成）、`profile_version`、`rule_version`、`risk_version`、normal_candidates、retest_required、red_flag_blocked |
+| 输出 | `PrioritySuggestions`，含 `suggestion_id`（服务端生成）、`profile_version`、`rule_version`、`risk_version`、normal_candidates、retest_required、safety_blocked |
 | 授权 | JWT 用户 |
 | 数据读取 | 档案 + 安全信号 + 知识库关联图谱 |
-| 资格规则 | normal 不入候选；provisional/conflict 进 retest_required；红旗进 red_flag_blocked；仅 confirmed+非normal+非红旗进 normal_candidates |
+| 资格规则 | restricted/red_flag 优先进入 safety_blocked；normal 不入候选；其余 provisional/conflict 进 retest_required；仅 confirmed+非normal+risk_tier normal/cautious 进 normal_candidates |
 | 副作用 | 无（纯计算）。返回服务端生成的 `suggestion_id` 和 `profile_version` 供后续 confirm 乐观锁 |
 | 幂等性 | 是（相同档案、安全信号和规则版本产生相同 suggestion_id） |
-| 错误类型 | `UserNotFound`, `InsufficientData`（无合格候选） |
+| 错误类型 | `UserNotFound`；无评估或无合格候选时返回三个空分区，不报错 |
 | 审计字段 | 无（只读计算） |
 | 照片门关闭行为 | 不受影响 |
 | 重新安全分类 | **是。** 每次调用前重新读取档案 + 安全信号 + 重新执行风险分类。新安全信号使旧 suggestion_id 失效。 |
@@ -1012,16 +1024,16 @@ async def confirm_posture_goals(
 | --- | --- |
 | 输入 | `actor`、`suggestion_id`（来自 priorities 响应）、`profile_version`、`goals`、`idempotency_key` |
 | 服务端控制值 | suggestion_id、profile_version、rule_version、risk_version 由服务端生成，客户端回传校验 |
-| 资格前置检查 | 重新读取最新档案 → 重新执行风险分类 → 校验 suggestion_id 和 profile_version → 拒绝红旗/provisional/conflict/normal/未评估 |
+| 资格前置检查 | 重新读取最新档案 → 重新执行风险分类 → 校验 suggestion_id 和 profile_version → 拒绝 restricted/red_flag/provisional/conflict/normal/未评估/非当前候选 |
 | 输出 | `ConfirmedGoals`，含 confirmed_goals、can_generate_plan、risk_version |
 | 授权 | JWT 用户 |
 | 数据读取 | 档案 + 安全信号 + 优先级规则 |
 | 副作用 | 写入 posture_user_goals，supersede 旧 goals |
 | 幂等性 | 通过 `idempotency_key` 实现 |
-| 错误类型 | `StalePriority`(409), `RedFlagBlocked`(409), `InvalidGoal`(400), `IssueNotFound`(404) |
+| 错误类型 | `StalePriority`(409), `RestrictedBlocked`(409), `RedFlagBlocked`(409), `InvalidGoal`(400), `IssueNotFound`(404) |
 | 审计字段 | user_id、goals、confirmed_at、risk_version（不含健康档案） |
 | 照片门关闭行为 | 不受影响 |
-| 重新安全分类 | **是。** 执行前重新执行风险分类。新红旗信号阻止确认。 |
+| 重新安全分类 | **是。** 执行前重新执行风险分类。新 restricted/red_flag 信号阻止确认。 |
 
 ### 10.8 `report_safety_signal`
 
@@ -1142,7 +1154,7 @@ async def report_safety_signal(
 
 **版本化风险分类：**
 
-- 风险分类规则版本化为 `risk_version`（如 `2026-07-11-v1`）
+- 风险分类规则版本化为 `risk_version`（当前 `2026-07-16-v4`）
 - 规则由版本化代码或策略数据实现，不依赖 Prompt
 - 每个档案条目携带当前 `risk_tier` 和 `risk_version`
 - 风险分类结果：`normal` / `cautious` / `restricted` / `red_flag`
@@ -1193,12 +1205,19 @@ async def report_safety_signal(
 - 恢复必须基于可验证的结构化输入和版本化规则的重新计算结果
 - `resolution_source` 必须记录重新分类时的档案快照、安全信号集和适用的 rule_version
 
-**红旗阻止规则：**
+**安全阻止规则：**
 
-- `risk_tier=red_flag` 的条目进入 `red_flag_blocked` 列表，不进入普通候选
-- `confirm_posture_goals` 拒绝包含红旗条目的确认请求（409 `red_flag_blocked`）
-- 红旗条目不自动转诊（App 提供就医建议文案），但阻止训练计划前置条件
-- 红旗解除必须通过上述恢复规则（新的结构化信息 + 重新分类），不接受"已就医"口头确认
+- `risk_tier=restricted` / `red_flag` 的条目进入 `safety_blocked` 列表，不进入普通候选；
+  每个条目显式返回其 `risk_tier`，不得把 restricted 文案表述成临床红旗
+- 路由优先级为 `safety_blocked` > `retest_required` > `normal_candidates`。因此安全信号导致
+  条目同时变为 provisional 时，仍必须展示在安全阻断路径
+- `confirm_posture_goals` 拒绝包含 restricted 条目的确认请求（409
+  `restricted_blocked`），拒绝包含 red_flag 条目的确认请求（409
+  `red_flag_blocked`）
+- restricted 仅提供有限健康教育和专业评估建议；red_flag 停止规划并提供升级指引。
+  两者都不自动转诊
+- restricted/red_flag 解除必须通过上述恢复规则（新的结构化信息 + 重新分类），
+  不接受"已就医"口头确认
 
 **红旗推断禁止规则：**
 
@@ -1217,16 +1236,39 @@ async def report_safety_signal(
 4. 如有新安全信号，生成新 `suggestion_id`（旧 ID 失效）
 5. 重新计算优先级
 
+`profile_version` 必须是对当前用户完整资格输入的稳定 SHA-256：按 `issue_id` 排序的档案条目
+（严重度、certainty、冲突标记、risk tier/version、最新 source event 标识与时间）以及按 ID
+排序的 active 安全信号（类型、作用域、severity、reported_at、invalidates_until）。时间统一
+为 UTC ISO-8601；不得包含 `generated_at` 或数据库读取顺序。
+
+`suggestion_id` 必须由 `user_id + profile_version + PRIORITY_RULE_VERSION +
+RISK_VERSION + priority_context_digest` 确定性生成。`priority_context_digest`
+至少覆盖知识关联数据和每条候选的 `older_than_30_days` 派生位；这样知识数据变化或评估跨过
+30 天衰减边界时，即使没有数据库写入，旧 suggestion 仍会失效。相同输入和相同派生状态必须
+产生相同 ID。
+
 ### 12.4 优先级资格矩阵
 
 | 档案条目状态 | 优先级路径 | 说明 |
 | --- | --- | --- |
-| `certainty=confirmed` + severity 非 normal + 非红旗 | `normal_candidates` | 可进入普通优先级排序 |
+| `risk_tier=restricted` | `safety_blocked` | 优先于 certainty 路由；阻止普通建议和目标确认 |
+| `risk_tier=red_flag` | `safety_blocked` | 优先于 certainty 路由；停止规划并提供升级指引 |
+| `certainty=confirmed` + severity 非 normal + `risk_tier=normal/cautious` | `normal_candidates` | 可进入普通优先级排序 |
 | `certainty=confirmed` + severity=normal | 排除 | normal 不进入改善目标候选 |
 | `certainty=provisional` | `retest_required` | 进入重测或专业评估路径 |
 | `certainty=conflict` | `retest_required` | 进入重测或专业评估路径 |
-| `risk_tier=red_flag` | `red_flag_blocked` | 进入停止/就医路径 |
 | 未评估 | 排除 | 不进入任何候选 |
+
+普通候选最多返回 3 条。排序采用可解释的分层分数，确保严重度不会被次级加分反超：
+
+- severity 基础分：`severe=300`、`moderate=200`、`mild=100`
+- 与另一条 confirmed 非 normal 候选存在 `weight>=0.9` 的知识关联：`+20`
+- 最新投影包含两个不同 source：`+2`
+- 最新 source event 距当前时间严格超过 30 天：`-1`
+- 最终按 `score DESC, latest_event_at DESC, issue_id ASC` 排序，保证完全确定性
+
+知识关联按当前知识库中的显式有向边计算；不得把关联解释成病因。知识关联内容和
+`older_than_30_days` 派生位必须进入 `priority_context_digest`。
 
 ### 12.5 安全案例矩阵
 
@@ -1236,8 +1278,8 @@ async def report_safety_signal(
 | --- | --- | --- | --- |
 | **普通** | 无安全信号，confirmed 非 normal 评估 | normal | 进入 normal_candidates |
 | **谨慎** | 单个 mild pain 信号，无其他风险 | cautious | 保守参数，仍可生成建议 |
-| **受限** | 多个 moderate 信号、单个 severe 非神经症状、`acute_trauma`（任意 body_region）、或 head_neck/cervical/upper_back 区域 `severity_hint=severe` 的 `numbness`/`weakness`（**不含 dizziness**） | restricted | 阻止普通自动建议，仅教育和体态辅助（product-policy，非临床主张） |
-| **红旗** | Phase 1 **不自动产生** red_flag（无 clinical-source 红旗规则）。`acute_trauma` 与 severe neuro 均为 `restricted`（product-policy）。`red_flag` tier 保留给未来结构化输入。 | （Phase 1 不产生） | 当前不阻断；保留 tier 定义与 startup guard 供未来启用 |
+| **受限** | 多个 moderate 信号、单个 severe 非神经症状、`acute_trauma`（任意 body_region）、或 head_neck/cervical/upper_back 区域 `severity_hint=severe` 的 `numbness`/`weakness`（**不含 dizziness**） | restricted | 进入 safety_blocked；阻止普通自动建议和目标确认，仅教育和体态辅助（product-policy，非临床主张） |
+| **红旗** | Phase 1 **不自动产生** red_flag（无 clinical-source 红旗规则）。`acute_trauma` 与 severe neuro 均为 `restricted`（product-policy）。`red_flag` tier 保留给未来结构化输入。 | （Phase 1 不产生） | 当前无规则触发；若存在预留 red_flag 状态，仍必须进入 safety_blocked 并阻止确认 |
 | **恶意/模糊输入** | 矛盾信号（同一时刻 pain+no_pain）、空字段、非法枚举、超长字符串 | 拒绝写入（400） | 不创建安全信号，返回校验错误 |
 | **降级恢复尝试** | red_flag 状态下用户点击"已就医"按钮 | 维持 red_flag | 拒绝自动恢复，要求结构化重新分类 |
 
@@ -1502,7 +1544,8 @@ migration 0002 downgrade（按 FK 依赖逆序）：
 
 ### 17.1 额外验收项
 
-- 优先级资格矩阵正确执行（normal 排除、provisional/conflict 进 retest、红旗进 blocked）
+- 优先级资格矩阵正确执行（restricted/red_flag 优先进入 safety_blocked；normal 排除；
+  其余 provisional/conflict 进 retest）
 - 优先级建议不自动创建训练计划
 - 结果页存在"生成改善计划"入口但 Phase 1 不触发
 - 用户可确认主要改善目标（服务端控制 suggestion_id/profile_version）
@@ -1528,8 +1571,8 @@ migration 0002 downgrade（按 FK 依赖逆序）：
 | 删除/保留 | purged 实际删除原始健康数据，保留 tombstone；照片对象删除可验证 |
 | 过期 | expired 惰性触发 purge |
 | 档案 API | 完整档案、单问题档案、未评估区域 |
-| 优先级资格 | normal 排除；provisional/conflict 进 retest；红旗进 blocked；仅 confirmed+非normal+非红旗进 normal_candidates |
-| 目标确认 | 正常确认；过期 suggestion_id/profile_version 返回 409；红旗阻止返回 409；normal/provisional/conflict/未评估返回 400 |
+| 优先级资格 | restricted/red_flag 优先进入 safety_blocked；normal 排除；其余 provisional/conflict 进 retest；仅 confirmed+非normal+risk_tier normal/cautious 进 normal_candidates |
+| 目标确认 | 1–3 个不同的当前候选；排名唯一连续；过期 suggestion_id/profile_version 返回 409；restricted/red_flag 阻止返回 409；normal/provisional/conflict/未评估/非当前候选返回 400 |
 | Tool 身份 | ActorContext 注入 user_id；photo_keys 所有权校验；idempotency_key 去重；suggestion_id 服务端生成 |
 | 权限隔离 | 跨用户读写拒绝 |
 | 安全信号闭环 | 写入安全信号 → 相关条目 certainty→provisional → 优先级 suggestion_id 失效 → confirm 返回 409 |
@@ -1587,10 +1630,10 @@ flutter test --no-pub
 | # | 问题 | 暂定方向 | 需要决策的时机 |
 | --- | --- | --- | --- |
 | 1 | `mild` 严重度是否对 Flutter 暴露？ | events 表保留原始 mild；Phase 1 档案 API 暴露 mild；Flutter UI 渲染 mild 为"轻度" | Task 8 |
-| 2 | 优先级规则的具体权重公式？ | 严重度 > 关联强度 > 来源数 > 时间新鲜度（仅 confirmed+非normal 入排序） | Task 6 |
+| 2 | 优先级规则的具体权重公式？ | **已决策：** severe/moderate/mild=300/200/100；强关联 +20；双来源 +2；超过 30 天 -1；再按最新事件、issue_id 稳定破同分 | Task 6 已关闭 |
 | 3 | 自测内容的最小填充集（5 条）选哪些问题？ | 头部前倾、圆肩、骨盆前倾、驼背、扁平足（覆盖 4 个部位） | Task 3 |
 | 4 | 照片保留期 90 天是否足够？ | 默认 90 天，用户可缩短，不可延长；到期实际 purge | Task 9 |
-| 5 | `posture_user_goals` 最多确认几个目标？ | 建议 1-3 个 | Task 6 |
+| 5 | `posture_user_goals` 最多确认几个目标？ | **已决策：** 每次确认 1–3 个当前候选，issue 不重复，rank 唯一且连续 1..N | Task 6 已关闭 |
 | 6 | 档案过期扫描是定时任务还是惰性删除？ | Phase 1 惰性删除（读取时检查 lifecycle，触发 purge），Phase 7 定时任务 | Task 2 |
 
 > 安全信号恢复规则（原 #7/8/9）已移至 §12.2 和 Task 6.5 中明确决定，不再作为 Open Question。决定摘要：active/resolved 生命周期；restricted/red_flag 只能通过新的结构化信息重新分类解除；不得仅因时间经过、用户确认或声称已就医自动恢复；`invalidates_until` 仅用于快照失效和复查提醒，不影响 risk_tier。
