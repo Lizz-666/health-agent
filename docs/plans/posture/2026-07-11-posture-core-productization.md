@@ -530,6 +530,9 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 - Modify: `backend/tests/test_openapi_contracts.py`（新增路由的 schema/ref 契约）
 
 `PostureUserGoal` 已由 Task 1 完整创建；本 Task 不修改 `models.py`，不新增 migration。
+Task 6 不抽取或重构 `safety.py` 的既有幂等流程，也不新建通用 `idempotency.py`。
+`confirm_goals` 在 service 内按统一表和统一错误语义实现领域专用的最小路径；是否抽公共 helper
+留到 Task 7 后的独立重构，并以现有 safety 全量回归为前提。
 
 **数据/API 契约：**
 
@@ -775,11 +778,16 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 
 **非目标：** 不创建独立 Tool HTTP 路由；不实现 Agent orchestrator。
 
+**依赖与并行约束：** Task 7 的写实现必须基于已验证并合入的 Task 6 head；两者都修改
+`router.py`，不得并行实现。Task 6 期间仅允许 Task 7 只读审计，不提前写
+`actor_context.py` / `tool_contracts.py`，避免契约漂移。
+
 **预计修改文件：**
 
 - Create: `backend/app/posture/tools.py`（8 个 Tool 函数）
-- Create: `backend/app/posture/tool_contracts.py`（TypedDict / Pydantic 契约 + ActorContext）
+- Create: `backend/app/posture/tool_contracts.py`（仅 Tool 业务 I/O TypedDict / Pydantic 契约）
 - Create: `backend/app/core/actor_context.py`（服务端 ActorContext 定义）
+- Create: `backend/app/upload/ownership.py`（PhotoOwnershipVerifier 协议 + Phase 1 fail-closed 默认实现）
 - Modify: `backend/app/posture/router.py`（REST 端点改为调用 Tool 函数，注入 ActorContext）
 - Create: `backend/tests/test_posture_tools.py`
 
@@ -801,7 +809,7 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 - `ActorContext` 由服务端从 JWT 会话注入（user_id、consent_record、risk_context）
 - user_id **不是** 模型可控 Tool 参数
 - consent_record 从服务端隐私上下文读取，**不暴露给模型**
-- photo_keys 所有权校验：服务端校验 photo_keys 属于 actor.user_id
+- photo_keys 所有权校验通过 `PhotoOwnershipVerifier`；路径前缀只做格式预检，不作为证明
 - 有副作用 Tool 使用 idempotency_key（统一幂等表，规格 §8.5 idempotency_records）
 - suggest_posture_priorities 返回服务端生成的 suggestion_id、profile_version、rule_version、risk_version
 - confirm_posture_goals 不接受客户端自报 priority_context_snapshot
@@ -825,6 +833,8 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 - `report_safety_signal` 写入触发风险分类重算
 - 审计字段不含照片 URL、原始模型响应或健康档案
 - photo_keys 所有权校验（PhotoOwnershipDenied 错误）
+- 无可信 ownership backend 时返回 PhotoOwnershipUnavailable；Phase 1 隐私门应更早
+  PhotoAnalysisDisabled，且不得探测对象、创建幂等记录/事件或调用模型
 - idempotency_key 去重验证（统一幂等表）
 
 **migration 和兼容策略：** idempotency_records 表在 Task 1 migration 中创建。不创建新 migration。
@@ -837,7 +847,9 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 - ActorContext 注入正确（user_id 不在模型参数中）
 - 未认证调用拒绝
 - 跨用户调用拒绝
-- photo_keys 跨用户所有权校验拒绝
+- 合成 `PhotoOwnershipVerifier` 覆盖 owned / cross-user / unavailable；fake 只验证 Tool 契约，
+  不作为生产照片门启用证据
+- 默认 verifier fail closed；不得通过解析 `posture_photos/{user_id}/...` 前缀声称对象已上传或归属
 - idempotency_key 重复调用返回首次结果（不重复副作用）
 - **idempotency_key 相同但 request_hash 不同 → 拒绝（400）**
 - **统一幂等表覆盖 analyze_photo、confirm_goals、report_safety_signal**
@@ -860,7 +872,8 @@ docker stop health-task1-pg && docker rm health-task1-pg && docker volume rm ...
 
 - 8 个 Tool 有类型化契约定义（含 confirm_posture_goals 和 report_safety_signal）
 - ActorContext 正确注入（user_id 非模型参数）
-- photo_keys 所有权校验有测试
+- photo_keys owner verifier 契约有合成测试，默认运行时 fail closed；真实 provider-backed
+  ownership 实现仍是照片隐私门未来启用的前置，不在 Phase 1 伪造
 - 统一幂等表有测试（覆盖 3 个副作用 Tool，相同 key 不同 hash 拒绝）
 - REST 端点和 Tool 共享同一逻辑
 - 权限、照片门和安全门检查有测试

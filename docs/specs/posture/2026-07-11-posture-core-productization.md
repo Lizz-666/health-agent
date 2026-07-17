@@ -849,8 +849,14 @@ Tools 是内部应用层类型化函数，不暴露独立 HTTP 路由。REST API
 
 **photo_keys 所有权校验：**
 
-- 副作用 Tool 接收 `photo_keys` 时，服务端校验这些 key 属于当前 `ActorContext.user_id` 的已上传对象
+- 副作用 Tool 接收 `photo_keys` 时，通过服务端 `PhotoOwnershipVerifier` 校验这些 key
+  是当前 `ActorContext.user_id` 的已上传对象
 - 不接受跨用户的 photo_keys
+- 对象 key 中包含 user_id 或匹配路径前缀只能用于格式预检，**不能**单独作为所有权证明
+- Phase 1 没有上传授权记录或可核验对象元数据，默认 verifier 必须 fail closed；
+  照片隐私门仍先返回 `PhotoAnalysisDisabled`，不得触发模型、写事件或创建幂等记录
+- 隐私门未来启用前，必须提供持久化上传授权或由对象存储返回的可信 owner metadata，
+  并完成真实实现与测试；测试 fake 不能作为生产启用证据
 
 **幂等性（统一 `idempotency_records` 表，§8.5）：**
 
@@ -952,15 +958,15 @@ async def analyze_posture_photo(
 | --- | --- |
 | 输入 | `actor`（服务端注入，含 user_id 和 consent_record）、`issue_id`、`photo_keys`、`idempotency_key` |
 | consent_token | **从 `actor.consent_record` 读取，非模型参数** |
-| photo_keys 所有权 | 服务端校验 photo_keys 属于 `actor.user_id` |
+| photo_keys 所有权 | 通过 `PhotoOwnershipVerifier` 校验已上传对象归属；路径前缀不构成证明 |
 | 输出 | `PhotoAssessmentResult`，含 severity（可空）、confidence、evidence、model_meta |
 | 授权 | JWT 用户 + 照片门 + 同意记录（从 actor 读取） |
 | 数据读取 | 知识库 + 用户档案 + 模型 API |
 | 副作用 | 创建评估事件 + 更新档案条目 |
 | 幂等性 | 通过 `idempotency_key` 实现：相同 `(user_id, idempotency_key)` 在 24h 内返回首次结果 |
-| 错误类型 | `PhotoAnalysisDisabled`, `ConsentRequired`, `ModelUnavailable`, `SchemaValidationFailed`, `IssueNotFound`, `PhotoOwnershipDenied` |
+| 错误类型 | `PhotoAnalysisDisabled`, `ConsentRequired`, `PhotoOwnershipUnavailable`, `PhotoOwnershipDenied`, `ModelUnavailable`, `SchemaValidationFailed`, `IssueNotFound` |
 | 审计字段 | `user_id, issue_id, model_name, model_version, confidence, created_at`（不含照片 URL 或原始响应） |
-| 照片门关闭行为 | 返回 `PhotoAnalysisDisabled`，不创建事件，保留自测路径 |
+| 照片门关闭行为 | 认证后先返回 `PhotoAnalysisDisabled`；不探测对象是否存在，不创建幂等记录/事件，不调用模型，保留自测路径 |
 | 重新安全分类 | 新事件触发档案 certainty 重算和风险分类更新 |
 
 ### 10.5 `get_posture_profile`
@@ -1539,7 +1545,7 @@ migration 0002 downgrade（按 FK 依赖逆序）：
 | 1 | 用户可完成至少一个部位的图示自测 | Android 手工冒烟：自测流程含扩展内容 |
 | 2 | 照片和自测冲突能够正确展示 | 后端测试：冲突检测规则覆盖 + combined_severity=null + Flutter UI 测试 |
 | 3 | 体态档案明确区分已评估与未评估区域 | 档案 API 测试 + Flutter 档案页 UI |
-| 4 | Tool 输出全部通过类型校验和权限检查 | Tool 层单元测试 + ActorContext 注入 + 权限隔离 + photo_keys 所有权测试 |
+| 4 | Tool 输出全部通过类型校验和权限检查 | Tool 层单元测试 + ActorContext 注入 + 权限隔离；照片 Tool 默认 fail closed，并用合成 verifier 验证 owner 契约（不代表照片门可启用） |
 | 5 | 新安全信号会使旧资格判断失效，并在继续建议前重新执行风险分类 | 安全信号写入 → certainty 降级 → suggestion_id 失效 → confirm 409 全链路测试 |
 
 ### 17.1 额外验收项
@@ -1551,6 +1557,8 @@ migration 0002 downgrade（按 FK 依赖逆序）：
 - 用户可确认主要改善目标（服务端控制 suggestion_id/profile_version）
 - 自测内容包含停止条件、正确姿势、常见错误、权威来源标识
 - 隐私门硬拒绝（非配置布尔值），8 个启用条件有验证检查点
+- 照片 Tool 在无可信 `PhotoOwnershipVerifier` 时 fail closed；路径前缀不作为所有权证明，
+  合成 verifier 测试不计入隐私门启用证据
 - 8 个 Tool 有类型化契约定义和单元测试（含 confirm_posture_goals 和 report_safety_signal）
 - 历史数据迁移后档案投影正确（expand/contract 模式验证）
 - purged 事件实际删除原始健康数据，仅保留不含健康内容的 tombstone

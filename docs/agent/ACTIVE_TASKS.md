@@ -24,7 +24,12 @@
 | Phase 1 integration | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | Task 2/6.5/9 以干净可审计的 5-commit 链提交并已本地 fast-forward 到 main；最新 reviewer fix 为 `64afd6b`；尚未 push/PR，未标记 Phase 1 完成；参考 worktree（`codex/phase1-integration`）仅作历史最终态参照，不得修改 |
 | Phase 1 Task 4 | OpenCode (impl) + Codex review | `codex/phase1-task4-profile-api` / `health-worktrees/phase1-task4-profile-api` | `552fb41` | `merged` via `9892c3e` | 体态档案读取 API：GET /profile + GET /profile/{issue_id}（spec §9.2）；JWT-only 跨用户隔离（无 user_id 参数）；sources 只透传 profile 投影结构化内容，不暴露 photo_keys/原始 ai_response；未实现 priorities 与 related_priority（属 Task 6）；Codex 已检查真实 diff、重跑验证并 fast-forward 到 main |
 | Phase 1 Task 5 | OpenCode (impl) + Codex review | `codex/phase1-task5-conflict-state` / `health-worktrees/phase1-task5-conflict-state` | `9892c3e` | `merged` via `f00098e` | 冲突状态收口（spec §6.3/§6.4/§11.1）：审计确认 `project_profile` 已完整正确实现 §11.1 全表且无“取更严重”自动合并路径，/profile 与 /profile/{issue_id} 已透传 conflict；零生产代码改动，仅补测试缺口——新建 test_posture_conflict.py（§11.1 全量参数化矩阵 + 单来源 + no-take-severe + DB 冲突解决重建）并补 test_posture_profile_api.py 单条目 conflict 详情；未实现 priorities/goals（Task 6），conflict 无提前放行路径；Codex 已检查真实 diff 并重跑验证 |
-| Phase 1 Task 6 | OpenCode (impl) + Codex review | `codex/phase1-task6-priority-goals` / `health-worktrees/phase1-task6-priority-goals` | `018baa3` | `planned` | 确定性优先级 + 目标确认；负责人已在实现前收口安全契约：restricted/red_flag 优先进入 `safety_blocked` 且语义分离，确认分别返回 409 `restricted_blocked` / `red_flag_blocked`；1–3 个当前候选、稳定版本 token、30 天边界失效、幂等批次重放、OpenAPI ref 均为验收项；不改 models/migration，不生成训练计划 |
+| Phase 1 Task 6 | OpenCode (impl) + Codex review | `codex/phase1-task6-priority-goals` / `health-worktrees/phase1-task6-priority-goals` | `018baa3` | `planned` | 确定性优先级 + 目标确认；负责人已在实现前收口安全契约：restricted/red_flag 优先进入 `safety_blocked` 且语义分离，确认分别返回 409 `restricted_blocked` / `red_flag_blocked`；1–3 个当前候选、稳定版本 token、30 天边界失效、幂等批次重放、OpenAPI ref 均为验收项；不改 models/migration，不抽取或重构 safety 幂等路径，不生成训练计划 |
+
+Task 7 只读准备审计已完成，写实现必须等待 Task 6 验证并合入后再建立 worktree。
+负责人裁决：`ActorContext` 归 `app/core`，Tool I/O 归 `tool_contracts.py`；照片所有权使用
+fail-closed `PhotoOwnershipVerifier` 边界，禁止用对象 key 前缀冒充已上传对象证明；真实
+provider-backed verifier 是未来照片隐私门启用前置，不在 Phase 1 伪造。
 
 ## Phase 1 Integration — Clean Chain Verification
 
