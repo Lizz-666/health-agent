@@ -18,10 +18,10 @@
 
 | Task | Executor | Branch / worktree | Base SHA | Status | Scope and coordination note |
 | --- | --- | --- | --- | --- | --- |
-| Phase 1 Task 2 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `committed` at `d01492c` | 双写评估事件投影 + profile 投影（spec §6.3/§6.4/§8.5）；service.py 的 safety/purge 导入在本 commit 为防御式（模块尚未存在），于后续 commit 移除 |
-| Phase 1 Task 6.5 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `committed` at `f420a48` | 结构化安全信号分类 + risk_rules + safety-signals 端点；safety.py 的 purge 导入仍为防御式（purge 未存在）；依赖 Task 2 的 service 投影 |
-| Phase 1 Task 9 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `committed` at `99afcd8` | 隐私门 photo→privacy_gate + crash-safe purge + 配置/路由/conftest 条件补丁；移除全部防御式导入，恢复 service/safety 为直接导入，恢复完整 test_posture_safety.py |
-| Phase 1 integration | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `committed`, NOT merged | Task 2/6.5/9 以干净可审计的 5-commit 链提交；最新 reviewer fix 为 `64afd6b`；尚未 push/PR/merge，未标记 Phase 1 完成；参考 worktree（`codex/phase1-integration`）仅作历史最终态参照，不得修改 |
+| Phase 1 Task 2 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | 双写评估事件投影 + profile 投影（spec §6.3/§6.4/§8.5）；service.py 的 safety/purge 导入在本 commit 为防御式（模块尚未存在），于后续 commit 移除 |
+| Phase 1 Task 6.5 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | 结构化安全信号分类 + risk_rules + safety-signals 端点；safety.py 的 purge 导入仍为防御式（purge 未存在）；依赖 Task 2 的 service 投影 |
+| Phase 1 Task 9 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | 隐私门 photo→privacy_gate + crash-safe purge + 配置/路由/conftest 条件补丁；移除全部防御式导入，恢复 service/safety 为直接导入，恢复完整 test_posture_safety.py |
+| Phase 1 integration | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | Task 2/6.5/9 以干净可审计的 5-commit 链提交并已本地 fast-forward 到 main；最新 reviewer fix 为 `64afd6b`；尚未 push/PR，未标记 Phase 1 完成；参考 worktree（`codex/phase1-integration`）仅作历史最终态参照，不得修改 |
 
 ## Phase 1 Integration — Clean Chain Verification
 
@@ -45,6 +45,7 @@
 | Phase 1 规格和实施计划 | `87f7b74`, merged by `083f6d9` | `merged` |
 | Phase 1 Task 1 migration foundation | `c510d49`, merged by `eb5210b` | `merged` |
 | Phase 1 Task 3 sourced self-test content gate | `b65b4e7`, merged by `e470572` | `merged` |
+| Phase 1 Task 2/6.5/9 clean integration | `d01492c` → `cc92449`, fast-forwarded to main | `merged` |
 
 ## Other Worktrees
 
