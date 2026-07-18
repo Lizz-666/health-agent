@@ -66,9 +66,12 @@ class IssueDetail {
     selfTests: (json['self_tests'] as List? ?? [])
         .map((e) => SelfTest.fromJson(e as Map<String, dynamic>))
         .toList(),
-    corrections: List<Map<String, dynamic>>.from(json['corrections'] as List? ?? []),
-    consequences:
-        List<Map<String, dynamic>>.from(json['consequences'] as List? ?? []),
+    corrections: List<Map<String, dynamic>>.from(
+      json['corrections'] as List? ?? [],
+    ),
+    consequences: List<Map<String, dynamic>>.from(
+      json['consequences'] as List? ?? [],
+    ),
     redFlags: List<String>.from(json['red_flags'] as List? ?? []),
     relatedIssues: (json['related_issues'] as List? ?? [])
         .map((e) => RelatedIssueRef.fromJson(e as Map<String, dynamic>))
@@ -83,21 +86,84 @@ class SelfTest {
   final String imageKey;
   final String toolsNeeded;
 
+  // Extended self-test fields mirrored from the backend SelfTestSchema
+  // (spec §6.6 / §12.1). These are display-only on the client; legacy
+  // knowledge entries ship without them and parse with empty defaults.
+  final String preparation;
+  final String correctPosture;
+  final List<String> commonErrors;
+  final List<String> stopConditions;
+  final List<String> safetyNotes;
+  final String? contentVersion;
+  final Map<String, dynamic>? source;
+
   SelfTest({
     required this.name,
     required this.steps,
     required this.positiveSign,
     required this.imageKey,
     required this.toolsNeeded,
+    this.preparation = '',
+    this.correctPosture = '',
+    this.commonErrors = const [],
+    this.stopConditions = const [],
+    this.safetyNotes = const [],
+    this.contentVersion,
+    this.source,
   });
 
-  factory SelfTest.fromJson(Map<String, dynamic> json) => SelfTest(
-    name: (json['name'] as String?) ?? '',
-    steps: List<String>.from(json['steps'] as List? ?? []),
-    positiveSign: (json['positive_sign'] as String?) ?? '',
-    imageKey: (json['image_key'] as String?) ?? '',
-    toolsNeeded: (json['tools_needed'] as String?) ?? '',
-  );
+  factory SelfTest.fromJson(Map<String, dynamic> json) {
+    final contentVersion = (json['content_version'] as String?)?.trim();
+    final preparation = (json['preparation'] as String?)?.trim() ?? '';
+    final correctPosture = (json['correct_posture'] as String?)?.trim() ?? '';
+    final commonErrors = List<String>.from(
+      json['common_errors'] as List? ?? [],
+    ).map((e) => e.trim()).toList(growable: false);
+    final stopConditions = List<String>.from(
+      json['stop_conditions'] as List? ?? [],
+    ).map((e) => e.trim()).toList(growable: false);
+    final safetyNotes = List<String>.from(
+      json['safety_notes'] as List? ?? [],
+    ).map((e) => e.trim()).toList(growable: false);
+    final source = json['source'] == null
+        ? null
+        : Map<String, dynamic>.from(json['source'] as Map);
+    final extended =
+        preparation.isNotEmpty ||
+        correctPosture.isNotEmpty ||
+        commonErrors.isNotEmpty ||
+        stopConditions.isNotEmpty ||
+        (contentVersion?.isNotEmpty ?? false) ||
+        source != null;
+    if (extended &&
+        (preparation.isEmpty ||
+            correctPosture.isEmpty ||
+            !commonErrors.any((e) => e.isNotEmpty) ||
+            !stopConditions.any((e) => e.isNotEmpty) ||
+            contentVersion == null ||
+            contentVersion.isEmpty ||
+            source == null)) {
+      throw const FormatException(
+        'SelfTest: extended content is missing required safety fields',
+      );
+    }
+    return SelfTest(
+      name: (json['name'] as String?) ?? '',
+      steps: List<String>.from(json['steps'] as List? ?? []),
+      positiveSign: (json['positive_sign'] as String?) ?? '',
+      imageKey: (json['image_key'] as String?) ?? '',
+      toolsNeeded: (json['tools_needed'] as String?) ?? '',
+      preparation: preparation,
+      correctPosture: correctPosture,
+      commonErrors: commonErrors,
+      stopConditions: stopConditions,
+      safetyNotes: safetyNotes,
+      contentVersion: (contentVersion == null || contentVersion.isEmpty)
+          ? null
+          : contentVersion,
+      source: source,
+    );
+  }
 }
 
 class RelatedIssueRef {
