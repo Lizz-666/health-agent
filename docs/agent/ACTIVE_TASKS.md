@@ -8,7 +8,7 @@
 - 阶段：Phase 1 体态核心产品化
 - 规格：`docs/specs/posture/2026-07-11-posture-core-productization.md`
 - 计划：`docs/plans/posture/2026-07-11-posture-core-productization.md`
-- 当前下一实现任务代码基线：`edde8b0279b834d23d0bf16a1a50b648ebe570c2`
+- 当前下一实现任务代码基线：`6fd47d1`
 
 ## Status Definitions
 
@@ -29,6 +29,7 @@
 | Phase 1 Task 8A | OpenCode (impl) + Codex review | `codex/phase1-task8a-history-source` / `health-worktrees/phase1-task8a-history-source` | `55acc62` | `merged` via `9fcea74` | history 同时返回真实 `source` 与同值 `method` 兼容别名，legacy nullable source 回退 method；OpenAPI 将 source 保持为可选追加字段。Codex review 修复过时精确 keyset 断言并补 OpenAPI optional 守护；主分支全量后端 558 passed、11 个 PostgreSQL/Docker 条件测试 skipped |
 | Phase 1 Task 8B | OpenCode (impl) + Codex review | `codex/phase1-task8b-flutter-foundation` / `health-worktrees/phase1-task8b-flutter-foundation` | `55acc62` | `merged` via `cf7a889` | Flutter 类型模型、Provider、状态与 UUID 幂等基础层。Codex review 修复无效照片响应降级 normal、旧 priorities 乱序回写、安全信号 2xx 解析失败未失效旧建议、扩展自测安全字段不完整、宽松数值/枚举解析和重复确认；主分支 flutter analyze 通过、flutter test 134 passed |
 | Phase 1 Task 8C | OpenCode (impl) + Codex review | `codex/phase1-task8c-flutter-posture-ui` / `health-worktrees/phase1-task8c-flutter-posture-ui` | `ef18d22` | `merged` via `edde8b0` | Flutter 体态档案/结果/自测/历史页面与状态徽标已完成。Codex review 正式扩展范围至 `app.dart`、auth/user/assessment/posture-profile providers 与认证会话清理测试：修复缺失结果静默降级 normal、跨账号健康缓存泄露、注销后旧请求回写、2xx 安全响应解析失败仍保留旧目标、非 conflict 来源缺失、空档案分类缺失、mild 显示未知及窄屏溢出；constants/theme/home/issues 和既有共享 widget 未改，`starlit-galaxy-rolls-21h55` 未触碰。主分支 `edde8b0` 新鲜验证：analyze 通过；全量 196 passed；debug APK 构建成功；未做实体 Android 冒烟 |
+| Phase 1 Task 10.5 | OpenCode (impl) + Codex review | `codex/phase1-task10-5-migration-contract` / `health-worktrees/phase1-task10-5-migration-contract` | `6fd47d1` | `planned` | Migration Phase C contract/cleanup：0003 收紧 source/lifecycle NOT NULL，severity 永久 nullable，删除数据库 method/result 旧列并移除 dual-write；API method/result 兼容字段继续由 source/severity 映射。必须完成 PostgreSQL 16 upgrade/downgrade/re-upgrade 与普通/null severity 数据往返；Task 10 最终 E2E 在本任务合入前不得启动 |
 
 Task 7 已验证并合入；后续 Agent 编排只能复用这些受控 Tool，不得直接访问数据库或绕过照片门。
 负责人裁决：`ActorContext` 归 `app/core`，Tool I/O 归 `tool_contracts.py`；照片所有权使用
