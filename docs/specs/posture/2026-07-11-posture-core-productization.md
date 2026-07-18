@@ -1527,7 +1527,13 @@ migration 0002 downgrade（按 FK 依赖逆序）：
 7. 删除 events 表的新增列（source、severity、lifecycle、content_version、ai_model_meta）
 8. 重命名 posture_assessment_events 回 posture_assessments
 
-> Phase C 的 0003 cleanup migration 有独立 downgrade（恢复 method/result 列、恢复 source/lifecycle 为 nullable）。severity 在 0003 中仍保持 nullable，无需恢复。
+> Phase C 的 0003 cleanup migration 有独立 downgrade：先以 nullable
+> 恢复 method/result，按 `method=source`、
+> `result=COALESCE(severity, 'uncertain')` 回填并重新收紧为 NOT NULL，再把
+> source/lifecycle 恢复为 nullable。severity 在 0003 中仍保持 nullable，
+> 无需恢复。数据库旧列删除后，对外 API 仍保留 method/result 兼容字段：
+> method 是 source 的同值别名，result 由 severity 确定性映射，null 映射为
+> `uncertain`。
 
 ### 16.5 测试策略
 

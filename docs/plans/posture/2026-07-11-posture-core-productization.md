@@ -1207,9 +1207,15 @@ PHOTO_CONSENT_REQUIRED=true
 
 - Create: `backend/alembic/versions/0003_posture_contract.py`
 - Modify: `backend/app/posture/models.py`（移除 method/result 列定义）
-- Modify: `backend/app/posture/service.py`（移除 dual-write 逻辑，仅保留 source/severity）
-- Modify: `backend/tests/conftest.py`（移除旧列适配）
+- Modify: `backend/app/posture/service.py`（移除数据库旧列读写；对外 API 的 method/result 兼容字段由 source/severity 确定性映射）
 - Modify: `backend/tests/test_migrations.py`（追加 0003 测试）
+- Modify: `backend/tests/test_posture.py`（Phase C 后 history 兼容字段与 NOT NULL 契约）
+- Modify: `backend/tests/test_pg_integration.py`（事件 fixture 移除旧列）
+- Modify: `backend/tests/test_posture_safety.py`（事件 fixture 移除旧列）
+- Modify: `backend/tests/test_privacy_gate.py`（事件 fixture 移除旧列）
+- Modify: `docs/agent/ACTIVE_TASKS.md`（仅更新本 Task 状态）
+
+`backend/tests/conftest.py` 当前没有 method/result 旧列适配，不因历史计划描述做无关修改。
 
 **数据/API 契约：**
 
@@ -1218,17 +1224,24 @@ PHOTO_CONSENT_REQUIRED=true
   - 收紧 `lifecycle` 为 NOT NULL（回填完成后）
   - **severity 保持 nullable**（永久，"不确定"答案合法产生 null）
   - 删除旧列 `method`、`result`（确认无代码引用后）
+- 数据库旧列删除不等于删除 API 兼容字段：
+  - history 继续返回 `method`，其值恒等于 `source`
+  - assessment/history 继续返回 `result`，由 `severity` 映射；`severity=null` 映射为 `uncertain`
+  - 不允许 schemas/router/Flutter 因本迁移发生破坏性契约变化
 
 **安全与隐私要求：**
 
-- 删除旧列前确认无代码引用（grep method/result in service/router/schemas）
+- 删除旧列前确认无 ORM 构造、查询、回放或 fixture 引用
+  `PostureAssessmentEvent.method/result`；grep 命中的 API response 字段必须逐项区分，不能机械删除
 - severity 保持 nullable 不影响数据完整性（null 是合法值）
 - downgrade 可恢复旧列和 nullable 状态
 
 **migration 和兼容策略（规格 §16.1 Phase C）：**
 
-- upgrade：收紧 source/lifecycle NOT NULL → 删除 method/result 列
-- downgrade：恢复 method/result 列 → 恢复 source/lifecycle nullable
+- upgrade：先验证 source/lifecycle 无 null → 收紧 source/lifecycle NOT NULL → 删除 method/result 列
+- downgrade：先以 nullable 恢复 method/result 列 → `method=source`、
+  `result=COALESCE(severity, 'uncertain')` 回填 → 收紧 method/result NOT NULL →
+  恢复 source/lifecycle nullable
 - severity 在 0003 中仍保持 nullable，无需变更
 
 **后端测试：**
@@ -1256,10 +1269,11 @@ python -m pytest tests -q
 - source、lifecycle 为 NOT NULL
 - **severity 仍为 nullable**（不收紧）
 - method、result 列已删除
-- downgrade 恢复 method/result 列和 nullable
+- downgrade 恢复 method/result NOT NULL 列并按确定性映射保留数据，同时恢复 source/lifecycle nullable
 - 现有测试不回归（移除 dual-write 后）
 - 真实 PostgreSQL upgrade/downgrade/re-upgrade 闭环通过
-- grep 确认无代码引用旧 method/result 列
+- 真实 PostgreSQL 合成行覆盖普通 severity 与 null severity，在 downgrade/re-upgrade 后语义不丢失
+- grep 确认无代码引用旧数据库 method/result 列；API 兼容字段仍保留
 
 **Flutter 测试：** 无
 
