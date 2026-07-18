@@ -1210,6 +1210,7 @@ PHOTO_CONSENT_REQUIRED=true
 - Modify: `backend/app/posture/service.py`（移除数据库旧列读写；对外 API 的 method/result 兼容字段由 source/severity 确定性映射）
 - Modify: `backend/tests/test_migrations.py`（追加 0003 测试）
 - Modify: `backend/tests/test_posture.py`（Phase C 后 history 兼容字段与 NOT NULL 契约）
+- Modify: `backend/tests/test_posture_profile.py`（移除 dual-write 旧列断言，保留 source/severity 投影断言）
 - Modify: `backend/tests/test_pg_integration.py`（事件 fixture 移除旧列）
 - Modify: `backend/tests/test_posture_safety.py`（事件 fixture 移除旧列）
 - Modify: `backend/tests/test_privacy_gate.py`（事件 fixture 移除旧列）
