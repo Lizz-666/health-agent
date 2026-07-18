@@ -895,19 +895,28 @@ Task 6 不抽取或重构 `safety.py` 的既有幂等流程，也不新建通用
 
 **非目标：** 不实现训练计划 UI；不实现 Agent 聊天 UI。
 
+**依赖与并行约束：** 基于已合入 Task 7 的主分支最新 HEAD。现有
+`starlit-galaxy-rolls-21h55` worktree 含未提交 UI 改动，不得读取为当前产品事实、复制、清理
+或覆盖。主分支已经存在 `/profile/posture` 路由和本地状态占位档案页，Task 8 复用路由并把
+占位页改为服务端档案；不修改与 starlit 重叠的 `app.dart`、`core/constants.dart`、
+`core/theme.dart`、home/issues/widgets 文件。
+
 **预计修改文件：**
 
 - Create: `app/lib/models/posture_profile.dart`
 - Create: `app/lib/models/priority_suggestion.dart`
+- Create: `app/lib/models/safety_signal.dart`
+- Modify: `app/lib/models/issue.dart`（解析扩展自测字段）
 - Modify: `app/lib/providers/assessment_provider.dart`
 - Create: `app/lib/providers/posture_profile_provider.dart`
-- Create: `app/lib/screens/profile/posture_profile_screen.dart`
+- Modify: `app/lib/screens/profile/posture_profile_screen.dart`（替换本地状态占位实现）
 - Modify: `app/lib/screens/result/result_screen.dart`（certainty + source 标注）
 - Modify: `app/lib/screens/test/self_test_screen.dart`（扩展自测内容渲染）
 - Modify: `app/lib/screens/history/history_screen.dart`（source 字段）
-- Modify: `app/lib/core/constants.dart`（路由）
-- Modify: `app/lib/app.dart`（新路由）
+- Modify: `app/pubspec.yaml` / `app/pubspec.lock`（将已锁定的 `uuid` 声明为直接依赖）
 - Create: `app/test/models/posture_profile_test.dart`
+- Create: `app/test/models/priority_suggestion_test.dart`
+- Create: `app/test/providers/posture_profile_provider_test.dart`
 - Create: `app/test/screens/posture_profile_test.dart`
 
 **数据/API 契约：**
@@ -919,6 +928,10 @@ Flutter 模型对应后端新 API：
 - `PrioritySuggestions`：suggestion_id、profile_version、rule_version、risk_version、normal_candidates、retest_required、safety_blocked
 - `PrioritySuggestion`：issue_id、suggested_rank、reasons、association_weight
 - `SafetySignal`：signal_type、body_region、related_issue_id、severity_hint
+- 照片分析、目标确认和安全信号上报必须发送客户端生成的 1–64 字符
+  `idempotency_key`；一次用户动作/网络重试复用同一 key，不以时间戳充当唯一性保证
+- 目标确认只提交当前 `normal_candidates` 中 1–3 个不同 issue，rank 连续为 `1..N`
+- `409 stale_priority` 不自动重放确认：刷新 priorities，提示用户重新核对和选择
 
 **安全与隐私要求：**
 
@@ -928,8 +941,10 @@ Flutter 模型对应后端新 API：
 - restricted 显示有限教育/专业评估提示；red_flag 显示停止规划和升级指引
 - provisional 条目标注"建议重新评估"
 - 安全信号报告入口（Phase 1 最小实现）
+- 安全信号上报成功后刷新档案和 priorities；不得继续展示或提交旧 suggestion_id
 - 结果页保留免责声明
 - combined_severity 为空时 UI 显示"无合并结论"
+- 网络/解析失败显示明确错误和重试，不得渲染成空档案、normal 或“无问题”
 
 **migration 和兼容策略：** 无（前端）
 
@@ -947,6 +962,8 @@ Flutter 模型对应后端新 API：
 - restricted/red_flag 按各自 risk_tier 渲染不同安全提示
 - 优先级列表渲染（normal_candidates、retest_required、safety_blocked 分区）
 - 目标确认交互（回传 suggestion_id/profile_version）
+- 目标确认重复点击不重复提交；stale_priority 刷新后要求用户重新确认
+- 安全信号上报使用结构化枚举，成功后旧优先级失效并刷新
 - 自测扩展字段（停止条件、正确姿势）渲染
 
 **Android 手工验证：**
