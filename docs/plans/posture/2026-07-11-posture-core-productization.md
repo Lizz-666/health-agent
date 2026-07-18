@@ -923,6 +923,8 @@ Codex review、提交并合入后再开始。实现 Agent 不修改 `ACTIVE_TASK
 - Modify: `backend/app/posture/schemas.py`
 - Modify: `backend/app/posture/service.py`
 - Modify: `backend/tests/test_posture.py`
+- Modify: `backend/tests/test_posture_profile.py`（更新旧 shape 兼容断言）
+- Modify: `backend/tests/test_openapi_contracts.py`（`source` 为可选追加字段）
 
 **契约与验收：**
 
