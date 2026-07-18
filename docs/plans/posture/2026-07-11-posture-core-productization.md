@@ -901,22 +901,82 @@ Task 6 不抽取或重构 `safety.py` 的既有幂等流程，也不新建通用
 占位页改为服务端档案；不修改与 starlit 重叠的 `app.dart`、`core/constants.dart`、
 `core/theme.dart`、home/issues/widgets 文件。
 
+Task 8 拆分为以下依赖有向图：
+
+```text
+Task 8A（history source 后端兼容补丁） ──┐
+                                           ├──→ Task 8C（Flutter 页面集成与验收）
+Task 8B（Flutter 模型/Provider/幂等基础） ┘
+```
+
+Task 8A 与 8B 文件范围不重叠，可以从同一已登记 base 并行；Task 8C 必须等待二者均经
+Codex review、提交并合入后再开始。实现 Agent 不修改 `ACTIVE_TASKS.md`，状态由协调者维护，
+避免并行任务争用治理总账。
+
+### Task 8A: history source 后端兼容补丁
+
+**目标：** 补齐规格 §9.1/§15 已要求但当前实现遗漏的 history `source` 字段，同时保留
+旧 `method` 字段作为兼容别名。
+
 **预计修改文件：**
 
+- Modify: `backend/app/posture/schemas.py`
+- Modify: `backend/app/posture/service.py`
+- Modify: `backend/tests/test_posture.py`
+
+**契约与验收：**
+
+- `GET /api/v1/posture/history` 每条记录同时返回 `source` 与 `method`
+- `source` 来自事件记录的真实 `source`；`method` 保持兼容且值与 `source` 一致
+- 不新增 migration，不改变事件写入、档案投影、风险分类或其他 API
+- 覆盖 self_test/photo 的序列化、空历史、鉴权和跨用户隔离；只用合成数据
+- 相关测试与后端全量测试通过
+
+### Task 8B: Flutter 模型、Provider 与幂等基础
+
+**目标：** 建立 Task 8C 页面所需的类型模型、API 状态层和稳定客户端幂等键，不修改页面。
+
+**预计修改文件：**
+
+- Create: `app/lib/core/idempotency_key.dart`
 - Create: `app/lib/models/posture_profile.dart`
 - Create: `app/lib/models/priority_suggestion.dart`
 - Create: `app/lib/models/safety_signal.dart`
+- Modify: `app/lib/models/assessment.dart`（解析 history source，兼容 method）
 - Modify: `app/lib/models/issue.dart`（解析扩展自测字段）
 - Modify: `app/lib/providers/assessment_provider.dart`
 - Create: `app/lib/providers/posture_profile_provider.dart`
+- Modify: `app/pubspec.yaml` / `app/pubspec.lock`（将已锁定的 `uuid` 声明为直接依赖）
+- Create: `app/test/core/idempotency_key_test.dart`
+- Create: `app/test/models/posture_profile_test.dart`
+- Create: `app/test/models/priority_suggestion_test.dart`
+- Create: `app/test/models/safety_signal_test.dart`
+- Create: `app/test/providers/posture_profile_provider_test.dart`
+
+**契约与验收：**
+
+- 为 profile、profile detail、priorities、confirm goals、safety signals 提供类型化调用和
+  loading/error/data 状态；有效空档案与网络/解析失败必须可区分
+- 未知关键枚举或缺失必需字段不得默认成 `normal`、空档案或“无问题”
+- `combined_severity` 保持可空；conflict/provisional/restricted/red_flag 信息不丢失
+- 照片分析、目标确认和安全信号上报使用客户端 UUID v4；一次用户动作及其网络重试复用同一
+  key，新用户动作生成新 key
+- `409 stale_priority` 清除旧选择/旧建议状态并刷新 priorities，不自动重放确认
+- 安全信号成功后刷新 profile 与 priorities，不继续暴露旧 suggestion
+- 不修改任何 screen、route、theme、home/issues/widgets 文件
+- `dart format`、`flutter analyze`、相关测试和 Flutter 全量测试通过
+
+### Task 8C: Flutter 页面集成与统一验收
+
+**依赖：** Task 8A、Task 8B 均已验证并合入。
+
+**预计修改文件：**
+
 - Modify: `app/lib/screens/profile/posture_profile_screen.dart`（替换本地状态占位实现）
 - Modify: `app/lib/screens/result/result_screen.dart`（certainty + source 标注）
 - Modify: `app/lib/screens/test/self_test_screen.dart`（扩展自测内容渲染）
 - Modify: `app/lib/screens/history/history_screen.dart`（source 字段）
-- Modify: `app/pubspec.yaml` / `app/pubspec.lock`（将已锁定的 `uuid` 声明为直接依赖）
-- Create: `app/test/models/posture_profile_test.dart`
-- Create: `app/test/models/priority_suggestion_test.dart`
-- Create: `app/test/providers/posture_profile_provider_test.dart`
+- Create: `app/lib/widgets/posture_status_badge.dart`
 - Create: `app/test/screens/posture_profile_test.dart`
 
 **数据/API 契约：**
