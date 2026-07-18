@@ -87,6 +87,18 @@ def test_list_routes_have_array_item_schema(method, path, openapi_schema):
         )
 
 
+def test_history_source_is_additive_optional_field(openapi_schema):
+    """Spec §15 keeps the new source field optional in the public schema."""
+    response_schema = openapi_schema["paths"]["/api/v1/posture/history"]["get"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    array_schema = _resolve_ref(response_schema, openapi_schema)
+    item_schema = _resolve_ref(array_schema["items"], openapi_schema)
+
+    assert "source" in item_schema["properties"]
+    assert "source" not in item_schema.get("required", [])
+
+
 @pytest.mark.parametrize(
     "method,path",
     [

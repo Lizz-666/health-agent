@@ -662,17 +662,19 @@ async def test_history_api_keeps_legacy_shape(client):
     assert resp.status_code == 200
     records = resp.json()
     assert len(records) == 1
-    # legacy fields present and unchanged
+    # Legacy fields stay present; source is the additive alias required by
+    # spec §9.1/§15.
     rec = records[0]
     assert set(rec.keys()) == {
         "id",
         "issue_id",
         "issue_name",
         "method",
+        "source",
         "result",
         "created_at",
     }
-    assert rec["method"] == "self_test"
+    assert rec["source"] == rec["method"] == "self_test"
     assert rec["result"] == "moderate"
 
 

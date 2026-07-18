@@ -282,6 +282,7 @@ class AssessmentRecord(BaseModel):
     issue_id: str
     issue_name: str
     method: str
+    source: Optional[str] = None
     result: str
     created_at: datetime
 

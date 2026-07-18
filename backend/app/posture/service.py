@@ -773,12 +773,14 @@ async def get_user_history(
     output = []
     for r in records:
         issue = get_issue_by_id(r.issue_id)
+        source = r.source or r.method
         output.append(
             {
                 "id": str(r.id),
                 "issue_id": r.issue_id,
                 "issue_name": issue["name_cn"] if issue else r.issue_id,
-                "method": r.method,
+                "method": source,
+                "source": source,
                 "result": r.result,
                 "created_at": r.created_at,
             }

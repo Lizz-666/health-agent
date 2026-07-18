@@ -368,7 +368,11 @@ async def test_detail_self_tests_shape(client):
 
 @pytest.mark.asyncio
 async def test_history_response_shape(client):
-    """History response must match Flutter AssessmentRecord fields."""
+    """History response must match Flutter AssessmentRecord fields.
+
+    Spec §9.1/§15 + Task 8A: every record carries the real ``source`` and a
+    backward-compatible ``method`` alias of equal value.
+    """
     token = await _login_user(client)
     # Create an assessment first
     await client.post(
@@ -388,9 +392,144 @@ async def test_history_response_shape(client):
             "issue_id",
             "issue_name",
             "method",
+            "source",
             "result",
             "created_at",
         }
+        assert rec["source"] == rec["method"]
+
+
+@pytest.mark.asyncio
+async def test_history_includes_source_equal_to_method_for_self_test(client):
+    """Self-test events must surface source=self_test with method as equal alias."""
+    token = await _login_user(client)
+    await client.post(
+        "/api/v1/posture/assess",
+        json={"issue_id": "HN-01", "test_index": 0, "answer": "positive"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    resp = await client.get(
+        "/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    records = resp.json()
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["source"] == "self_test"
+    assert rec["method"] == "self_test"
+    assert rec["source"] == rec["method"]
+
+
+@pytest.mark.asyncio
+async def test_history_includes_source_for_photo(client):
+    """Photo events must surface source=ai_photo with method as equal alias.
+
+    The HTTP /assess/photo path is privacy-gated to 503 in Phase 1, so the
+    event is persisted via the service layer (same approach as
+    ``test_photo_assess_mild_mapped_to_moderate``) and read back through the
+    history endpoint.
+    """
+    from app.core.security import decode_token
+    from tests.conftest import TestSession
+    from app.posture import service
+
+    token = await _login_user(client)
+    user_id = decode_token(token)["sub"]
+    ai_result = {
+        "level": "moderate",
+        "confidence": 0.8,
+        "evidence": ["forward head position"],
+        "suggestion": "建议改善",
+        "need_retake": False,
+        "retake_reason": "",
+    }
+    async with TestSession() as db:
+        await service.save_photo_assessment(
+            db, user_id, "HN-01", ["fake-key.jpg"], ai_result
+        )
+    resp = await client.get(
+        "/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    records = resp.json()
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["source"] == "ai_photo"
+    assert rec["method"] == "ai_photo"
+    assert rec["source"] == rec["method"]
+
+
+@pytest.mark.asyncio
+async def test_history_source_falls_back_to_method_for_legacy_rows(client):
+    """Legacy rows with source=None must surface method as source (spec §15 alias).
+
+    Expand-phase ``source`` is nullable; rows predating the backfill must still
+    produce a non-null ``source`` equal to the legacy ``method`` value.
+    """
+    import uuid as _uuid
+    from app.core.security import decode_token
+    from tests.conftest import TestSession
+
+    token = await _login_user(client)
+    user_id = decode_token(token)["sub"]
+    async with TestSession() as db:
+        legacy = PostureAssessment(
+            id=_uuid.uuid4(),
+            user_id=_uuid.UUID(user_id),
+            issue_id="HN-01",
+            method="self_test",
+            result="moderate",
+            source=None,
+            severity=None,
+            lifecycle=None,
+        )
+        db.add(legacy)
+        await db.commit()
+    resp = await client.get(
+        "/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    records = resp.json()
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["source"] == "self_test"
+    assert rec["method"] == "self_test"
+    assert rec["source"] == rec["method"]
+
+
+@pytest.mark.asyncio
+async def test_history_empty_for_new_user(client):
+    """A fresh user with no events must receive an empty list (shape preserved)."""
+    token = await _login_user(client)
+    resp = await client.get(
+        "/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_history_cross_user_isolation(client):
+    """One user's history must never leak to another user (JWT-scoped read)."""
+    token_a = await _login_user(client, phone="13800138000")
+    await client.post(
+        "/api/v1/posture/assess",
+        json={"issue_id": "HN-01", "test_index": 0, "answer": "positive"},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    token_b = await _login_user(client, phone="13900139000")
+    resp = await client.get(
+        "/api/v1/posture/history", headers={"Authorization": f"Bearer {token_b}"}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_history_returns_401_when_unauthenticated(client):
+    """Auth dependency must run before any history read."""
+    resp = await client.get("/api/v1/posture/history")
+    assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
