@@ -442,6 +442,104 @@ def _map_ai_level_to_db(ai_level: str) -> str:
     return ai_level
 
 
+def _photo_suggestion(db_result: str, ai_result: dict) -> str:
+    """Pick the user-facing suggestion text for a photo assessment.
+
+    Prefers the model's own suggestion when present; otherwise falls back to a
+    deterministic message keyed off the mapped DB level. Shared by the legacy
+    write path (``save_photo_assessment``), the new idempotent orchestration
+    (``analyze_and_save_photo``) and the replay path so all three agree.
+    """
+    if db_result == "normal":
+        return ai_result.get("suggestion", "") or (
+            "AI 分析结果为正常，保持良好的体态习惯即可。"
+        )
+    if db_result == "moderate":
+        return ai_result.get("suggestion", "") or (
+            "存在需要关注的体态问题，建议进行纠正训练。"
+        )
+    return ai_result.get("suggestion", "") or (
+        "体态问题较为明显，建议尽快咨询专业医师。"
+    )
+
+
+def _photo_response(assessment: Any, db_result: str, suggestion: str) -> dict:
+    """Build the photo-assessment response dict (shape shared by all paths)."""
+    return {
+        "id": str(assessment.id),
+        "issue_id": assessment.issue_id,
+        "result": db_result,
+        "suggestion": suggestion,
+    }
+
+
+def _photo_tool_response(
+    assessment: Any,
+    db_result: str,
+    suggestion: str,
+    ai_result: Optional[dict],
+) -> dict:
+    """Build the richer typed Tool result while preserving the REST response.
+
+    The REST endpoint still declares ``SelfAssessResponse`` and therefore
+    serializes only its legacy four fields. Direct Tool callers additionally
+    receive the structured, schema-validated analysis fields required by
+    spec §10.4. Missing analysis metadata after a retention/purge operation is
+    represented explicitly instead of inventing a healthy result.
+    """
+    result = _photo_response(assessment, db_result, suggestion)
+    analysis = ai_result or {}
+    result.update(
+        {
+            "severity": analysis.get("level") or assessment.severity,
+            "confidence": analysis.get("confidence"),
+            "evidence": analysis.get("evidence") or [],
+            "model_meta": assessment.ai_model_meta,
+        }
+    )
+    return result
+
+
+async def _persist_photo_event(
+    db: AsyncSession,
+    user_id: str,
+    issue_id: str,
+    photo_keys: List[str],
+    ai_result: dict,
+) -> tuple:
+    """Write-core for a photo assessment event (Task 7 photo-idempotency split).
+
+    Creates the immutable event, superseding prior same-source active events,
+    and recomputes the profile entry. Assumes the caller already holds the user
+    transaction lock and has done the freeze / idempotency checks. Does NOT
+    commit -- the orchestration entry points (``save_photo_assessment`` /
+    ``analyze_and_save_photo``) own the commit so the write, the profile
+    projection and (for the new path) the idempotency record land in ONE
+    consistent transaction result (spec §10.0 / plan Task 7).
+
+    Returns ``(assessment, db_result, suggestion)`` so callers can refresh and
+    build the response dict after commit.
+    """
+    db_result = _map_ai_level_to_db(ai_result["level"])
+    suggestion = _photo_suggestion(db_result, ai_result)
+    await _supersede_active_events(db, user_id, issue_id, SOURCE_AI_PHOTO)
+    assessment = PostureAssessment(
+        user_id=UUID(user_id),
+        issue_id=issue_id,
+        method=SOURCE_AI_PHOTO,
+        result=db_result,
+        source=SOURCE_AI_PHOTO,
+        severity=db_result,
+        lifecycle=LIFECYCLE_ACTIVE,
+        ai_response=ai_result,
+        photo_keys=photo_keys,
+    )
+    db.add(assessment)
+    await db.flush()
+    await _recompute_and_upsert_profile(db, user_id, issue_id)
+    return assessment, db_result, suggestion
+
+
 async def save_photo_assessment(
     db: AsyncSession,
     user_id: str,
@@ -452,68 +550,212 @@ async def save_photo_assessment(
     """Persist a photo assessment event (dual-write) and recompute the profile
     entry in a single transaction.
 
-    ``ai_result`` is already validated by ``ai_service.analyze_posture_photo``
-    (level in normal/mild/moderate/severe, ``need_retake`` False). AI failures
-    / retakes / disabled photo gate are handled upstream (they raise 503 before
-    this function is ever called), so this path always produces an event. The
-    raw ``ai_response`` (with the original AI level) is preserved verbatim.
+    Legacy entry point: the caller has ALREADY run the model and supplies
+    ``ai_result``. AI failures / retakes / disabled photo gate are handled
+    upstream (they raise 503 before this function is ever called), so this path
+    always produces an event. The raw ``ai_response`` (with the original AI
+    level) is preserved verbatim.
+
+    Behaviour and signature are unchanged after the Task 7 write-core
+    extraction (``_persist_photo_event``): lock -> freeze -> write core ->
+    commit. Existing callers / tests see identical output.
     """
     # Hardening fix #9: service-layer validation (defense in depth)
     if not photo_keys:
         raise AppException(400, "photo_keys 不能为空", "invalid_photo_keys")
-    issue = get_issue_by_id(issue_id)
-    if not issue:
+    if not get_issue_by_id(issue_id):
         raise AppException(400, "体态问题不存在", "issue_not_found")
-
-    ai_level = ai_result["level"]
-    db_result = _map_ai_level_to_db(ai_level)
-
-    if db_result == "normal":
-        suggestion = (
-            ai_result.get("suggestion", "")
-            or "AI 分析结果为正常，保持良好的体态习惯即可。"
-        )
-    elif db_result == "moderate":
-        suggestion = (
-            ai_result.get("suggestion", "")
-            or "存在需要关注的体态问题，建议进行纠正训练。"
-        )
-    else:  # severe
-        suggestion = (
-            ai_result.get("suggestion", "")
-            or "体态问题较为明显，建议尽快咨询专业医师。"
-        )
 
     try:
         await _acquire_user_lock(db, user_id)
         await _assert_not_frozen(db, user_id)
-        await _supersede_active_events(db, user_id, issue_id, SOURCE_AI_PHOTO)
-        assessment = PostureAssessment(
-            user_id=UUID(user_id),
-            issue_id=issue_id,
-            method=SOURCE_AI_PHOTO,
-            result=db_result,
-            source=SOURCE_AI_PHOTO,
-            severity=db_result,
-            lifecycle=LIFECYCLE_ACTIVE,
-            ai_response=ai_result,
-            photo_keys=photo_keys,
+        assessment, db_result, suggestion = await _persist_photo_event(
+            db, user_id, issue_id, photo_keys, ai_result
         )
-        db.add(assessment)
-        await db.flush()
-        await _recompute_and_upsert_profile(db, user_id, issue_id)
         await db.commit()
     except Exception:
         await db.rollback()
         raise
 
     await db.refresh(assessment)
-    return {
-        "id": str(assessment.id),
-        "issue_id": assessment.issue_id,
-        "result": db_result,
-        "suggestion": suggestion,
-    }
+    return _photo_response(assessment, db_result, suggestion)
+
+
+# --- Photo analysis idempotent orchestration (Task 7, spec §10.0 / §10.4) ---
+#
+# The idempotency check MUST run before the model call, under the user
+# transaction lock, and the orchestration (check/replay -> model -> event +
+# profile + idempotency_record) lands in one consistent transaction result
+# (plan Task 7 photo-idempotency boundary). This path does NOT extract or
+# refactor ``safety.py`` / ``confirm_posture_goals``' existing idempotency
+# flows; it mirrors their rules against the SAME unified ``idempotency_records``
+# table (spec §8.5).
+
+_IDEMPOTENCY_OPERATION_PHOTO = "analyze_photo"
+
+
+def _hash_photo_request(issue_id: str, photo_keys: List[str]) -> str:
+    """Stable sha256 over the photo-analysis request identity (spec §8.5).
+
+    ``photo_keys`` preserve caller order because image order can affect model
+    interpretation. ``idempotency_key`` is intentionally excluded (it is the
+    lookup key, not request identity), mirroring ``safety`` /
+    ``confirm_posture_goals``.
+    """
+    identity = {"issue_id": issue_id, "photo_keys": list(photo_keys)}
+    payload = json.dumps(identity, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+async def _replay_photo_event(
+    db: AsyncSession, user_id: str, event_id: str
+) -> dict:
+    """Rebuild a photo-assessment response from its stored event id.
+
+    Restores the FIRST result without re-calling the model or re-writing. If
+    the event was purged (cascade delete removed the row, or it belongs to
+    another user) the replay surfaces HTTP 410 -- the cached health content is
+    never served once its source is gone (spec §10.0 / §8.5).
+    """
+    try:
+        event_uuid = UUID(event_id)
+    except (AttributeError, TypeError, ValueError):
+        raise AppException(
+            410, "幂等记录指向的评估事件已被清除", "idempotency_result_gone"
+        )
+    event = await db.get(PostureAssessmentEvent, event_uuid)
+    if event is None or event.user_id != UUID(user_id):
+        raise AppException(
+            410, "幂等记录指向的评估事件已被清除", "idempotency_result_gone"
+        )
+    # ai_response may have been purged; fall back to the mapped legacy result.
+    suggestion = _photo_suggestion(
+        event.result, (event.ai_response or {})
+    )
+    return _photo_tool_response(
+        event, event.result, suggestion, event.ai_response
+    )
+
+
+async def analyze_and_save_photo(
+    db: AsyncSession,
+    user_id: str,
+    issue_id: str,
+    photo_keys: List[str],
+    idempotency_key: str,
+    *,
+    now: Optional[datetime] = None,
+) -> dict:
+    """Idempotent photo-analysis orchestration (spec §10.4 / plan Task 7).
+
+    Runs under the user transaction lock and sequences: freeze check ->
+    idempotency check / replay -> MODEL CALL -> event + profile projection +
+    idempotency_record -> commit. The model is invoked at most once per
+    ``(user, operation, idempotency_key)``; a replay returns the first result
+    via ``result_ref`` and never calls the model or repeats the write.
+
+    Idempotency rules (mirrors ``safety.record_safety_signal`` /
+    ``confirm_posture_goals``):
+
+      * same ``(user, op, key)`` + same ``request_hash`` -> replay first result
+        (no model call, no repeat write)
+      * same key + DIFFERENT ``request_hash`` -> 400 ``idempotency_key_conflict``
+      * ``result_ref`` event purged / cross-user -> 410 ``idempotency_result_gone``
+      * expired record -> removed, the key is reusable
+      * ``idempotency_records`` stores ONLY ``result_ref`` (event id), never the
+        full health response
+
+    ``request_hash`` excludes ``idempotency_key`` (lookup key, not identity).
+    Photo ownership and the privacy gate are enforced OUTSIDE this function
+    (Tool layer): this orchestration assumes the caller already passed both.
+    """
+    from app.posture.ai_service import analyze_posture_photo
+
+    if not photo_keys:
+        raise AppException(400, "photo_keys 不能为空", "invalid_photo_keys")
+    if (
+        not isinstance(idempotency_key, str)
+        or not idempotency_key.strip()
+        or len(idempotency_key) > 64
+    ):
+        raise AppException(
+            400, "idempotency_key 必须为 1-64 个非空字符", "invalid_idempotency_key"
+        )
+    if not get_issue_by_id(issue_id):
+        raise AppException(400, "体态问题不存在", "issue_not_found")
+
+    clock = _to_aware_utc(now) if now is not None else datetime.now(timezone.utc)
+    request_hash = _hash_photo_request(issue_id, photo_keys)
+
+    try:
+        await _acquire_user_lock(db, user_id)
+        await _assert_not_frozen(db, user_id)
+
+        # --- Idempotency resolution (unified idempotency_records) ---
+        existing = await db.execute(
+            select(IdempotencyRecord).where(
+                IdempotencyRecord.user_id == UUID(user_id),
+                IdempotencyRecord.operation == _IDEMPOTENCY_OPERATION_PHOTO,
+                IdempotencyRecord.idempotency_key == idempotency_key,
+            )
+        )
+        record = existing.scalar_one_or_none()
+        if record is not None:
+            if _to_aware_utc(record.expires_at) > clock:
+                if record.request_hash == request_hash:
+                    # Same key + same request -> replay the FIRST result. The
+                    # model is NOT called and nothing is written. End the read
+                    # transaction explicitly instead of holding the user lock.
+                    response = await _replay_photo_event(
+                        db, user_id, record.result_ref
+                    )
+                    await db.rollback()
+                    return response
+                # Same key + DIFFERENT request -> reject.
+                raise AppException(
+                    400,
+                    "idempotency_key 已用于不同的请求",
+                    "idempotency_key_conflict",
+                )
+            # Expired record no longer blocks; remove it and proceed.
+            await db.delete(record)
+            await db.flush()
+
+        # --- Model call (under the lock, per the photo-idempotency boundary).
+        # The Tool layer has already enforced the privacy gate and ownership,
+        # so reaching here means both passed.
+        ai_result = await analyze_posture_photo(
+            issue_id, photo_keys, user_id, db
+        )
+        assessment, db_result, suggestion = await _persist_photo_event(
+            db, user_id, issue_id, photo_keys, ai_result
+        )
+
+        # --- Persist the idempotency record (result_ref = event id only). ---
+        db.add(
+            IdempotencyRecord(
+                user_id=UUID(user_id),
+                operation=_IDEMPOTENCY_OPERATION_PHOTO,
+                idempotency_key=idempotency_key,
+                request_hash=request_hash,
+                status="completed",
+                result_ref=str(assessment.id),
+                expires_at=clock + _IDEMPOTENCY_TTL,
+            )
+        )
+
+        await db.commit()
+    except AppException:
+        await db.rollback()
+        raise
+    except Exception:
+        await db.rollback()
+        raise
+
+    await db.refresh(assessment)
+    return _photo_tool_response(
+        assessment, db_result, suggestion, assessment.ai_response
+    )
 
 
 async def get_user_history(

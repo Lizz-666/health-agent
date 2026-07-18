@@ -253,8 +253,18 @@ class SelfAssessRequest(BaseModel):
 
 
 class PhotoAssessRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     issue_id: str
-    photo_keys: List[str]
+    photo_keys: List[str] = Field(..., min_length=1, max_length=20)
+    idempotency_key: str = Field(..., min_length=1, max_length=64)
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def _reject_blank_idempotency_key(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("idempotency_key 不能为空白")
+        return v
 
 
 # --- Response models for assessment ---
