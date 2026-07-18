@@ -789,6 +789,7 @@ Task 6 不抽取或重构 `safety.py` 的既有幂等流程，也不新建通用
 - Create: `backend/app/core/actor_context.py`（服务端 ActorContext 定义）
 - Create: `backend/app/upload/ownership.py`（PhotoOwnershipVerifier 协议 + Phase 1 fail-closed 默认实现）
 - Modify: `backend/app/posture/service.py`（仅新增照片分析的统一幂等编排；Tool 不直接 ORM）
+- Modify: `backend/app/posture/schemas.py`（照片请求显式要求客户端 `idempotency_key`）
 - Modify: `backend/app/posture/router.py`（REST 端点改为调用 Tool 函数，注入 ActorContext）
 - Create: `backend/tests/test_posture_tools.py`
 
