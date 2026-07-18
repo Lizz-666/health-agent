@@ -62,6 +62,7 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
         '/posture/assess',
         data: {'issue_id': issueId, 'test_index': testIndex, 'answer': answer},
       );
+      if (!mounted) return null;
       final result = SelfAssessResult.fromJson(
         resp.data as Map<String, dynamic>,
       );
@@ -72,6 +73,7 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
       );
       return result;
     } on DioException catch (e) {
+      if (!mounted) return null;
       final msg = _dioMessage(e) ?? '提交失败';
       state = state.copyWith(
         isLoading: false,
@@ -80,6 +82,7 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
       );
       return null;
     } on FormatException catch (e) {
+      if (!mounted) return null;
       state = state.copyWith(
         isLoading: false,
         error: '数据解析异常',
@@ -94,6 +97,7 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
       }());
       return null;
     } catch (e) {
+      if (!mounted) return null;
       state = state.copyWith(
         isLoading: false,
         error: '提交失败',
@@ -127,12 +131,14 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
           'idempotency_key': key,
         },
       );
+      if (!mounted) return null;
       final parsed = SelfAssessResult.fromJson(
         resp.data as Map<String, dynamic>,
       );
       state = state.copyWith(isLoading: false, status: LoadStatus.data);
       return parsed.toJson();
     } on DioException catch (e) {
+      if (!mounted) return null;
       final msg = _dioMessage(e) ?? '分析失败';
       state = state.copyWith(
         isLoading: false,
@@ -141,6 +147,7 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
       );
       return null;
     } on FormatException catch (e) {
+      if (!mounted) return null;
       state = state.copyWith(
         isLoading: false,
         error: '数据解析异常',
@@ -153,6 +160,7 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
       }());
       return null;
     } catch (_) {
+      if (!mounted) return null;
       state = state.copyWith(
         isLoading: false,
         error: '分析失败',
@@ -173,6 +181,7 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
         '/posture/history',
         queryParameters: {'limit': limit, 'offset': offset},
       );
+      if (!mounted) return;
       final raw = resp.data;
       if (raw is! List) {
         state = state.copyWith(
@@ -208,6 +217,7 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
         status: list.isEmpty ? LoadStatus.empty : LoadStatus.data,
       );
     } on DioException catch (e) {
+      if (!mounted) return;
       final msg = _dioMessage(e) ?? '加载失败';
       state = state.copyWith(
         isLoading: false,
@@ -215,6 +225,7 @@ class AssessmentNotifier extends StateNotifier<AssessmentState> {
         status: LoadStatus.networkError,
       );
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         error: '数据解析异常',

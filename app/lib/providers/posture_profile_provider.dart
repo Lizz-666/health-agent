@@ -171,6 +171,7 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
     );
     try {
       final resp = await _api.dio.get('/posture/profile');
+      if (!mounted) return;
       final profile = PostureProfile.fromJson(
         resp.data as Map<String, dynamic>,
       );
@@ -182,15 +183,18 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
             : LoadStatus.data,
       );
     } on DioException catch (e) {
+      if (!mounted) return;
       if (generation != _profileGeneration) return;
       state = state.copyWith(
         profileStatus: LoadStatus.networkError,
         error: _dioMessage(e) ?? '加载档案失败',
       );
     } on FormatException catch (e) {
+      if (!mounted) return;
       if (generation != _profileGeneration) return;
       _reportParseError('fetchProfile: ${e.message}');
     } catch (_) {
+      if (!mounted) return;
       if (generation != _profileGeneration) return;
       _reportParseError('fetchProfile: unexpected error');
     }
@@ -207,12 +211,14 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
     );
     try {
       final resp = await _api.dio.get('/posture/profile/$issueId');
+      if (!mounted) return;
       final entry = PostureProfileEntry.fromJson(
         resp.data as Map<String, dynamic>,
       );
       if (generation != _entryGeneration) return;
       state = state.copyWith(entryDetail: entry, entryStatus: LoadStatus.data);
     } on DioException catch (e) {
+      if (!mounted) return;
       if (generation != _entryGeneration) return;
       final code = _errorCode(e);
       if (e.response?.statusCode == 404 || code == 'issue_not_found') {
@@ -227,6 +233,7 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
         );
       }
     } on FormatException catch (e) {
+      if (!mounted) return;
       if (generation != _entryGeneration) return;
       state = state.copyWith(
         entryStatus: LoadStatus.parseError,
@@ -238,6 +245,7 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
         return true;
       }());
     } catch (_) {
+      if (!mounted) return;
       if (generation != _entryGeneration) return;
       state = state.copyWith(
         entryStatus: LoadStatus.parseError,
@@ -262,6 +270,7 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
     );
     try {
       final resp = await _api.dio.get('/posture/priorities');
+      if (!mounted) return;
       final suggestions = PrioritySuggestions.fromJson(
         resp.data as Map<String, dynamic>,
       );
@@ -280,12 +289,14 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
         needsReconfirm: clearNeedsReconfirm ? false : state.needsReconfirm,
       );
     } on DioException catch (e) {
+      if (!mounted) return;
       if (generation != _prioritiesGeneration) return;
       state = state.copyWith(
         prioritiesStatus: LoadStatus.networkError,
         error: _dioMessage(e) ?? '加载优先级失败',
       );
     } on FormatException catch (e) {
+      if (!mounted) return;
       if (generation != _prioritiesGeneration) return;
       state = state.copyWith(
         prioritiesStatus: LoadStatus.parseError,
@@ -297,6 +308,7 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
         return true;
       }());
     } catch (_) {
+      if (!mounted) return;
       if (generation != _prioritiesGeneration) return;
       state = state.copyWith(
         prioritiesStatus: LoadStatus.parseError,
@@ -359,6 +371,7 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
           'idempotency_key': idempotencyKey,
         },
       );
+      if (!mounted) return false;
       if (generation != _confirmGeneration) return false;
       _prioritiesGeneration++;
       state = state.copyWith(clearPriorities: true);
@@ -373,6 +386,7 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
       );
       return true;
     } on DioException catch (e) {
+      if (!mounted) return false;
       if (generation != _confirmGeneration) return false;
       final code = _errorCode(e);
       final message = _dioMessage(e) ?? '确认失败';
@@ -401,6 +415,7 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
       }
       return false;
     } on FormatException catch (e) {
+      if (!mounted) return false;
       if (generation != _confirmGeneration) return false;
       state = state.copyWith(
         confirmStatus: LoadStatus.parseError,
@@ -414,6 +429,7 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
       }());
       return false;
     } catch (_) {
+      if (!mounted) return false;
       if (generation != _confirmGeneration) return false;
       state = state.copyWith(
         confirmStatus: LoadStatus.parseError,
@@ -448,6 +464,7 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
         '/posture/safety-signals',
         data: requestBody,
       );
+      if (!mounted) return false;
       _invalidateProfileReads();
       state = state.copyWith(
         profileStatus: LoadStatus.idle,
@@ -478,12 +495,14 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
         clearConfirmedGoals: true,
       );
       await fetchProfile();
+      if (!mounted) return false;
       // Preserve needsReconfirm: a fresh safety signal invalidates any
       // prior suggestion_id; the user must explicitly re-confirm against
       // the new candidate set.
       await fetchPriorities(clearNeedsReconfirm: false);
       return true;
     } on DioException catch (e) {
+      if (!mounted) return false;
       final code = _errorCode(e);
       final statusCode = e.response?.statusCode;
       SafetySignalError typed;
@@ -508,10 +527,14 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
       );
       return false;
     } on FormatException catch (e) {
+      if (!mounted) return false;
       state = state.copyWith(
+        profileStatus: LoadStatus.parseError,
+        prioritiesStatus: LoadStatus.parseError,
         safetyStatus: LoadStatus.parseError,
         safetyError: SafetySignalError.parse,
         safetyErrorMessage: '数据解析异常',
+        error: '安全信号已提交，但返回数据异常，请重新加载档案和优先级',
       );
       assert(() {
         // ignore: avoid_print
@@ -520,10 +543,14 @@ class PostureProfileNotifier extends StateNotifier<PostureProfileState> {
       }());
       return false;
     } catch (_) {
+      if (!mounted) return false;
       state = state.copyWith(
+        profileStatus: LoadStatus.parseError,
+        prioritiesStatus: LoadStatus.parseError,
         safetyStatus: LoadStatus.parseError,
         safetyError: SafetySignalError.parse,
         safetyErrorMessage: '上报失败',
+        error: '安全信号已提交，但结果处理失败，请重新加载档案和优先级',
       );
       return false;
     }

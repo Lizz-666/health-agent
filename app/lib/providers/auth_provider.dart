@@ -5,6 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
 import '../core/storage.dart';
 import '../models/token.dart';
+import 'assessment_provider.dart';
+import 'posture_profile_provider.dart';
+import 'posture_state_provider.dart';
+import 'user_provider.dart';
 
 class AuthState {
   final bool isLoggedIn;
@@ -29,25 +33,28 @@ class AuthState {
     int? countdown,
     bool clearError = false,
     bool clearisNewUser = false,
-  }) =>
-      AuthState(
-        isLoggedIn: isLoggedIn ?? this.isLoggedIn,
-        isLoading: isLoading ?? this.isLoading,
-        error: clearError ? null : (error ?? this.error),
-        isNewUser: clearisNewUser ? false : (isNewUser ?? this.isNewUser),
-        countdown: countdown ?? this.countdown,
-      );
+  }) => AuthState(
+    isLoggedIn: isLoggedIn ?? this.isLoggedIn,
+    isLoading: isLoading ?? this.isLoading,
+    error: clearError ? null : (error ?? this.error),
+    isNewUser: clearisNewUser ? false : (isNewUser ?? this.isNewUser),
+    countdown: countdown ?? this.countdown,
+  );
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _api;
+  final void Function() _resetSessionState;
   Timer? _timer;
 
-  AuthNotifier(this._api) : super(const AuthState()) {
+  AuthNotifier(this._api, {void Function()? resetSessionState})
+    : _resetSessionState = resetSessionState ?? _noop,
+      super(const AuthState()) {
     _api.onAuthFailed = _onAuthFailed;
   }
 
   void _onAuthFailed() {
+    _resetSessionState();
     if (state.isLoggedIn) {
       state = const AuthState();
     }
@@ -56,6 +63,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> checkAuth() async {
     final hasToken = await AppStorage.hasToken();
     if (!hasToken) {
+      _resetSessionState();
       state = state.copyWith(isLoggedIn: false);
       return;
     }
@@ -64,6 +72,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoggedIn: true);
     } catch (_) {
       await AppStorage.clearTokens();
+      _resetSessionState();
       state = state.copyWith(isLoggedIn: false);
     }
   }
@@ -88,12 +97,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> login(String phone, String code) async {
     try {
       state = state.copyWith(isLoading: true, clearError: true);
-      final resp = await _api.dio.post('/auth/verify-login', data: {
-        'phone': phone,
-        'code': code,
-      });
+      final resp = await _api.dio.post(
+        '/auth/verify-login',
+        data: {'phone': phone, 'code': code},
+      );
       final token = TokenResponse.fromJson(resp.data as Map<String, dynamic>);
       await AppStorage.saveTokens(token.accessToken, token.refreshToken);
+      _resetSessionState();
       state = state.copyWith(
         isLoading: false,
         isLoggedIn: true,
@@ -112,6 +122,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await AppStorage.clearTokens();
+    _resetSessionState();
     state = const AuthState();
   }
 
@@ -119,12 +130,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> devLogin(String phone, String password) async {
     try {
       state = state.copyWith(isLoading: true, clearError: true);
-      final resp = await _api.dio.post('/auth/dev-login', data: {
-        'phone': phone,
-        'password': password,
-      });
+      final resp = await _api.dio.post(
+        '/auth/dev-login',
+        data: {'phone': phone, 'password': password},
+      );
       final token = TokenResponse.fromJson(resp.data as Map<String, dynamic>);
       await AppStorage.saveTokens(token.accessToken, token.refreshToken);
+      _resetSessionState();
       state = state.copyWith(
         isLoading: false,
         isLoggedIn: true,
@@ -175,5 +187,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final api = ref.read(apiClientProvider);
-  return AuthNotifier(api);
+  return AuthNotifier(
+    api,
+    resetSessionState: () {
+      ref.invalidate(userProvider);
+      ref.invalidate(assessmentProvider);
+      ref.invalidate(postureProfileProvider);
+      ref.invalidate(postureStateProvider);
+    },
+  );
 });
+
+void _noop() {}

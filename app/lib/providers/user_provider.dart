@@ -17,12 +17,11 @@ class UserState {
     bool? isLoading,
     String? error,
     bool clearError = false,
-  }) =>
-      UserState(
-        profile: clearProfile ? null : (profile ?? this.profile),
-        isLoading: isLoading ?? this.isLoading,
-        error: clearError ? null : (error ?? this.error),
-      );
+  }) => UserState(
+    profile: clearProfile ? null : (profile ?? this.profile),
+    isLoading: isLoading ?? this.isLoading,
+    error: clearError ? null : (error ?? this.error),
+  );
 }
 
 class UserNotifier extends StateNotifier<UserState> {
@@ -34,15 +33,18 @@ class UserNotifier extends StateNotifier<UserState> {
     try {
       state = state.copyWith(isLoading: true, clearError: true);
       final resp = await _api.dio.get('/user/profile');
+      if (!mounted) return;
       final profile = UserProfile.fromJson(resp.data as Map<String, dynamic>);
       state = state.copyWith(profile: profile, isLoading: false);
     } on DioException catch (e) {
+      if (!mounted) return;
       final data = e.response?.data;
       final msg = (data is Map<String, dynamic>)
           ? (data['detail'] as String?) ?? '获取用户信息失败'
           : '获取用户信息失败';
       state = state.copyWith(isLoading: false, error: msg);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: '获取用户信息失败');
     }
   }
@@ -63,10 +65,12 @@ class UserNotifier extends StateNotifier<UserState> {
       if (age != null) data['age'] = age;
       if (gender != null) data['gender'] = gender;
       final resp = await _api.dio.put('/user/profile', data: data);
+      if (!mounted) return false;
       final profile = UserProfile.fromJson(resp.data as Map<String, dynamic>);
       state = state.copyWith(profile: profile, isLoading: false);
       return true;
     } on DioException catch (e) {
+      if (!mounted) return false;
       final data = e.response?.data;
       final msg = (data is Map<String, dynamic>)
           ? (data['detail'] as String?) ?? '更新失败'
@@ -74,6 +78,7 @@ class UserNotifier extends StateNotifier<UserState> {
       state = state.copyWith(isLoading: false, error: msg);
       return false;
     } catch (e) {
+      if (!mounted) return false;
       state = state.copyWith(isLoading: false, error: '更新失败');
       return false;
     }

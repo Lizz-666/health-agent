@@ -20,6 +20,36 @@ import 'screens/search/search_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
+class ResultRouteArgs {
+  final String assessmentId;
+  final String result;
+  final String suggestion;
+
+  const ResultRouteArgs({
+    required this.assessmentId,
+    required this.result,
+    required this.suggestion,
+  });
+}
+
+ResultRouteArgs? parseResultRouteExtra(Object? extra) {
+  if (extra is! Map<String, dynamic>) return null;
+  final assessmentId = extra['assessmentId'];
+  final result = extra['result'];
+  final suggestion = extra['suggestion'];
+  if (assessmentId is! String || assessmentId.trim().isEmpty) return null;
+  if (result is! String ||
+      !const {'normal', 'mild', 'moderate', 'severe'}.contains(result)) {
+    return null;
+  }
+  if (suggestion != null && suggestion is! String) return null;
+  return ResultRouteArgs(
+    assessmentId: assessmentId,
+    result: result,
+    suggestion: suggestion as String? ?? '',
+  );
+}
+
 class _AuthNotifier extends ChangeNotifier {
   final Ref _ref;
   _AuthNotifier(this._ref) {
@@ -112,15 +142,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/issue/:id/result',
         builder: (_, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          if (extra == null) {
+          final args = parseResultRouteExtra(state.extra);
+          if (args == null) {
             return const HomeScreen();
           }
           return ResultScreen(
             issueId: state.pathParameters['id'] ?? '',
-            assessmentId: extra['assessmentId'] as String? ?? '',
-            result: extra['result'] as String? ?? 'normal',
-            suggestion: extra['suggestion'] as String? ?? '',
+            assessmentId: args.assessmentId,
+            result: args.result,
+            suggestion: args.suggestion,
           );
         },
       ),
