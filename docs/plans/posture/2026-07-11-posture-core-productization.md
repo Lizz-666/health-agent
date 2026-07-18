@@ -859,7 +859,8 @@ Task 6 不抽取或重构 `safety.py` 的既有幂等流程，也不新建通用
 - **idempotency_key 相同但 request_hash 不同 → 拒绝（400）**
 - **统一幂等表覆盖 analyze_photo、confirm_goals、report_safety_signal**
 - idempotency_records 数据最小化：不存储完整健康响应（仅 result_ref 引用 ID）
-- 已 purge 数据的 result_ref 重放返回 410 Gone（不返回旧缓存健康内容）
+- 幂等记录仍存在但 result_ref 已悬空时重放返回 410 Gone；完整隐私清除删除关联幂等记录，
+  不保留可关联健康元数据
 - 过期 idempotency_records 清理后，相同 key 可重新使用
 - 照片门关闭时 `analyze_posture_photo` 硬拒绝
 - `suggest_posture_priorities` 安全门（重新计算 + 重新风险分类）

@@ -8,7 +8,7 @@
 - 阶段：Phase 1 体态核心产品化
 - 规格：`docs/specs/posture/2026-07-11-posture-core-productization.md`
 - 计划：`docs/plans/posture/2026-07-11-posture-core-productization.md`
-- 当前下一实现任务代码基线：`7566968451d75d053dc85b6766ab50e2ddcbd85a`
+- 当前下一实现任务代码基线：`4eb0bd2a6be0d73430956a115bc7470983f56e11`
 
 ## Status Definitions
 
@@ -25,9 +25,9 @@
 | Phase 1 Task 4 | OpenCode (impl) + Codex review | `codex/phase1-task4-profile-api` / `health-worktrees/phase1-task4-profile-api` | `552fb41` | `merged` via `9892c3e` | 体态档案读取 API：GET /profile + GET /profile/{issue_id}（spec §9.2）；JWT-only 跨用户隔离（无 user_id 参数）；sources 只透传 profile 投影结构化内容，不暴露 photo_keys/原始 ai_response；未实现 priorities 与 related_priority（属 Task 6）；Codex 已检查真实 diff、重跑验证并 fast-forward 到 main |
 | Phase 1 Task 5 | OpenCode (impl) + Codex review | `codex/phase1-task5-conflict-state` / `health-worktrees/phase1-task5-conflict-state` | `9892c3e` | `merged` via `f00098e` | 冲突状态收口（spec §6.3/§6.4/§11.1）：审计确认 `project_profile` 已完整正确实现 §11.1 全表且无“取更严重”自动合并路径，/profile 与 /profile/{issue_id} 已透传 conflict；零生产代码改动，仅补测试缺口——新建 test_posture_conflict.py（§11.1 全量参数化矩阵 + 单来源 + no-take-severe + DB 冲突解决重建）并补 test_posture_profile_api.py 单条目 conflict 详情；未实现 priorities/goals（Task 6），conflict 无提前放行路径；Codex 已检查真实 diff 并重跑验证 |
 | Phase 1 Task 6 | OpenCode (impl) + Codex review | `codex/phase1-task6-priority-goals` / `health-worktrees/phase1-task6-priority-goals` | `8d3f3ab` | `merged` via `7566968` | 确定性优先级 + 目标确认：restricted/red_flag 优先进入 `safety_blocked` 且语义分离，确认分别返回 409 `restricted_blocked` / `red_flag_blocked`；1–3 个当前候选、服务端稳定控制值、30 天边界失效、统一幂等批次锚点重放/410、OpenAPI ref 已实现。Codex review 修复批次时间碰撞导致跨批重放、微秒级排序丢失，并把双来源数量纳入 suggestion 上下文摘要，补齐安全信号变化后 stale 优先与上述回归测试。主分支 `7566968` 新鲜验证：priority 44 passed；profile/safety 163 passed；posture/OpenAPI 87 passed；全量 482 passed、11 个 PostgreSQL/Docker 条件测试 skipped。未生成训练计划，未改 models/migration，未抽取或重构 safety 幂等路径 |
-| Phase 1 Task 7 | OpenCode (impl) + Codex review | `codex/phase1-task7-posture-tools` / `health-worktrees/phase1-task7-posture-tools` | `b7e0052` | `planned` | 体态 Tool 应用层（spec §10.0–§10.8，plan Task 7）：创建 core `ActorContext`、独立 Tool I/O 契约、8 个 Tool、fail-closed `PhotoOwnershipVerifier`，并把现有 REST 路由改为复用 Tool。依赖 Task 6 已满足；只允许 `actor_context.py`、`tool_contracts.py`、`tools.py`、`ownership.py`、`posture/router.py`、`test_posture_tools.py`、`posture/service.py` 的最小照片幂等编排、`posture/schemas.py` 的照片幂等请求契约和 `ACTIVE_TASKS.md` 的 Task 7 行，如 OpenAPI 契约确有必要可最小修改 `test_openapi_contracts.py`。不得创建 Tool HTTP 路由、Agent orchestrator、migration，不得重写 Task 6 或 safety 幂等逻辑；照片门关闭必须早于 ownership 探测、幂等写入、事件写入和模型调用，照片幂等检查必须早于模型调用且由 service 层持有用户事务锁实现 |
+| Phase 1 Task 7 | OpenCode (impl) + Codex review | `codex/phase1-task7-posture-tools` / `health-worktrees/phase1-task7-posture-tools` | `1c14319` | `merged` via `4eb0bd2` | 体态 Tool 应用层（spec §10.0–§10.8）：8 个 Tool 使用真实 Pydantic 输入/输出契约，REST 与未来 Agent 共用同一应用层；JWT 注入 frozen ActorContext，照片总开关→证据门→用户同意→ownership→统一幂等/模型/事件链默认 fail closed。照片 REST 显式要求客户端 idempotency_key。Codex review 修复随机幂等键、Tool 绕过总开关、缺少用户同意、裸 dict/Any 契约、图片顺序哈希和非法 category 等问题；未创建 Tool HTTP 路由/Agent/migration，未重构 safety/confirm 幂等。主分支 `4eb0bd2` 新鲜验证：Tool 69 passed；全量 551 passed、11 个 PostgreSQL/Docker 条件测试 skipped |
 
-Task 7 只读准备审计已完成；Task 6 依赖已合入，可基于主分支最新 HEAD 建立独立 worktree 开始实现。
+Task 7 已验证并合入；后续 Agent 编排只能复用这些受控 Tool，不得直接访问数据库或绕过照片门。
 负责人裁决：`ActorContext` 归 `app/core`，Tool I/O 归 `tool_contracts.py`；照片所有权使用
 fail-closed `PhotoOwnershipVerifier` 边界，禁止用对象 key 前缀冒充已上传对象证明；真实
 provider-backed verifier 是未来照片隐私门启用前置，不在 Phase 1 伪造。
@@ -56,6 +56,7 @@ provider-backed verifier 是未来照片隐私门启用前置，不在 Phase 1 �
 | Phase 1 Task 3 sourced self-test content gate | `b65b4e7`, merged by `e470572` | `merged` |
 | Phase 1 Task 2/6.5/9 clean integration | `d01492c` → `cc92449`, fast-forwarded to main | `merged` |
 | Phase 1 Task 4/5/6 posture profile and priorities | `9892c3e`, `f00098e`, `7566968` | `merged` |
+| Phase 1 Task 7 typed posture Tool layer | `4eb0bd2` | `merged` |
 
 ## Other Worktrees
 
