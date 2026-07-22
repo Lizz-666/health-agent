@@ -147,7 +147,20 @@ async def get_history(
 # --- Safety signal reporting (spec §10.8): Tool ------------------------------
 
 
-@router.post("/safety-signals", response_model=SafetySignalResponse)
+@router.post(
+    "/safety-signals",
+    response_model=SafetySignalResponse,
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": SafetySignalRequest.model_json_schema()
+                }
+            },
+        }
+    },
+)
 async def report_safety_signal(
     request: Request,
     actor: ActorContext = Depends(get_actor_context),
@@ -238,7 +251,20 @@ async def get_priorities(
 # --- Goal confirmation (spec §10.7): Tool -----------------------------------
 
 
-@router.post("/goals/confirm", response_model=ConfirmedGoalsResponse)
+@router.post(
+    "/goals/confirm",
+    response_model=ConfirmedGoalsResponse,
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": ConfirmGoalsRequest.model_json_schema()
+                }
+            },
+        }
+    },
+)
 async def confirm_goals(
     request: Request,
     actor: ActorContext = Depends(get_actor_context),

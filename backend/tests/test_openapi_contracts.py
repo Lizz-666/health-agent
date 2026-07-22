@@ -132,3 +132,98 @@ def test_detail_routes_have_component_ref(method, path, openapi_schema):
             f"Referenced schema for {method.upper()} {path} has no properties"
         )
         assert len(resolved["properties"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 Task 10: full-route contract validation (security, errors, requests)
+# ---------------------------------------------------------------------------
+
+# Routes that require authentication (JWT bearer).
+PROTECTED_ROUTES = [
+    ("post", "/api/v1/posture/assess"),
+    ("post", "/api/v1/posture/assess/photo"),
+    ("get", "/api/v1/posture/history"),
+    ("post", "/api/v1/posture/safety-signals"),
+    ("get", "/api/v1/posture/profile"),
+    ("get", "/api/v1/posture/profile/{issue_id}"),
+    ("get", "/api/v1/posture/priorities"),
+    ("post", "/api/v1/posture/goals/confirm"),
+]
+
+# Routes that are publicly accessible (no auth).
+PUBLIC_ROUTES = [
+    ("get", "/api/v1/posture/issues"),
+    ("get", "/api/v1/posture/issues/{issue_id}"),
+    ("get", "/api/v1/posture/issues/{issue_id}/related"),
+]
+
+
+@pytest.mark.parametrize("method,path", PROTECTED_ROUTES)
+def test_protected_routes_have_security_requirement(method, path, openapi_schema):
+    """Every protected route must declare a security requirement."""
+    operation = openapi_schema["paths"][path][method]
+    assert "security" in operation, (
+        f"{method.upper()} {path} must declare security requirement"
+    )
+    assert len(operation["security"]) > 0
+
+
+@pytest.mark.parametrize("method,path", PUBLIC_ROUTES)
+def test_public_routes_have_no_security_requirement(method, path, openapi_schema):
+    """Public routes must not carry security requirements."""
+    operation = openapi_schema["paths"][path][method]
+    assert "security" not in operation or len(operation["security"]) == 0, (
+        f"{method.upper()} {path} is public and must not require auth"
+    )
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("post", "/api/v1/posture/assess"),
+        ("post", "/api/v1/posture/assess/photo"),
+        ("post", "/api/v1/posture/safety-signals"),
+        ("post", "/api/v1/posture/goals/confirm"),
+    ],
+)
+def test_post_routes_have_request_body_schema(method, path, openapi_schema):
+    """POST routes that use declared Pydantic models must have requestBody."""
+    operation = openapi_schema["paths"][path][method]
+    assert "requestBody" in operation, (
+        f"{method.upper()} {path} missing requestBody"
+    )
+    content = operation["requestBody"].get("content", {})
+    assert "application/json" in content, (
+        f"{method.upper()} {path} requestBody missing application/json"
+    )
+    schema = content["application/json"]["schema"]
+    assert schema not in (None, {}), (
+        f"{method.upper()} {path} has empty requestBody schema"
+    )
+
+
+def test_priorities_response_has_three_buckets(openapi_schema):
+    """GET /priorities response must carry the three-way routing buckets."""
+    schema = openapi_schema["paths"]["/api/v1/posture/priorities"]["get"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    resolved = _resolve_ref(schema, openapi_schema)
+    props = resolved["properties"]
+    for bucket in ("normal_candidates", "retest_required", "safety_blocked"):
+        assert bucket in props, (
+            f"priorities response missing {bucket} bucket"
+        )
+    assert "suggestion_id" in props
+    assert "profile_version" in props
+
+
+def test_confirm_response_has_goals_and_risk_version(openapi_schema):
+    """POST /goals/confirm response must carry confirmed_goals + risk_version."""
+    schema = openapi_schema["paths"]["/api/v1/posture/goals/confirm"]["post"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    resolved = _resolve_ref(schema, openapi_schema)
+    props = resolved["properties"]
+    assert "confirmed_goals" in props
+    assert "risk_version" in props
+    assert "can_generate_plan" in props

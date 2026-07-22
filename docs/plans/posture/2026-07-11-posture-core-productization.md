@@ -1368,19 +1368,21 @@ python -m pytest tests -q
 
 **验收条件（对应规格第 17 节）：**
 
-1. 用户可完成至少一个部位的图示自测 ✓
-2. 照片和自测冲突能够正确展示 ✓
-3. 体态档案明确区分已评估与未评估区域 ✓
-4. Tool 输出全部通过类型校验和权限检查 ✓
-5. 新安全信号使旧资格判断失效 ✓
-6. 优先级不自动创建训练计划 ✓
-7. 结果页有"生成改善计划"入口但不触发 ✓
-8. 自测内容含停止条件、正确姿势 ✓
-9. 隐私门 8 个条件有检查点 ✓
-10. 8 个 Tool 有类型化契约 ✓
-11. migration head 为 0003，旧列已删除 ✓
-12. purge 执行流程正确（photo_keys 保护；encrypted_object_keys 在 OSS 确认后、DB 删除前清除；completed 后无可关联字段残留） ✓
-13. idempotency 隐私删除覆盖 ✓
+> 验收证据记录于规格 §17.2。E2E 测试：`backend/tests/test_phase1_e2e.py`（6 tests）；OpenAPI 全路由校验：`backend/tests/test_openapi_contracts.py`（40 tests）。验证日期：2026-07-22，PostgreSQL 16.14。
+
+1. 用户可完成至少一个部位的图示自测 ✓（E2E test_e2e_full_user_journey step 6）
+2. 照片和自测冲突能够正确展示 ✓（E2E step 8：conflict, combined_severity=null）
+3. 体态档案明确区分已评估与未评估区域 ✓（E2E step 7）
+4. Tool 输出全部通过类型校验和权限检查 ✓（Task 7 已验证，69 passed）
+5. 新安全信号使旧资格判断失效 ✓（E2E step 12：409 stale_priority）
+6. 优先级不自动创建训练计划 ✓（E2E step 10：can_generate_plan=True 但无计划生成）
+7. 结果页有"生成改善计划"入口但不触发 ✓（E2E step 10：can_generate_plan=True）
+8. 自测内容含停止条件、正确姿势 ✓（E2E step 5：detail 验证扩展字段）
+9. 隐私门 8 个条件有检查点 ✓（E2E step 16：/assess/photo 503）
+10. 8 个 Tool 有类型化契约 ✓（Task 7 已验证）
+11. migration head 为 0003，旧列已删除 ✓（E2E test_e2e_migration_head_is_0003 + test_e2e_schema_*）
+12. purge 执行流程正确（photo_keys 保护；encrypted_object_keys 在 OSS 确认后、DB 删除前清除；completed 后无可关联字段残留）✓（E2E test_e2e_purge_full_flow）
+13. idempotency 过期复用与隐私删除覆盖 ✓（E2E test_e2e_idempotency_expiry_and_purge_coverage）
 
 **Suggested commit:** `test: phase one final e2e acceptance after migration phase c`
 

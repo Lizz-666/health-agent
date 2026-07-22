@@ -1573,6 +1573,47 @@ migration 0002 downgrade（按 FK 依赖逆序）：
 - 红旗由结构化安全信号触发，不由 severity+知识库 red_flags 推断
 - 风险分类版本化，重新分类使旧 suggestion_id 失效
 
+### 17.2 Phase 1 最终验收证据（Task 10）
+
+> 验收时间：2026-07-22。PostgreSQL 16.14，Docker 可用。全部测试使用合成数据。
+
+**Migration 最终形态：**
+- Alembic head：`0003_posture_contract`（单一 head，链路 `0001 → 0002 → 0003`）
+- `posture_assessment_events`：`source` / `lifecycle` NOT NULL；`severity` 永久 nullable；旧列 `method` / `result` 已删除
+- 真实 PostgreSQL upgrade/downgrade/re-upgrade 闭环通过，覆盖 normal severity、null severity（legacy uncertain）和 null source/lifecycle（pre-backfill）数据
+
+**E2E 验收覆盖（`backend/tests/test_phase1_e2e.py`，6 tests）：**
+1. Alembic head = 0003_posture_contract ✓
+2. source/lifecycle NOT NULL，severity nullable，method/result 已删除 ✓
+3. 真实 PostgreSQL round-trip ✓
+4. 合成用户注册 + 登录 ✓
+5. 浏览问题列表（26 条）+ 详情含扩展自测字段和结构化 source ✓
+6. 完成自测 → 事件 + 档案 ✓
+7. 档案区分已评估/未评估，combined_severity 可空 ✓
+8. 产生 conflict（photo severe vs self-test moderate），不自动取更严重 ✓
+9. priorities 三路分区：normal_candidates / retest_required / safety_blocked ✓
+10. confirm goals 成功，返回 suggestion_id/profile_version 契约 ✓
+11. pain 安全信号使条目 provisional ✓
+12. 旧 suggestion_id confirm → 409 stale_priority ✓
+13. acute_trauma → restricted → safety_blocked（不因 provisional 降级 retest_required）✓
+14. purge：photo_keys 加密保护 → OSS 删除 → encrypted_object_keys 清除 → DB 删除 → completed tombstone → 无可关联字段残留 ✓
+15. confirm idempotency 过期记录可复用，且 idempotency 记录被 purge 覆盖删除 ✓
+16. /assess/photo 硬返回 503 photo_analysis_disabled ✓
+
+**OpenAPI 全路由校验（`backend/tests/test_openapi_contracts.py`，40 tests）：**
+- 全部 11 路由有非空 200 响应 schema ✓
+- 受保护路由声明 security 要求 ✓
+- 公开路由无 security 要求 ✓
+- POST 路由有 requestBody schema ✓
+- priorities 响应含三路分区 + suggestion_id + profile_version ✓
+- confirm 响应含 confirmed_goals + risk_version + can_generate_plan ✓
+
+**验证命令结果：**
+- `pytest tests/test_phase1_e2e.py -q -s` → **6 passed**
+- `pytest tests/test_openapi_contracts.py -q` → **40 passed**
+- `pytest tests/test_pg_integration.py -q -s` → **11 passed**（PostgreSQL 16.14）
+- `pytest tests -q -rs` → **599 passed**，0 skipped
+
 ---
 
 ## 18. Test and Evaluation Strategy
