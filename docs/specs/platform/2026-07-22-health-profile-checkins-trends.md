@@ -117,6 +117,8 @@ Phase 2 statuses:
 - `active_rest`
 - `safety_adjustment`
 
+`active_rest` and `safety_adjustment` are valid health-management states. They are explicitly not failures, gaps, or missed days, and they count as completed engagement for the day, consistent with the product vision section 8. Phase 2 must never label them red or penalizing.
+
 Later training phases may add:
 
 - `partial_execution`
@@ -237,6 +239,7 @@ Audit metadata should include user id, operation, entity type, entity id when re
 - A normal user can complete the check-in flow in about 20 seconds when no abnormal pain is reported.
 - Reporting abnormal pain requires conditional follow-up before the check-in is accepted as complete.
 - Red-flag follow-up answers produce a red-flag safety state and block ordinary future recommendation readiness.
+- Active rest and safety adjustment are recorded and projected as valid, non-failure engagement states; they never reduce a day to `none`, missed, or failed on the activity grid.
 - Weight trend shows raw points and a moving trend only when enough points exist; it does not recommend adjustments from one-day changes.
 - Logout, token failure, and account switch clear Phase 2 health data from Flutter state.
 - Users can view, correct, and delete health profile data, check-ins, and weight records.
@@ -294,7 +297,7 @@ Rollback:
 
 - Project safety boundary: `docs/product/safety-boundaries.md`.
 - Product vision: `docs/product/vision.md`.
-- Roadmap Phase 2: `docs/product/roadmap.md` §6.
+- Roadmap Phase 2: `docs/product/roadmap.md` section 6.
 - WHO physical activity and sedentary behaviour guidance, official publication page verified 2026-07-22: https://www.who.int/publications/i/item/9789240015128
 - PRC Personal Information Protection Law, CAC repost of official text verified 2026-07-22: https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm
 - NHC response referencing Chinese Dietary Guidelines 2022 core principles, verified 2026-07-22: https://www.nhc.gov.cn/wjw/jiany/202301/bd6c614391274ebd955fc9018f2032a2.shtml

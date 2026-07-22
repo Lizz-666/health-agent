@@ -7,10 +7,11 @@
 
 - 阶段：Phase 2 健康档案、签到与趋势（2026-07-22 启动规格与任务拆分）
 - 规格：`docs/specs/platform/2026-07-22-health-profile-checkins-trends.md`
-- 计划：`docs/plans/platform/2026-07-22-health-profile-checkins-trends.md`
+- 计划：`docs/plans/platform/2026-07-22-health-profile-checkins-trends.md`（含 Task 0-8 完整 charter：目标/非目标/允许文件/禁止范围/依赖/契约/安全规则/行为/验收/验证命令/报告格式）
 - Phase 1 完成审计：`docs/reports/phase1-exit-audit-2026-07-22.md`
 - 当前 Phase 2 代码基线：`10f0c658aa1826d9ea69b9de8b8a2aa395826b3a`
-- 下一步：审查并合入 Phase 2 Task 0 文档变更；合入后从 Phase 2 Task 1 创建独立 worktree 开始实现
+- Task 0 文档基线：`0e92e2c`（`docs: start phase two planning`），其上 charter/规格补全已进入提交范围
+- 下一步：Phase 2 Task 0 已完成本地提交；从 Phase 2 Task 1 创建独立 worktree 开始实现
 
 ## Status Definitions
 
@@ -20,7 +21,7 @@
 
 | Task | Executor | Branch / worktree | Base SHA | Status | Scope and coordination note |
 | --- | --- | --- | --- | --- | --- |
-| Phase 2 Task 0 | Codex coordinator | `codex/phase2-spec-plan` / root worktree | `10f0c65` | `committed` | 仅创建 Phase 2 规格、实施计划和总账登记；允许文件：`docs/specs/platform/2026-07-22-health-profile-checkins-trends.md`、`docs/plans/platform/2026-07-22-health-profile-checkins-trends.md`、`docs/agent/ACTIVE_TASKS.md`、`docs/product/roadmap.md`；禁止实现 runtime、迁移、API、Flutter UI |
+| Phase 2 Task 0 | Codex coordinator + OpenCode impl | `codex/phase2-spec-plan` / root worktree | base `10f0c65`（分支起点）；scaffold `0e92e2c` + charter refinement commit | `committed` | 创建并补全 Phase 2 规格、实施计划和总账登记；`0e92e2c` 为初始 scaffold，OpenCode 随后补齐：规格显式声明「主动休息/安全调整为有效非失败状态」、计划补齐 Task 0-8 全部 AGENTS.md section 4 charter 字段（目标/非目标/允许文件/禁止范围/依赖/契约/安全规则/行为/验收/验证命令/报告格式）、总账同步基线与下一步；协调者 review 修复 Task 3/4 迁移链缺口并清理新增英文非 ASCII 标点；允许文件：`docs/specs/platform/2026-07-22-health-profile-checkins-trends.md`、`docs/plans/platform/2026-07-22-health-profile-checkins-trends.md`、`docs/agent/ACTIVE_TASKS.md`、`docs/product/roadmap.md`；禁止实现 runtime、迁移、API、Flutter UI |
 | Phase 2 Task 1 | Unassigned | `codex/phase2-task1-health-profile-domain` / `health-worktrees/phase2-task1-health-profile-domain` | TBD after Task 0 merge | `planned` | 后端 health profile domain + migration + risk readiness primitives；允许 `backend/app/health/*`、new Alembic revision、focused backend tests；禁止改 Flutter、训练计划、Agent、nutrition |
 | Phase 2 Task 2 | Unassigned | `codex/phase2-task2-health-profile-api` / `health-worktrees/phase2-task2-health-profile-api` | TBD after Task 1 merge | `planned` | `GET/PUT/DELETE /api/v1/health/profile`、auth/cross-user/delete/OpenAPI；依赖 Task 1；禁止继续扩展旧 `/api/v1/user/profile` 为健康档案 |
 | Phase 2 Task 3 | Unassigned | `codex/phase2-task3-daily-checkins` / `health-worktrees/phase2-task3-daily-checkins` | TBD after Task 2 merge | `planned` | Daily check-in + abnormal pain conditional follow-up + check-in risk summary；依赖 Task 1/2；禁止生成训练调整或计划 |
