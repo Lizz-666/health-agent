@@ -22,7 +22,6 @@ from sqlalchemy import select, event
 from app.core.config import settings
 from app.core.exceptions import ServiceUnavailable
 from app.posture.models import (
-    PostureAssessment,
     PostureAssessmentEvent,
     PostureProfileEntry,
 )
@@ -263,10 +262,8 @@ async def test_self_assessment_positive_dual_writes_and_projects(client):
     events = await _events_for("HN-01")
     assert len(events) == 1
     ev = events[0]
-    # dual-write: method + source together, result + severity together
-    assert ev.method == "self_test"
+    # Phase C: writes source/severity/lifecycle
     assert ev.source == "self_test"
-    assert ev.result == "moderate"
     assert ev.severity == "moderate"
     assert ev.lifecycle == "active"
 
@@ -308,8 +305,7 @@ async def test_self_assessment_uncertain_keeps_result_sets_severity_null(client)
     events = await _events_for("HN-01")
     assert len(events) == 1
     ev = events[0]
-    # legacy result kept for compat, severity explicitly None
-    assert ev.result == "uncertain"
+    # severity explicitly None for uncertain answers
     assert ev.severity is None
 
     profile = await _profile_for("HN-01")
@@ -339,9 +335,9 @@ async def test_same_source_reassess_supersedes_old_and_uses_latest(client):
     events = await _events_for("HN-01")
     assert len(events) == 2
     older, newer = events  # ordered asc by created_at
-    assert older.result == "moderate"
+    assert older.severity == "moderate"
     assert older.lifecycle == "superseded"
-    assert newer.result == "normal"
+    assert newer.severity == "normal"
     assert newer.lifecycle == "active"
 
     profile = await _profile_for("HN-01")
@@ -389,9 +385,8 @@ async def test_photo_assessment_dual_writes_and_projects(client):
     events = await _events_for("HN-01")
     assert len(events) == 1
     ev = events[0]
-    assert ev.method == "ai_photo"
+    # Phase C: writes source/severity/lifecycle
     assert ev.source == "ai_photo"
-    assert ev.result == "moderate"
     assert ev.severity == "moderate"
     assert ev.lifecycle == "active"
     # raw AI response preserved verbatim
@@ -424,7 +419,6 @@ async def test_photo_assessment_mild_mapped_to_moderate_in_projection(client):
     events = await _events_for("HN-01")
     ev = events[0]
     # AI mild promoted to moderate for DB/severity, original kept in ai_response
-    assert ev.result == "moderate"
     assert ev.severity == "moderate"
     assert ev.ai_response["level"] == "mild"
 
@@ -564,7 +558,7 @@ async def test_transaction_failure_leaves_no_half_state(client):
     from app.auth.models import User
     from app.posture import service
 
-    token = await _login_user(client)
+    await _login_user(client)
     async with TestSession() as db:
         res = await db.execute(select(User).where(User.phone == "13800138000"))
         user_id = str(res.scalar_one().id)
@@ -697,7 +691,7 @@ async def test_concurrent_same_source_never_two_active_events(client):
     from app.auth.models import User
     from app.posture import service
 
-    token = await _login_user(client)
+    await _login_user(client)
     async with TestSession() as db:
         res = await db.execute(select(User).where(User.phone == "13800138000"))
         user_id = str(res.scalar_one().id)

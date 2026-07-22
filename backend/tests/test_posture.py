@@ -284,7 +284,7 @@ async def test_photo_assess_mild_mapped_to_moderate(client):
         assessment = (
             await db.execute(select(PostureAssessment))
         ).scalar_one()
-        assert assessment.result == "moderate"
+        assert assessment.severity == "moderate"
         assert assessment.ai_response["level"] == "mild"
 
 
@@ -460,31 +460,14 @@ async def test_history_includes_source_for_photo(client):
 
 
 @pytest.mark.asyncio
-async def test_history_source_falls_back_to_method_for_legacy_rows(client):
-    """Legacy rows with source=None must surface method as source (spec §15 alias).
-
-    Expand-phase ``source`` is nullable; rows predating the backfill must still
-    produce a non-null ``source`` equal to the legacy ``method`` value.
-    """
-    import uuid as _uuid
-    from app.core.security import decode_token
-    from tests.conftest import TestSession
-
+async def test_history_source_not_null_contract(client):
+    """Phase C: source is NOT NULL; history always returns source directly."""
     token = await _login_user(client)
-    user_id = decode_token(token)["sub"]
-    async with TestSession() as db:
-        legacy = PostureAssessment(
-            id=_uuid.uuid4(),
-            user_id=_uuid.UUID(user_id),
-            issue_id="HN-01",
-            method="self_test",
-            result="moderate",
-            source=None,
-            severity=None,
-            lifecycle=None,
-        )
-        db.add(legacy)
-        await db.commit()
+    await client.post(
+        "/api/v1/posture/assess",
+        json={"issue_id": "HN-01", "test_index": 0, "answer": "positive"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
     resp = await client.get(
         "/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"}
     )
@@ -492,9 +475,11 @@ async def test_history_source_falls_back_to_method_for_legacy_rows(client):
     records = resp.json()
     assert len(records) == 1
     rec = records[0]
+    # Phase C: source is always present (NOT NULL), method equals source
     assert rec["source"] == "self_test"
     assert rec["method"] == "self_test"
-    assert rec["source"] == rec["method"]
+    # result is derived from severity; positive → moderate
+    assert rec["result"] == "moderate"
 
 
 @pytest.mark.asyncio
@@ -530,6 +515,26 @@ async def test_history_returns_401_when_unauthenticated(client):
     """Auth dependency must run before any history read."""
     resp = await client.get("/api/v1/posture/history")
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_history_result_maps_from_severity_uncertain(client):
+    """Phase C: history result='uncertain' when severity is null (answer=uncertain)."""
+    token = await _login_user(client)
+    await client.post(
+        "/api/v1/posture/assess",
+        json={"issue_id": "HN-01", "test_index": 0, "answer": "uncertain"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    resp = await client.get(
+        "/api/v1/posture/history", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    records = resp.json()
+    assert len(records) == 1
+    assert records[0]["result"] == "uncertain"
+    assert records[0]["source"] == "self_test"
+    assert records[0]["method"] == "self_test"
 
 
 @pytest.mark.asyncio

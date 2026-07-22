@@ -32,10 +32,11 @@ TOMBSTONE_OBJECT_DELETE_COMPLETED = (
 class PostureAssessmentEvent(Base):
     """Immutable assessment event log (renamed from ``posture_assessments``).
 
-    Expand-phase columns (source / severity / lifecycle / content_version /
-    ai_model_meta) are all nullable and are NOT tightened here; ``severity``
-    stays permanently nullable. Legacy ``method`` / ``result`` columns are
-    retained for the dual-write / backfill phase (Task 2).
+    Phase C (migration 0003): ``source`` and ``lifecycle`` are NOT NULL;
+    ``severity`` stays permanently nullable (an absent severity is a legal
+    state). Legacy ``method`` / ``result`` columns have been dropped from
+    the database; the API-facing method/result fields are now computed from
+    source/severity in the service layer.
     """
 
     __tablename__ = "posture_assessment_events"
@@ -57,13 +58,10 @@ class PostureAssessmentEvent(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     issue_id: Mapped[str] = mapped_column(String(20), nullable=False)
-    # Legacy columns (kept intact for dual-write compatibility).
-    method: Mapped[str] = mapped_column(String(20), nullable=False)
-    result: Mapped[str] = mapped_column(String(20), nullable=False)
-    # Expand-phase columns (nullable, not tightened).
-    source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # Phase C: source and lifecycle are NOT NULL (tightened in migration 0003).
+    source: Mapped[str] = mapped_column(String(20), nullable=False)
     severity: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    lifecycle: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    lifecycle: Mapped[str] = mapped_column(String(20), nullable=False)
     content_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     ai_model_meta: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     self_test_answers: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
@@ -73,9 +71,8 @@ class PostureAssessmentEvent(Base):
 
 
 # Backward-compatible alias. ``app.posture.service`` and existing tests import
-# ``PostureAssessment``; service.py is intentionally untouched in this task
-# (dual-write migration of service happens in Task 2). The alias keeps those
-# callers working against the renamed table/model without any edit.
+# ``PostureAssessment``. The alias keeps those callers working against the
+# renamed table/model while Phase C removes only the old database columns.
 PostureAssessment = PostureAssessmentEvent
 
 

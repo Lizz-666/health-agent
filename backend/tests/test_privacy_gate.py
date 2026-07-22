@@ -92,8 +92,6 @@ async def _seed_photo_event(db, user_id, issue_id="HN-01", photo_keys=None):
     event = PostureAssessmentEvent(
         user_id=user_id,
         issue_id=issue_id,
-        method="ai_photo",
-        result="moderate",
         source="ai_photo",
         severity="moderate",
         lifecycle="active",
@@ -111,8 +109,6 @@ async def _seed_self_test_event(db, user_id, issue_id="HN-02"):
     event = PostureAssessmentEvent(
         user_id=user_id,
         issue_id=issue_id,
-        method="self_test",
-        result="normal",
         source="self_test",
         severity="normal",
         lifecycle="active",
@@ -1012,8 +1008,6 @@ async def test_scope_retention_expired_preserves_recent_photo_events():
         old_event = PostureAssessmentEvent(
             user_id=user_id,
             issue_id="HN-01",
-            method="ai_photo",
-            result="moderate",
             source="ai_photo",
             severity="moderate",
             lifecycle="active",
@@ -1023,8 +1017,6 @@ async def test_scope_retention_expired_preserves_recent_photo_events():
         recent_event = PostureAssessmentEvent(
             user_id=user_id,
             issue_id="HN-02",
-            method="ai_photo",
-            result="mild",
             source="ai_photo",
             severity="mild",
             lifecycle="active",
@@ -1595,8 +1587,6 @@ async def test_scoped_purge_selects_by_source_not_photo_keys():
         weird_event = PostureAssessmentEvent(
             user_id=user_id,
             issue_id="HN-01",
-            method="self_test",
-            result="normal",
             source="self_test",
             severity="normal",
             lifecycle="active",
@@ -1606,8 +1596,6 @@ async def test_scoped_purge_selects_by_source_not_photo_keys():
         photo_event = PostureAssessmentEvent(
             user_id=user_id,
             issue_id="HN-01",
-            method="ai_photo",
-            result="moderate",
             source="ai_photo",
             severity="moderate",
             lifecycle="active",
@@ -1651,8 +1639,6 @@ async def test_scoped_purge_rebuilds_profile_after_photo_deletion():
         self_event = PostureAssessmentEvent(
             user_id=user_id,
             issue_id="HN-01",
-            method="self_test",
-            result="moderate",
             source="self_test",
             severity="moderate",
             lifecycle="active",
@@ -1661,8 +1647,6 @@ async def test_scoped_purge_rebuilds_profile_after_photo_deletion():
         photo_event = PostureAssessmentEvent(
             user_id=user_id,
             issue_id="HN-01",
-            method="ai_photo",
-            result="moderate",
             source="ai_photo",
             severity="moderate",
             lifecycle="active",
@@ -1722,8 +1706,6 @@ async def test_scoped_purge_deletes_profile_when_no_events_remain():
         photo_event = PostureAssessmentEvent(
             user_id=user_id,
             issue_id="HN-01",
-            method="ai_photo",
-            result="moderate",
             source="ai_photo",
             severity="moderate",
             lifecycle="active",

@@ -86,19 +86,20 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0002。"""
+    """Alembic 只有一个 head，且为 0003_posture_contract。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0002", head_lines[0]
+    assert head_lines[0].split()[0] == "0003_posture_contract", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
-    """0002 直接 revises 0001_initial_schema（链路完整）。"""
+    """0003_posture_contract -> 0002 -> 0001_initial_schema（链路完整）。"""
     proc = _run_alembic("history")
     assert proc.returncode == 0, proc.stderr
     out = proc.stdout
+    assert "0003_posture_contract" in out
     assert "0002" in out
     assert "0001_initial_schema" in out
 
@@ -237,17 +238,31 @@ def test_migration_tables_match_base_metadata():
 
 
 def test_assessment_event_columns_nullable_in_metadata():
-    """expand 阶段新增列在 ORM 元数据中均为 nullable；severity 永久 nullable。"""
+    """0003 收紧 source/lifecycle 为 NOT NULL；severity 永久 nullable；method/result 已删除。"""
     from app.db.base import Base
     import app.auth.models  # noqa: F401
     import app.posture.models  # noqa: F401
 
     events = Base.metadata.tables["posture_assessment_events"]
-    for col in ("source", "severity", "lifecycle", "content_version", "ai_model_meta"):
+
+    # source and lifecycle are NOT nullable after 0003 contract migration.
+    for col in ("source", "lifecycle"):
+        assert events.c[col].nullable is False, f"{col} must be NOT NULL after 0003"
+
+    # severity remains permanently nullable.
+    assert events.c["severity"].nullable is True, "severity must remain nullable"
+
+    # content_version and ai_model_meta remain nullable.
+    for col in ("content_version", "ai_model_meta"):
         assert events.c[col].nullable is True, f"{col} must be nullable"
 
-    # 旧列保持原状（NOT NULL 未被收紧/放松）。
-    for col in ("method", "result", "issue_id", "user_id"):
+    # method and result columns should NOT exist anymore after 0003.
+    col_names = set(events.c.keys())
+    assert "method" not in col_names, "method column must not exist after 0003"
+    assert "result" not in col_names, "result column must not exist after 0003"
+
+    # Remaining old columns stay NOT NULL.
+    for col in ("issue_id", "user_id"):
         assert events.c[col].nullable is False, f"{col} should remain NOT NULL"
 
 
@@ -588,3 +603,72 @@ def test_profile_backfill_conflict_sets_certainty_conflict():
 
     assert "g.distinct_non_null >= 2" in region
     assert "THEN 'conflict'" in region
+
+
+# ---------------------------------------------------------------------------
+# 0003_posture_contract specific tests
+# ---------------------------------------------------------------------------
+
+
+def _offline_upgrade_0003_sql() -> str:
+    proc = _run_alembic("upgrade", "0002:0003_posture_contract", "--sql")
+    assert proc.returncode == 0, f"alembic upgrade 0002:0003 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def _offline_downgrade_0003_sql() -> str:
+    proc = _run_alembic("downgrade", "0003_posture_contract:0002", "--sql")
+    assert proc.returncode == 0, f"alembic downgrade 0003:0002 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def test_0003_upgrade_sql_drops_method_result():
+    """0003 upgrade drops method and result columns."""
+    sql = _offline_upgrade_0003_sql()
+    assert "DROP COLUMN method" in sql, "0003 must DROP COLUMN method"
+    assert "DROP COLUMN result" in sql, "0003 must DROP COLUMN result"
+
+
+def test_0003_upgrade_sql_tightens_source_lifecycle():
+    """0003 upgrade sets source and lifecycle to NOT NULL."""
+    sql = _offline_upgrade_0003_sql()
+    assert "SET NOT NULL" in sql, "0003 must contain SET NOT NULL"
+    # Verify both source and lifecycle are tightened.
+    sql_lower = sql.lower()
+    assert "source" in sql_lower and "set not null" in sql_lower, (
+        "0003 must SET NOT NULL for source"
+    )
+    assert "lifecycle" in sql_lower and "set not null" in sql_lower, (
+        "0003 must SET NOT NULL for lifecycle"
+    )
+
+
+def test_0003_downgrade_sql_restores_method_result():
+    """0003 downgrade restores method and result columns."""
+    sql = _offline_downgrade_0003_sql()
+    assert "ADD COLUMN method" in sql, "0003 downgrade must ADD COLUMN method"
+    assert "ADD COLUMN result" in sql, "0003 downgrade must ADD COLUMN result"
+
+
+def test_0003_severity_never_tightened():
+    """severity must never be tightened to NOT NULL in 0003 upgrade."""
+    sql = _offline_upgrade_0003_sql()
+    # severity SET NOT NULL should never appear in the 0003 upgrade SQL.
+    assert "severity SET NOT NULL" not in sql, (
+        "severity must never be tightened to NOT NULL in 0003"
+    )
+    assert "severity VARCHAR(20) NOT NULL" not in sql, (
+        "severity must never be declared as NOT NULL in 0003"
+    )
+
+
+def test_0003_metadata_no_method_result_columns():
+    """After 0003, method and result must not exist in Base.metadata table columns."""
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+
+    events = Base.metadata.tables["posture_assessment_events"]
+    col_names = set(events.c.keys())
+    assert "method" not in col_names, "method must not exist in metadata after 0003"
+    assert "result" not in col_names, "result must not exist in metadata after 0003"

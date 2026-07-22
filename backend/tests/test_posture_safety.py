@@ -746,7 +746,7 @@ async def test_reclassification_does_not_resolve_when_other_red_flag_remains(cli
         ),
         headers={"Authorization": f"Bearer {token}"},
     )
-    s2 = await client.post(
+    await client.post(
         "/api/v1/posture/safety-signals",
         json=_signal_payload(
             signal_type="weakness",
@@ -1604,7 +1604,6 @@ async def test_two_issues_moderate_signals_no_cross_escalation():
     async with TestSession() as db:
         from tests.test_privacy_gate import _make_user
         user_id = await _make_user(db)
-        uid_str = str(user_id)
         # Two profile entries
         db.add_all([
             PostureProfileEntry(
@@ -1682,7 +1681,7 @@ async def test_global_signal_affects_new_profile_for_any_issue():
 
     # Now save a self-assessment — the profile should get provisional override
     async with TestSession() as db:
-        result = await service.save_self_assessment(db, uid_str, "HN-01", "positive", 0)
+        await service.save_self_assessment(db, uid_str, "HN-01", "positive", 0)
 
     # Profile should be provisional because of global signal
     from sqlalchemy import select as sa_select
@@ -1701,24 +1700,23 @@ async def test_global_signal_affects_new_profile_for_any_issue():
 async def test_scoped_purge_maintains_correct_risk_after_photo_deletion():
     """Fix #6: Scoped purge (consent_withdrawn) deletes photo events →
     remaining profile maintains correct risk_tier/risk_version/certainty."""
-    from app.posture import purge, safety
+    from app.posture import purge
     from app.posture.models import PostureAssessmentEvent
     from sqlalchemy import select as sa_select
 
     async with TestSession() as db:
         from tests.test_privacy_gate import _make_user
         user_id = await _make_user(db)
-        uid_str = str(user_id)
         # Create a self-test event (will survive purge)
         self_evt = PostureAssessmentEvent(
-            user_id=user_id, issue_id="HN-01", method="self_test",
-            result="moderate", source="self_test", severity="moderate",
+            user_id=user_id, issue_id="HN-01",
+            source="self_test", severity="moderate",
             lifecycle="active",
         )
         # Create a photo event (will be purged)
         photo_evt = PostureAssessmentEvent(
-            user_id=user_id, issue_id="HN-01", method="ai_photo",
-            result="moderate", source="ai_photo", severity="moderate",
+            user_id=user_id, issue_id="HN-01",
+            source="ai_photo", severity="moderate",
             lifecycle="active", photo_keys=["fix6-photo.jpg"],
         )
         db.add_all([self_evt, photo_evt])

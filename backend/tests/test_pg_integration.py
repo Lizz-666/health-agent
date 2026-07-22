@@ -17,6 +17,7 @@ CRITICAL invariants enforced by this module:
 import asyncio
 import uuid as _uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from sqlalchemy import select
@@ -60,8 +61,6 @@ async def _seed_photo_event(db, user_id, issue_id="HN-01", photo_keys=None):
     evt = PostureAssessmentEvent(
         user_id=user_id,
         issue_id=issue_id,
-        method="ai_photo",
-        result="moderate",
         source="ai_photo",
         severity="moderate",
         lifecycle="active",
@@ -199,13 +198,13 @@ async def test_pg_scoped_purge_fk_and_projection(pg_session):
     user_id = await _make_user(pg_session)
 
     self_evt = PostureAssessmentEvent(
-        user_id=user_id, issue_id="HN-01", method="self_test",
-        result="moderate", source="self_test", severity="moderate",
+        user_id=user_id, issue_id="HN-01",
+        source="self_test", severity="moderate",
         lifecycle="active",
     )
     photo_evt = PostureAssessmentEvent(
-        user_id=user_id, issue_id="HN-01", method="ai_photo",
-        result="moderate", source="ai_photo", severity="moderate",
+        user_id=user_id, issue_id="HN-01",
+        source="ai_photo", severity="moderate",
         lifecycle="active", photo_keys=["scoped-photo.jpg"],
     )
     pg_session.add_all([self_evt, photo_evt])
@@ -344,7 +343,7 @@ async def test_pg_different_issue_risk_isolation(pg_session):
 
 async def test_pg_retry_no_double_claim(pg_session_factory):
     from app.posture import purge
-    from app.posture.models import PostureAssessmentEvent, PosturePurgeTombstone, PurgeOperation
+    from app.posture.models import PosturePurgeTombstone, PurgeOperation
 
     seed = pg_session_factory()
     assert seed.bind.dialect.name == "postgresql"
@@ -521,8 +520,6 @@ async def test_pg_purge_waits_for_uncommitted_writer(pg_session_factory):
         PostureAssessmentEvent(
             user_id=user_id,
             issue_id="HN-01",
-            method="self_test",
-            result="moderate",
             source="self_test",
             severity="moderate",
             lifecycle="active",
@@ -688,3 +685,195 @@ async def test_pg_initial_purge_lease_does_not_duplicate_oss_delete(
         await verify.execute(select(PosturePurgeTombstone))
     ).scalars().all()
     assert len(tombstones) == 1
+
+
+# ---------------------------------------------------------------------------
+# Test: Migration 0003 upgrade/downgrade/re-upgrade round-trip (Phase C contract)
+# ---------------------------------------------------------------------------
+
+
+async def test_pg_migration_0003_round_trip(pg_dsn):
+    """Migration 0003 round-trip: upgrade -> downgrade -> re-upgrade on real PG.
+
+    Synthetic data covers both normal severity and severity=null (legacy
+    result='uncertain') to verify deterministic backfill/restore.
+    """
+    import subprocess
+    import sys
+    import os
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+    from sqlalchemy import text
+
+    backend_dir = str(Path(__file__).resolve().parent.parent)
+
+    def _alembic(target, direction="upgrade"):
+        env = dict(os.environ)
+        env["DATABASE_URL"] = pg_dsn
+        cmd = [sys.executable, "-m", "alembic", direction, target]
+        result = subprocess.run(
+            cmd, cwd=backend_dir, env=env, capture_output=True, text=True, timeout=60
+        )
+        assert result.returncode == 0, (
+            f"alembic {direction} {target} failed:\n{result.stderr}\n{result.stdout}"
+        )
+
+    engine = create_async_engine(pg_dsn, poolclass=NullPool)
+
+    try:
+        # --- Step 1: Downgrade to 0002 (restore method/result columns) ---
+        _alembic("0002", direction="downgrade")
+
+        # --- Step 2: Insert synthetic data at 0002 level ---
+        async with engine.begin() as conn:
+            # Ensure a user row exists for the FK (membership_level is NOT NULL with default 'free')
+            await conn.execute(text(
+                "INSERT INTO users (id, phone, nickname, membership_level) "
+                "VALUES ('a0000000-0000-0000-0000-000000000001'::uuid, '13900000001', 'mig_test', 'free') "
+                "ON CONFLICT DO NOTHING"
+            ))
+            # Row with normal severity (source already populated)
+            await conn.execute(text(
+                "INSERT INTO posture_assessment_events "
+                "(id, user_id, issue_id, method, result, source, severity, lifecycle) "
+                "VALUES ("
+                "'b0000000-0000-0000-0000-000000000001'::uuid, "
+                "'a0000000-0000-0000-0000-000000000001'::uuid, "
+                "'HN-01', 'self_test', 'moderate', 'self_test', 'moderate', 'active')"
+            ))
+            # Row with null severity (legacy uncertain)
+            await conn.execute(text(
+                "INSERT INTO posture_assessment_events "
+                "(id, user_id, issue_id, method, result, source, severity, lifecycle) "
+                "VALUES ("
+                "'b0000000-0000-0000-0000-000000000002'::uuid, "
+                "'a0000000-0000-0000-0000-000000000001'::uuid, "
+                "'HN-02', 'ai_photo', 'uncertain', 'ai_photo', NULL, 'active')"
+            ))
+            # Row with source=NULL (legacy pre-backfill row)
+            await conn.execute(text(
+                "INSERT INTO posture_assessment_events "
+                "(id, user_id, issue_id, method, result, source, severity, lifecycle) "
+                "VALUES ("
+                "'b0000000-0000-0000-0000-000000000003'::uuid, "
+                "'a0000000-0000-0000-0000-000000000001'::uuid, "
+                "'ST-04', 'self_test', 'normal', NULL, 'normal', NULL)"
+            ))
+
+        # --- Step 3: Upgrade to 0003 ---
+        _alembic("0003_posture_contract")
+
+        # --- Step 4: Verify post-upgrade state ---
+        async with engine.begin() as conn:
+            # source/lifecycle are NOT NULL
+            cols = await conn.execute(text(
+                "SELECT column_name, is_nullable "
+                "FROM information_schema.columns "
+                "WHERE table_name = 'posture_assessment_events' "
+                "ORDER BY ordinal_position"
+            ))
+            col_map = {row[0]: row[1] for row in cols.fetchall()}
+            assert "method" not in col_map, "method column should be dropped"
+            assert "result" not in col_map, "result column should be dropped"
+            assert col_map["source"] == "NO", "source must be NOT NULL"
+            assert col_map["lifecycle"] == "NO", "lifecycle must be NOT NULL"
+            assert col_map["severity"] == "YES", "severity must remain nullable"
+
+            # Verify backfill: row 3 source should now be 'self_test' (from method)
+            row3 = (await conn.execute(text(
+                "SELECT source, lifecycle FROM posture_assessment_events "
+                "WHERE id = 'b0000000-0000-0000-0000-000000000003'::uuid"
+            ))).fetchone()
+            assert row3[0] == "self_test", f"source backfill failed: {row3[0]}"
+            assert row3[1] == "active", f"lifecycle backfill failed: {row3[1]}"
+
+            # Row 2 severity remains NULL
+            row2 = (await conn.execute(text(
+                "SELECT severity FROM posture_assessment_events "
+                "WHERE id = 'b0000000-0000-0000-0000-000000000002'::uuid"
+            ))).fetchone()
+            assert row2[0] is None, f"severity should remain NULL: {row2[0]}"
+
+        # --- Step 5: Downgrade back to 0002 ---
+        _alembic("0002", direction="downgrade")
+
+        # --- Step 6: Verify post-downgrade state ---
+        async with engine.begin() as conn:
+            cols = await conn.execute(text(
+                "SELECT column_name, is_nullable "
+                "FROM information_schema.columns "
+                "WHERE table_name = 'posture_assessment_events' "
+                "ORDER BY ordinal_position"
+            ))
+            col_map = {row[0]: row[1] for row in cols.fetchall()}
+            assert "method" in col_map, "method column should be restored"
+            assert "result" in col_map, "result column should be restored"
+            assert col_map["method"] == "NO", "method must be NOT NULL after downgrade"
+            assert col_map["result"] == "NO", "result must be NOT NULL after downgrade"
+            assert col_map["source"] == "YES", "source must be nullable after downgrade"
+            assert col_map["lifecycle"] == "YES", "lifecycle must be nullable after downgrade"
+            assert col_map["severity"] == "YES", "severity must remain nullable"
+
+            # Verify data mapping: method=source, result=COALESCE(severity, 'uncertain')
+            row1 = (await conn.execute(text(
+                "SELECT method, result FROM posture_assessment_events "
+                "WHERE id = 'b0000000-0000-0000-0000-000000000001'::uuid"
+            ))).fetchone()
+            assert row1[0] == "self_test", f"method should equal source: {row1[0]}"
+            assert row1[1] == "moderate", f"result should equal severity: {row1[1]}"
+
+            # Row 2: severity was NULL -> result='uncertain'
+            row2 = (await conn.execute(text(
+                "SELECT method, result FROM posture_assessment_events "
+                "WHERE id = 'b0000000-0000-0000-0000-000000000002'::uuid"
+            ))).fetchone()
+            assert row2[0] == "ai_photo", f"method should equal source: {row2[0]}"
+            assert row2[1] == "uncertain", f"result should be 'uncertain' for null severity: {row2[1]}"
+
+            # Row 3: source was backfilled from method in upgrade, kept in downgrade
+            row3 = (await conn.execute(text(
+                "SELECT method, result, source FROM posture_assessment_events "
+                "WHERE id = 'b0000000-0000-0000-0000-000000000003'::uuid"
+            ))).fetchone()
+            assert row3[0] == "self_test", f"method: {row3[0]}"
+            assert row3[1] == "normal", f"result: {row3[1]}"
+            assert row3[2] == "self_test", f"source preserved: {row3[2]}"
+
+        # --- Step 7: Re-upgrade to 0003 ---
+        _alembic("0003_posture_contract")
+
+        # --- Step 8: Verify re-upgrade matches step 4 ---
+        async with engine.begin() as conn:
+            cols = await conn.execute(text(
+                "SELECT column_name, is_nullable "
+                "FROM information_schema.columns "
+                "WHERE table_name = 'posture_assessment_events' "
+                "ORDER BY ordinal_position"
+            ))
+            col_map = {row[0]: row[1] for row in cols.fetchall()}
+            assert "method" not in col_map, "method should be dropped after re-upgrade"
+            assert "result" not in col_map, "result should be dropped after re-upgrade"
+            assert col_map["source"] == "NO", "source must be NOT NULL after re-upgrade"
+            assert col_map["lifecycle"] == "NO", "lifecycle must be NOT NULL after re-upgrade"
+            assert col_map["severity"] == "YES", "severity must remain nullable"
+
+    finally:
+        # Always restore to head and remove synthetic rows so other PG tests are
+        # not affected by this direct pg_dsn migration exercise.
+        try:
+            _alembic("head")
+        except Exception:
+            pass
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text(
+                    "DELETE FROM posture_assessment_events "
+                    "WHERE user_id = 'a0000000-0000-0000-0000-000000000001'::uuid"
+                ))
+                await conn.execute(text(
+                    "DELETE FROM users "
+                    "WHERE id = 'a0000000-0000-0000-0000-000000000001'::uuid"
+                ))
+        except Exception:
+            pass
+        await engine.dispose()

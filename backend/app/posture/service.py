@@ -369,15 +369,14 @@ async def save_self_assessment(
     answer: str,
     test_index: int,
 ) -> Optional[dict]:
-    """Persist a self-test assessment event (dual-write) and recompute the
-    profile entry in a single transaction.
+    """Persist a self-test assessment event and recompute the profile entry
+    in a single transaction.
 
-    Dual-write: ``method`` + ``source`` and ``result`` + ``severity`` are
-    populated together. For an ``uncertain`` answer the legacy ``result`` stays
-    ``'uncertain'`` (compatibility) while ``severity`` is set to ``None``
-    (severity is permanently nullable, migration 0002). Prior same-source
-    active events are superseded; the projection honours only the latest event
-    per source.
+    Phase C: only ``source`` and ``severity`` are written (``method``/``result``
+    columns have been dropped). For an ``uncertain`` answer ``severity`` is set
+    to ``None`` (severity is permanently nullable). Prior same-source active
+    events are superseded; the projection honours only the latest event per
+    source.
     """
     # Hardening fix #9: service-layer validation (defense in depth)
     if answer not in _VALID_ANSWERS:
@@ -404,8 +403,6 @@ async def save_self_assessment(
         assessment = PostureAssessment(
             user_id=UUID(user_id),
             issue_id=issue_id,
-            method=SOURCE_SELF_TEST,
-            result=result_level,
             source=SOURCE_SELF_TEST,
             severity=severity,
             lifecycle=LIFECYCLE_ACTIVE,
@@ -526,8 +523,6 @@ async def _persist_photo_event(
     assessment = PostureAssessment(
         user_id=UUID(user_id),
         issue_id=issue_id,
-        method=SOURCE_AI_PHOTO,
-        result=db_result,
         source=SOURCE_AI_PHOTO,
         severity=db_result,
         lifecycle=LIFECYCLE_ACTIVE,
@@ -547,8 +542,8 @@ async def save_photo_assessment(
     photo_keys: List[str],
     ai_result: dict,
 ) -> dict:
-    """Persist a photo assessment event (dual-write) and recompute the profile
-    entry in a single transaction.
+    """Persist a photo assessment event and recompute the profile entry in a
+    single transaction.
 
     Legacy entry point: the caller has ALREADY run the model and supplies
     ``ai_result``. AI failures / retakes / disabled photo gate are handled
@@ -628,12 +623,14 @@ async def _replay_photo_event(
         raise AppException(
             410, "幂等记录指向的评估事件已被清除", "idempotency_result_gone"
         )
-    # ai_response may have been purged; fall back to the mapped legacy result.
+    # Phase C: derive db_result from severity (method/result columns dropped).
+    # severity=None maps to 'uncertain' for API compatibility.
+    db_result = event.severity if event.severity is not None else "uncertain"
     suggestion = _photo_suggestion(
-        event.result, (event.ai_response or {})
+        db_result, (event.ai_response or {})
     )
     return _photo_tool_response(
-        event, event.result, suggestion, event.ai_response
+        event, db_result, suggestion, event.ai_response
     )
 
 
@@ -773,15 +770,17 @@ async def get_user_history(
     output = []
     for r in records:
         issue = get_issue_by_id(r.issue_id)
-        source = r.source or r.method
+        # Phase C: source is NOT NULL; method is an API-compat alias of source.
+        # result is derived from severity; severity=None maps to 'uncertain'.
+        api_result = r.severity if r.severity is not None else "uncertain"
         output.append(
             {
                 "id": str(r.id),
                 "issue_id": r.issue_id,
                 "issue_name": issue["name_cn"] if issue else r.issue_id,
-                "method": source,
-                "source": source,
-                "result": r.result,
+                "method": r.source,
+                "source": r.source,
+                "result": api_result,
                 "created_at": r.created_at,
             }
         )
