@@ -186,6 +186,10 @@ flowchart TB
 
 ## 6. 阶段 2：健康档案、签到与趋势
 
+当前规格：`docs/specs/platform/2026-07-22-health-profile-checkins-trends.md`
+
+当前计划：`docs/plans/platform/2026-07-22-health-profile-checkins-trends.md`
+
 ### 目标
 
 建立训练调整所需的结构化数据，不先依赖聊天历史或穿戴设备。

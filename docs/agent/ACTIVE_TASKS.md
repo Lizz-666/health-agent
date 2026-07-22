@@ -1,16 +1,16 @@
 # Active Agent Tasks
 
-> 这是并行开发协调总账，不是产品规格。最后核对：2026-07-18，基于各 worktree 的 `git status` 和 HEAD。
+> 这是并行开发协调总账，不是产品规格。最后核对：2026-07-22，基于当前 worktree 的 `git status` 和 HEAD。
 > 协调者在分配任务前、进入 review 时、创建 commit 后和完成集成后更新本文件。
 
 ## Current Initiative
 
-- 阶段：Phase 1 体态核心产品化（2026-07-22 已由用户签核完成）
-- 规格：`docs/specs/posture/2026-07-11-posture-core-productization.md`
-- 计划：`docs/plans/posture/2026-07-11-posture-core-productization.md`
-- 完成审计：`docs/reports/phase1-exit-audit-2026-07-22.md`
-- 当前下一阶段代码基线：最新 `main` HEAD
-- 下一步：仅准备 Phase 2 规格与任务拆分；未登记前不得启动 Phase 2 实现
+- 阶段：Phase 2 健康档案、签到与趋势（2026-07-22 启动规格与任务拆分）
+- 规格：`docs/specs/platform/2026-07-22-health-profile-checkins-trends.md`
+- 计划：`docs/plans/platform/2026-07-22-health-profile-checkins-trends.md`
+- Phase 1 完成审计：`docs/reports/phase1-exit-audit-2026-07-22.md`
+- 当前 Phase 2 代码基线：`10f0c658aa1826d9ea69b9de8b8a2aa395826b3a`
+- 下一步：审查并合入 Phase 2 Task 0 文档变更；合入后从 Phase 2 Task 1 创建独立 worktree 开始实现
 
 ## Status Definitions
 
@@ -20,6 +20,15 @@
 
 | Task | Executor | Branch / worktree | Base SHA | Status | Scope and coordination note |
 | --- | --- | --- | --- | --- | --- |
+| Phase 2 Task 0 | Codex coordinator | `codex/phase2-spec-plan` / root worktree | `10f0c65` | `committed` | 仅创建 Phase 2 规格、实施计划和总账登记；允许文件：`docs/specs/platform/2026-07-22-health-profile-checkins-trends.md`、`docs/plans/platform/2026-07-22-health-profile-checkins-trends.md`、`docs/agent/ACTIVE_TASKS.md`、`docs/product/roadmap.md`；禁止实现 runtime、迁移、API、Flutter UI |
+| Phase 2 Task 1 | Unassigned | `codex/phase2-task1-health-profile-domain` / `health-worktrees/phase2-task1-health-profile-domain` | TBD after Task 0 merge | `planned` | 后端 health profile domain + migration + risk readiness primitives；允许 `backend/app/health/*`、new Alembic revision、focused backend tests；禁止改 Flutter、训练计划、Agent、nutrition |
+| Phase 2 Task 2 | Unassigned | `codex/phase2-task2-health-profile-api` / `health-worktrees/phase2-task2-health-profile-api` | TBD after Task 1 merge | `planned` | `GET/PUT/DELETE /api/v1/health/profile`、auth/cross-user/delete/OpenAPI；依赖 Task 1；禁止继续扩展旧 `/api/v1/user/profile` 为健康档案 |
+| Phase 2 Task 3 | Unassigned | `codex/phase2-task3-daily-checkins` / `health-worktrees/phase2-task3-daily-checkins` | TBD after Task 2 merge | `planned` | Daily check-in + abnormal pain conditional follow-up + check-in risk summary；依赖 Task 1/2；禁止生成训练调整或计划 |
+| Phase 2 Task 4 | Unassigned | `codex/phase2-task4-weight-grid-trends` / `health-worktrees/phase2-task4-weight-grid-trends` | TBD after Task 3 merge | `planned` | Weight CRUD、moving trend metadata、activity grid projection；禁止依据体重趋势输出计划/饮食调整建议 |
+| Phase 2 Task 5 | Unassigned | `codex/phase2-task5-flutter-health-state` / `health-worktrees/phase2-task5-flutter-health-state` | TBD after backend API contracts | `planned` | Flutter Phase 2 models/providers/session reset；依赖 Task 2-4 API shapes；禁止新增页面主流程，先完成状态层和测试 |
+| Phase 2 Task 6 | Unassigned | `codex/phase2-task6-flutter-my-health` / `health-worktrees/phase2-task6-flutter-my-health` | TBD after Task 5 merge | `planned` | My page health profile、weight trend、activity grid and deletion UI；依赖 Task 5；不得混入 Today check-in flow |
+| Phase 2 Task 7 | Unassigned | `codex/phase2-task7-flutter-today-checkin` / `health-worktrees/phase2-task7-flutter-today-checkin` | TBD after Task 5 merge | `planned` | Today page check-in、abnormal pain follow-up、active rest/safety adjustment UI；依赖 Task 5；不得渲染不存在的训练计划 |
+| Phase 2 Task 8 | Unassigned | `codex/phase2-task8-final-e2e` / `health-worktrees/phase2-task8-final-e2e` | TBD after Task 6/7 integration | `planned` | Phase 2 E2E、OpenAPI/privacy/cache/account-switch verification、Android smoke and exit audit；只在全部实现任务验证后更新完成状态 |
 | Phase 1 Task 2 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | 双写评估事件投影 + profile 投影（spec §6.3/§6.4/§8.5）；service.py 的 safety/purge 导入在本 commit 为防御式（模块尚未存在），于后续 commit 移除 |
 | Phase 1 Task 6.5 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | 结构化安全信号分类 + risk_rules + safety-signals 端点；safety.py 的 purge 导入仍为防御式（purge 未存在）；依赖 Task 2 的 service 投影 |
 | Phase 1 Task 9 | Coordinator clean integration | `codex/phase1-integration-clean` / `health-worktrees/phase1-integration-clean` | `d309969` | `merged` via `cc92449` | 隐私门 photo→privacy_gate + crash-safe purge + 配置/路由/conftest 条件补丁；移除全部防御式导入，恢复 service/safety 为直接导入，恢复完整 test_posture_safety.py |
