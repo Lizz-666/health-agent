@@ -4,7 +4,7 @@
 > Scope: Phase 1 posture core productization exit audit  
 > Referenced main HEAD: `1d746e9` (`docs: record merged phase one final acceptance`)  
 > Audit worktree HEAD: `1a88835` (`codex/phase1-task10-final-e2e`)  
-> Conclusion: Phase 1 has sufficient evidence for user sign-off. Phase 2 has not started.
+> Conclusion: Phase 1 has sufficient evidence for sign-off. User sign-off was received on 2026-07-22. Phase 2 has not started.
 
 ## 1. Exit Criteria
 
@@ -82,8 +82,7 @@ Notes:
 | P3 | Physical Android device smoke not performed | Emulator smoke is acceptable for this phase; user may request physical-device sign-off before external sharing |
 | P3 | Android screenshots were not available for Codex pixel review | Does not block API/domain acceptance; do visual review before demo or release |
 | P3 | `/auth/send-code` returned 429 during smoke | Likely test-environment residue; revisit rate-limit UX/config in a later auth hardening task |
-| P3 | Roadmap completion flag not changed | Intentional: user signs off Phase 1 completion before roadmap status is changed |
 
 ## 6. Sign-Off Recommendation
 
-Phase 1 posture core productization is ready for user sign-off. After sign-off, the coordinator can update roadmap status and prepare Phase 2 planning. Do not start Phase 2 implementation until that sign-off and roadmap update are complete.
+Phase 1 posture core productization has been signed off by the user. The coordinator may prepare Phase 2 specifications and task splitting next. Do not start Phase 2 implementation until the Phase 2 spec, safety boundaries, file scopes, and acceptance criteria are explicitly registered.

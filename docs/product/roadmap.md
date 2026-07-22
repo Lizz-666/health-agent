@@ -169,6 +169,21 @@ flowchart TB
 - Tool 输出全部通过类型校验和权限检查
 - 新安全信号会使旧资格判断失效，并在继续建议前重新执行风险分类
 
+### 完成状态
+
+阶段 1 已于 2026-07-22 由用户签核完成。验收证据见：
+
+- `docs/reports/phase1-exit-audit-2026-07-22.md`
+- `docs/specs/posture/2026-07-11-posture-core-productization.md` §17.2
+- 主分支 `a886e86`
+
+最终验收结果：
+
+- 后端全量测试 `599 passed`，0 skipped，包含 PostgreSQL 16.14 真实 PG 集成路径
+- Flutter `analyze` 通过，Flutter 全量测试 `196 passed`
+- Android 模拟器冒烟覆盖登录、问题详情、自测、档案、历史、照片门、优先级、目标确认和安全信号
+- Phase 1 未启动训练计划生成、Agent 对话或饮食推荐；照片分析仍由隐私门硬拒绝
+
 ## 6. 阶段 2：健康档案、签到与趋势
 
 ### 目标

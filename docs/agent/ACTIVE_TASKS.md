@@ -5,10 +5,12 @@
 
 ## Current Initiative
 
-- 阶段：Phase 1 体态核心产品化
+- 阶段：Phase 1 体态核心产品化（2026-07-22 已由用户签核完成）
 - 规格：`docs/specs/posture/2026-07-11-posture-core-productization.md`
 - 计划：`docs/plans/posture/2026-07-11-posture-core-productization.md`
-- 当前下一实现任务代码基线：`49f9a8d`
+- 完成审计：`docs/reports/phase1-exit-audit-2026-07-22.md`
+- 当前下一阶段代码基线：最新 `main` HEAD
+- 下一步：仅准备 Phase 2 规格与任务拆分；未登记前不得启动 Phase 2 实现
 
 ## Status Definitions
 
