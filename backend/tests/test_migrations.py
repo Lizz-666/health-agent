@@ -56,7 +56,7 @@ def _offline_downgrade_sql() -> str:
     return proc.stdout
 
 
-# 全部表名（重命名后的 events 表 + 6 个新表 + 平台表）。
+# 全部表名（重命名后的 events 表 + 6 个新表 + 平台表 + Phase 2 health_profiles）。
 ALL_TABLES = {
     "users",
     "verification_codes",
@@ -67,6 +67,7 @@ ALL_TABLES = {
     "idempotency_records",
     "posture_purge_tombstones",
     "purge_operations",
+    "health_profiles",
 }
 
 # Phase 1 expand 阶段新增的 6 张表。
@@ -86,12 +87,12 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0003_posture_contract。"""
+    """Alembic 只有一个 head，且为 0004_health_profile_tracking。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0003_posture_contract", head_lines[0]
+    assert head_lines[0].split()[0] == "0004_health_profile_tracking", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
@@ -99,6 +100,7 @@ def test_head_chains_to_initial_schema():
     proc = _run_alembic("history")
     assert proc.returncode == 0, proc.stderr
     out = proc.stdout
+    assert "0004_health_profile_tracking" in out
     assert "0003_posture_contract" in out
     assert "0002" in out
     assert "0001_initial_schema" in out
@@ -219,6 +221,7 @@ def test_migration_tables_match_base_metadata():
     from app.db.base import Base
     import app.auth.models  # noqa: F401
     import app.posture.models  # noqa: F401
+    import app.health.models  # noqa: F401
 
     metadata_tables = set(Base.metadata.tables.keys())
     assert metadata_tables == ALL_TABLES
@@ -235,6 +238,12 @@ def test_migration_tables_match_base_metadata():
     assert created | (
         {"posture_assessment_events"} if renamed_ok else set()
     ) == metadata_tables
+
+
+def test_alembic_env_imports_health_models():
+    """Alembic target metadata must include Phase 2 health models."""
+    env_text = (BACKEND_DIR / "alembic" / "env.py").read_text(encoding="utf-8")
+    assert "import app.health.models" in env_text
 
 
 def test_assessment_event_columns_nullable_in_metadata():
@@ -469,8 +478,9 @@ def test_metadata_indexes_match_offline_sql():
     migration 用 ``op.create_index`` / ``sa.UniqueConstraint`` 定义权威索引集；
     models.py 的 ``index=True`` / ``Index(...)`` / ``UniqueConstraint(...)``
     必须产生完全相同的集合，否则 SQLite ``create_all`` 测试 schema 与真实 PG
-    迁移结果会漂移。仅比较 posture 相关表（不含 users/verification_codes/
-    alembic_version，它们由 0001 定义且已有专门测试覆盖）。
+    迁移结果会漂移。仅比较领域相关表（posture + Phase 2 health；不含
+    users/verification_codes/alembic_version，它们由 0001 定义且已有专门
+    测试覆盖）。
     """
     import re
 
@@ -479,8 +489,9 @@ def test_metadata_indexes_match_offline_sql():
     from app.db.base import Base
     import app.auth.models  # noqa: F401
     import app.posture.models  # noqa: F401
+    import app.health.models  # noqa: F401
 
-    posture_tables = {
+    domain_tables = {
         "posture_assessment_events",
         "posture_profile_entries",
         "posture_user_goals",
@@ -488,11 +499,12 @@ def test_metadata_indexes_match_offline_sql():
         "idempotency_records",
         "posture_purge_tombstones",
         "purge_operations",
+        "health_profiles",
     }
 
     # 1. Base.metadata 中的索引名 + 命名 UNIQUE 约束名。
     metadata_names = set()
-    for tname in posture_tables:
+    for tname in domain_tables:
         table = Base.metadata.tables[tname]
         for idx in table.indexes:
             assert idx.name, f"index on {tname} has no name"
@@ -501,12 +513,13 @@ def test_metadata_indexes_match_offline_sql():
             if isinstance(cons, UniqueConstraint) and cons.name:
                 metadata_names.add(cons.name)
 
-    # 2. offline upgrade SQL 中的 CREATE [UNIQUE] INDEX 名（限定 posture 表）
-    #    + 命名 UNIQUE 约束名（全 SQL 中仅这两张 posture 表声明了命名 UNIQUE）。
+    # 2. offline upgrade SQL 中的 CREATE [UNIQUE] INDEX 名（限定领域表）
+    #    + 命名 UNIQUE 约束名（全 SQL 中 posture 两表与 health_profiles 表
+    #    声明了命名 UNIQUE，均纳入比较）。
     sql = _offline_upgrade_sql()
     sql_names = set()
     for m in re.finditer(r"CREATE (?:UNIQUE )?INDEX (\w+) ON (\w+)", sql):
-        if m.group(2) in posture_tables:
+        if m.group(2) in domain_tables:
             sql_names.add(m.group(1))
     for m in re.finditer(r"CONSTRAINT (\w+) UNIQUE \(", sql):
         sql_names.add(m.group(1))
@@ -672,3 +685,104 @@ def test_0003_metadata_no_method_result_columns():
     col_names = set(events.c.keys())
     assert "method" not in col_names, "method must not exist in metadata after 0003"
     assert "result" not in col_names, "result must not exist in metadata after 0003"
+
+
+# ---------------------------------------------------------------------------
+# 0004_health_profile_tracking specific tests (Phase 2 Task 1)
+# ---------------------------------------------------------------------------
+
+
+def _offline_upgrade_0004_sql() -> str:
+    proc = _run_alembic("upgrade", "0003_posture_contract:0004_health_profile_tracking", "--sql")
+    assert proc.returncode == 0, f"alembic upgrade 0003:0004 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def _offline_downgrade_0004_sql() -> str:
+    proc = _run_alembic("downgrade", "0004_health_profile_tracking:0003_posture_contract", "--sql")
+    assert proc.returncode == 0, f"alembic downgrade 0004:0003 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def test_0004_upgrade_creates_health_profiles_table():
+    """0004 upgrade creates health_profiles with required columns and constraints."""
+    sql = _offline_upgrade_0004_sql()
+    assert "CREATE TABLE health_profiles" in sql
+
+    # Required columns exist.
+    for col in (
+        "id",
+        "user_id",
+        "fitness_goal",
+        "training_experience",
+        "weekly_frequency",
+        "session_duration_minutes",
+        "equipment",
+        "pain_injury_limitations",
+        "risk_screen",
+        "allergies",
+        "diet_exclusions",
+        "version",
+        "created_at",
+        "updated_at",
+    ):
+        assert col in sql, f"missing column {col} in health_profiles"
+
+    # Optional training fields are nullable (no NOT NULL); version is NOT NULL.
+    assert "weekly_frequency INTEGER" in sql
+    assert "weekly_frequency INTEGER NOT NULL" not in sql
+    assert "session_duration_minutes INTEGER" in sql
+    assert "session_duration_minutes INTEGER NOT NULL" not in sql
+    assert "version INTEGER NOT NULL" in sql
+
+    # JSONB payloads (proves PostgreSQL dialect, not the SQLite patch).
+    assert "equipment JSONB" in sql
+    assert "risk_screen JSONB" in sql
+
+    # PK + FK + UNIQUE(user_id).
+    assert "PRIMARY KEY (id)" in sql
+    assert "FOREIGN KEY(user_id) REFERENCES users (id)" in sql
+    assert "CONSTRAINT uq_health_profiles_user_id UNIQUE (user_id)" in sql
+
+
+def test_0004_downgrade_drops_health_profiles_table():
+    """0004 downgrade drops the health_profiles table."""
+    sql = _offline_downgrade_0004_sql()
+    assert "DROP TABLE health_profiles" in sql
+
+
+def test_0004_health_profiles_unique_constraint_in_metadata():
+    """ORM health_profiles carries the named UNIQUE(user_id) constraint and
+    nullable optional fields (missing stays missing)."""
+    from sqlalchemy import UniqueConstraint
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+    import app.health.models  # noqa: F401
+
+    table = Base.metadata.tables["health_profiles"]
+
+    uniq = {
+        tuple(c.name for c in uc.columns)
+        for uc in table.constraints
+        if isinstance(uc, UniqueConstraint)
+    }
+    assert ("user_id",) in uniq
+
+    # Optional fields stay nullable in metadata.
+    for col in (
+        "fitness_goal",
+        "training_experience",
+        "weekly_frequency",
+        "session_duration_minutes",
+        "equipment",
+        "pain_injury_limitations",
+        "risk_screen",
+        "allergies",
+        "diet_exclusions",
+    ):
+        assert table.c[col].nullable is True, f"{col} must be nullable"
+
+    # version and user_id are NOT NULL.
+    assert table.c["version"].nullable is False
+    assert table.c["user_id"].nullable is False

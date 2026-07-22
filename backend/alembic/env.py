@@ -23,6 +23,7 @@ from app.db.base import Base
 # 显式导入所有模型模块，使其表定义注册进 Base.metadata。
 # 不要删除这些 import，否则 autogenerate / 元数据比对会漏表。
 import app.auth.models  # noqa: F401
+import app.health.models  # noqa: F401
 import app.posture.models  # noqa: F401
 
 # Alembic Config 对象，提供对 alembic.ini 的访问。

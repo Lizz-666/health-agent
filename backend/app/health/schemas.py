@@ -1,0 +1,153 @@
+"""Pydantic schemas for the Phase 2 health profile (spec Domain Model).
+
+Conventions mirror ``app.posture.schemas``: ``(str, Enum)`` enums,
+``ConfigDict(extra="forbid")`` to reject surprise fields, and bounded
+``Field`` validation. Bounds on ``weekly_frequency`` (2-5) and
+``session_duration_minutes`` (15/30/45/60) are enforced here at the
+application layer (no DB value CHECK), keeping SQLite tests and PostgreSQL in
+parity.
+
+``HealthProfileData`` is the canonical structured profile: the input to
+``app.health.risk`` classification and the shared shape for the Task 2 API
+I/O. Every optional field defaults to ``None`` - missing stays missing.
+"""
+
+from datetime import date, datetime
+from enum import Enum
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+# ---------------------------------------------------------------------------
+# Enums (app-layer enforcement; DB columns are nullable strings / ints)
+# ---------------------------------------------------------------------------
+
+
+class FitnessGoal(str, Enum):
+    posture_improvement = "posture_improvement"
+    fat_loss = "fat_loss"
+    basic_strength = "basic_strength"
+    mobility = "mobility"
+    general_wellness = "general_wellness"
+
+
+class TrainingExperience(str, Enum):
+    beginner = "beginner"
+    some_experience = "some_experience"
+    experienced = "experienced"
+
+
+class SessionDurationMinutes(int, Enum):
+    """Allowed single-session durations in minutes."""
+
+    fifteen = 15
+    thirty = 30
+    forty_five = 45
+    sixty = 60
+
+
+class YesNoUnknown(str, Enum):
+    """Structured answer for risk_screen qualifiers. ``unknown`` is distinct
+    from a missing answer (``None``): ``unknown`` means the user was asked and
+    did not know; ``None`` means the question was never answered."""
+
+    yes = "yes"
+    no = "no"
+    unknown = "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Structured nested payloads
+# ---------------------------------------------------------------------------
+
+
+class Equipment(BaseModel):
+    """Bodyweight / resistance-band availability. Missing on the parent
+    (``None``) means the user has not answered; present-but-all-false is a
+    distinct 'answered none' state that still counts as missing for readiness
+    (spec Domain Model: at least one must be true)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bodyweight: Optional[bool] = None
+    resistance_band: Optional[bool] = None
+
+
+class PainInjuryLimitation(BaseModel):
+    """A single user-stated limitation.
+
+    ``note`` is untrusted free text and is NEVER a safety-rule source (spec
+    Domain Model, Safety). Classification consumes only structured fields.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    body_area: str = Field(..., min_length=1, max_length=60)
+    status: str = Field(..., min_length=1, max_length=30)
+    note: Optional[str] = Field(None, max_length=500)
+    updated_at: Optional[date] = None
+
+
+class RiskScreen(BaseModel):
+    """Structured yes/no/unknown qualifiers that drive deterministic
+    ``restricted`` classification (safety-boundaries section 2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    underage: Optional[YesNoUnknown] = None
+    pregnancy_or_postpartum: Optional[YesNoUnknown] = None
+    recent_surgery_or_major_injury: Optional[YesNoUnknown] = None
+    major_chronic_condition: Optional[YesNoUnknown] = None
+    eating_disorder_concern: Optional[YesNoUnknown] = None
+    professional_instruction_limitations: Optional[YesNoUnknown] = None
+
+
+class Allergy(BaseModel):
+    """A user-stated allergy label with optional note. Phase 2 stores these
+    only; it generates no nutrition advice (spec Domain Model)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(..., min_length=1, max_length=60)
+    note: Optional[str] = Field(None, max_length=500)
+
+
+class DietExclusion(BaseModel):
+    """A user-stated explicit food exclusion / preference. Stored only in
+    Phase 2 (spec Domain Model)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    item: str = Field(..., min_length=1, max_length=60)
+    note: Optional[str] = Field(None, max_length=500)
+
+
+# ---------------------------------------------------------------------------
+# Canonical profile data
+# ---------------------------------------------------------------------------
+
+
+class HealthProfileData(BaseModel):
+    """Canonical structured health profile.
+
+    The input to ``app.health.risk`` classification and the shared shape for
+    the Task 2 API request/response wrappers. Missing fields stay ``None`` and
+    must never be inferred from posture results, chat text, defaults or other
+    accounts (spec Domain Model, Recommendation And AI Behavior).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    fitness_goal: Optional[FitnessGoal] = None
+    training_experience: Optional[TrainingExperience] = None
+    weekly_frequency: Optional[int] = Field(None, ge=2, le=5)
+    session_duration_minutes: Optional[SessionDurationMinutes] = None
+    equipment: Optional[Equipment] = None
+    pain_injury_limitations: Optional[List[PainInjuryLimitation]] = None
+    risk_screen: Optional[RiskScreen] = None
+    allergies: Optional[List[Allergy]] = None
+    diet_exclusions: Optional[List[DietExclusion]] = None
+
+    version: int = Field(1, ge=1)
+    updated_at: Optional[datetime] = None

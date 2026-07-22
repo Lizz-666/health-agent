@@ -21,7 +21,7 @@
 | Task | Executor | Branch / worktree | Base SHA | Status | Scope and coordination note |
 | --- | --- | --- | --- | --- | --- |
 | Phase 2 Task 0 | Codex coordinator + OpenCode implementation | `codex/phase2-spec-plan` / root worktree | `10f0c65` | `merged` | Phase 2 规格、Task 0-8 charter 和路线图基线；提交证据 `0e92e2c`、`4ed1c0e`。 |
-| Phase 2 Task 1 | OpenCode implementation + Codex coordination | `codex/phase2-task1-health-profile-domain` / `health-worktrees/phase2-task1-health-profile-domain` | `4ed1c0e` | `in_progress` | 后端 health profile domain、迁移和 risk-readiness primitives。当前 worktree 有实现中改动；`backend/test.db-journal` 是运行产物，不得提交。 |
+| Phase 2 Task 1 | OpenCode implementation + Codex coordination | `codex/phase2-task1-health-profile-domain` / `health-worktrees/phase2-task1-health-profile-domain` | `4ed1c0e` | `committed` | 后端 health profile domain、迁移和 risk-readiness primitives；Codex 已复核真实 diff 并重跑 Task 1 验证，提交 SHA 见 Git 历史。 |
 | Phase 2 Task 2 | Unassigned | Task 1 合并后创建 | Task 1 merge SHA | `planned` | `GET/PUT/DELETE /api/v1/health/profile`、鉴权、跨用户隔离、删除和 OpenAPI；依赖 Task 1。 |
 | Phase 2 Task 3 | Unassigned | Task 2 合并后创建 | Task 2 merge SHA | `planned` | Daily check-in、异常疼痛追问和签到风险摘要；依赖 Task 1/2，不生成训练调整或计划。 |
 | Phase 2 Task 4 | Unassigned | Task 3 合并后创建 | Task 3 merge SHA | `planned` | Weight CRUD、趋势元数据和 activity grid projection；不输出训练或饮食调整建议。 |
