@@ -66,6 +66,10 @@ from app.upload.router import router as upload_router
 
 app.include_router(upload_router)
 
+from app.health.router import router as health_router
+
+app.include_router(health_router)
+
 
 @app.get("/health")
 async def health():

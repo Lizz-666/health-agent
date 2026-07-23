@@ -227,3 +227,94 @@ def test_confirm_response_has_goals_and_risk_version(openapi_schema):
     assert "confirmed_goals" in props
     assert "risk_version" in props
     assert "can_generate_plan" in props
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 Task 2: health profile OpenAPI contracts
+# ---------------------------------------------------------------------------
+
+HEALTH_ROUTES = [
+    ("get", "/api/v1/health/profile"),
+    ("put", "/api/v1/health/profile"),
+    ("delete", "/api/v1/health/profile"),
+]
+
+
+@pytest.mark.parametrize("method,path", HEALTH_ROUTES)
+def test_health_route_has_response_schema(method, path, openapi_schema):
+    """Each health/profile route must expose a non-empty 200 JSON schema."""
+    paths = openapi_schema["paths"]
+    assert path in paths, f"Path {path} not found in OpenAPI paths"
+    operation = paths[path][method]
+    responses = operation["responses"]
+    assert "200" in responses, f"{method.upper()} {path} missing 200 response"
+    content = responses["200"]["content"]
+    assert "application/json" in content
+    schema = content["application/json"]["schema"]
+    assert schema not in (None, {}), f"{method.upper()} {path} has empty schema"
+
+
+@pytest.mark.parametrize("method,path", HEALTH_ROUTES)
+def test_health_routes_are_protected(method, path, openapi_schema):
+    """All health/profile routes must declare a security requirement
+    (JWT-only; ownership from token, never request body)."""
+    operation = openapi_schema["paths"][path][method]
+    assert "security" in operation and len(operation["security"]) > 0, (
+        f"{method.upper()} {path} must require auth"
+    )
+
+
+def test_health_put_has_request_body(openapi_schema):
+    """PUT /api/v1/health/profile must declare a requestBody schema."""
+    operation = openapi_schema["paths"]["/api/v1/health/profile"]["put"]
+    assert "requestBody" in operation
+    content = operation["requestBody"]["content"]
+    assert "application/json" in content
+    schema = content["application/json"]["schema"]
+    assert schema not in (None, {})
+
+
+@pytest.mark.parametrize("method", ["get", "put"])
+def test_health_profile_result_response_shape(method, openapi_schema):
+    """GET/PUT response carries configured + profile + readiness, and the
+    readiness component exposes the deterministic classifier fields."""
+    schema = openapi_schema["paths"]["/api/v1/health/profile"][method][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    resolved = _resolve_ref(schema, openapi_schema)
+    props = resolved["properties"]
+    for field in ("configured", "profile", "readiness"):
+        assert field in props, f"{method.upper()} response missing {field}"
+
+    readiness = _resolve_ref(props["readiness"], openapi_schema)
+    for field in ("readiness", "risk_version", "reason", "missing_fields"):
+        assert field in readiness["properties"], (
+            f"readiness component missing {field}"
+        )
+
+
+def test_health_update_component_has_editable_fields(openapi_schema):
+    """The PUT request component (HealthProfileUpdate) must carry the editable
+    fields and forbid extras (it must NOT accept version/timestamps)."""
+    component = openapi_schema["components"]["schemas"]["HealthProfileUpdate"]
+    props = component["properties"]
+    for field in (
+        "fitness_goal",
+        "training_experience",
+        "weekly_frequency",
+        "session_duration_minutes",
+        "equipment",
+        "pain_injury_limitations",
+        "risk_screen",
+        "allergies",
+        "diet_exclusions",
+    ):
+        assert field in props, f"HealthProfileUpdate missing {field}"
+    # Server-managed fields are NOT client-settable.
+    for forbidden in ("version", "created_at", "updated_at", "id"):
+        assert forbidden not in props, (
+            f"HealthProfileUpdate must not accept server-managed {forbidden}"
+        )
+    assert component.get("additionalProperties") is False, (
+        "HealthProfileUpdate must forbid extra fields"
+    )

@@ -15,6 +15,7 @@ I/O. Every optional field defaults to ``None`` - missing stays missing.
 from datetime import date, datetime
 from enum import Enum
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -151,3 +152,93 @@ class HealthProfileData(BaseModel):
 
     version: int = Field(1, ge=1)
     updated_at: Optional[datetime] = None
+
+
+# ---------------------------------------------------------------------------
+# API request / response DTOs (Task 2)
+#
+# ``HealthProfileUpdate`` is the PUT request body: the editable fields only
+# (server controls ``id`` / ``version`` / timestamps). ``HealthProfileResponse``
+# extends the canonical data with server-managed ``id`` / ``created_at``, so a
+# response instance is itself a valid ``HealthProfileData`` and can be fed
+# straight into ``app.health.risk.classify_readiness``.
+# ---------------------------------------------------------------------------
+
+
+class HealthProfileUpdate(BaseModel):
+    """PUT /api/v1/health/profile request body.
+
+    A full-replacement payload: omitted optional fields are stored as missing
+    (``None``), never converted into user-provided defaults (spec API And State
+    Contracts). ``version`` / timestamps are server-managed and therefore not
+    accepted here. ``extra="forbid"`` rejects unknown fields.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    fitness_goal: Optional[FitnessGoal] = None
+    training_experience: Optional[TrainingExperience] = None
+    weekly_frequency: Optional[int] = Field(None, ge=2, le=5)
+    session_duration_minutes: Optional[SessionDurationMinutes] = None
+    equipment: Optional[Equipment] = None
+    pain_injury_limitations: Optional[List[PainInjuryLimitation]] = None
+    risk_screen: Optional[RiskScreen] = None
+    allergies: Optional[List[Allergy]] = None
+    diet_exclusions: Optional[List[DietExclusion]] = None
+
+
+class HealthProfileResponse(HealthProfileData):
+    """Stored health profile returned by the API.
+
+    Extends ``HealthProfileData`` with server-managed ``id`` / ``created_at``.
+    Because it IS-A ``HealthProfileData``, it can be passed directly to the
+    deterministic readiness classifier.
+    """
+
+    id: UUID
+    created_at: datetime
+
+
+class HealthReadinessResponse(BaseModel):
+    """Serialised deterministic readiness result (from ``app.health.risk``).
+
+    Carries no raw sensitive values: only the tier, a reason naming field
+    names, the missing-field names, and the restricted qualifier name.
+    """
+
+    readiness: str
+    risk_version: str
+    reason: str
+    missing_fields: List[str]
+    restricted_reason: Optional[str] = None
+
+    @classmethod
+    def from_result(cls, result) -> "HealthReadinessResponse":
+        return cls(
+            readiness=result.readiness,
+            risk_version=result.risk_version,
+            reason=result.reason,
+            missing_fields=list(result.missing_fields),
+            restricted_reason=result.restricted_reason,
+        )
+
+
+class HealthProfileResultResponse(BaseModel):
+    """GET / PUT /api/v1/health/profile response envelope.
+
+    ``configured`` is false and ``profile`` is null when no profile exists yet
+    (an explicit not-configured state; no defaults are fabricated). ``readiness``
+    is always present so the client can show the missing-required-data state
+    even before a profile is created.
+    """
+
+    configured: bool
+    profile: Optional[HealthProfileResponse] = None
+    readiness: HealthReadinessResponse
+
+
+class HealthProfileDeleteResponse(BaseModel):
+    """DELETE /api/v1/health/profile response (idempotent)."""
+
+    deleted: bool
+    configured: bool = False
