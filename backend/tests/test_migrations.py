@@ -56,7 +56,8 @@ def _offline_downgrade_sql() -> str:
     return proc.stdout
 
 
-# 全部表名（重命名后的 events 表 + 6 个新表 + 平台表 + Phase 2 health_profiles）。
+# 全部表名（重命名后的 events 表 + 6 个新表 + 平台表 + Phase 2 health_profiles
+# + Phase 2 health_checkins）。
 ALL_TABLES = {
     "users",
     "verification_codes",
@@ -68,6 +69,7 @@ ALL_TABLES = {
     "posture_purge_tombstones",
     "purge_operations",
     "health_profiles",
+    "health_checkins",
 }
 
 # Phase 1 expand 阶段新增的 6 张表。
@@ -87,12 +89,12 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0004_health_profile_tracking。"""
+    """Alembic 只有一个 head，且为 0005_health_checkins。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0004_health_profile_tracking", head_lines[0]
+    assert head_lines[0].split()[0] == "0005_health_checkins", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
@@ -500,6 +502,7 @@ def test_metadata_indexes_match_offline_sql():
         "posture_purge_tombstones",
         "purge_operations",
         "health_profiles",
+        "health_checkins",
     }
 
     # 1. Base.metadata 中的索引名 + 命名 UNIQUE 约束名。
@@ -514,8 +517,8 @@ def test_metadata_indexes_match_offline_sql():
                 metadata_names.add(cons.name)
 
     # 2. offline upgrade SQL 中的 CREATE [UNIQUE] INDEX 名（限定领域表）
-    #    + 命名 UNIQUE 约束名（全 SQL 中 posture 两表与 health_profiles 表
-    #    声明了命名 UNIQUE，均纳入比较）。
+    #    + 命名 UNIQUE 约束名（全 SQL 中 posture 两表、health_profiles 与
+    #    health_checkins 表声明了命名 UNIQUE，均纳入比较）。
     sql = _offline_upgrade_sql()
     sql_names = set()
     for m in re.finditer(r"CREATE (?:UNIQUE )?INDEX (\w+) ON (\w+)", sql):
@@ -786,3 +789,99 @@ def test_0004_health_profiles_unique_constraint_in_metadata():
     # version and user_id are NOT NULL.
     assert table.c["version"].nullable is False
     assert table.c["user_id"].nullable is False
+
+
+# ---------------------------------------------------------------------------
+# 0005_health_checkins specific tests (Phase 2 Task 3)
+# ---------------------------------------------------------------------------
+
+
+def _offline_upgrade_0005_sql() -> str:
+    proc = _run_alembic("upgrade", "0004_health_profile_tracking:0005_health_checkins", "--sql")
+    assert proc.returncode == 0, f"alembic upgrade 0004:0005 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def _offline_downgrade_0005_sql() -> str:
+    proc = _run_alembic("downgrade", "0005_health_checkins:0004_health_profile_tracking", "--sql")
+    assert proc.returncode == 0, f"alembic downgrade 0005:0004 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def test_0005_upgrade_creates_health_checkins_table():
+    """0005 upgrade creates health_checkins with required columns and the
+    per-user daily uniqueness constraint."""
+    sql = _offline_upgrade_0005_sql()
+    assert "CREATE TABLE health_checkins" in sql
+
+    # Required columns exist.
+    for col in (
+        "id",
+        "user_id",
+        "local_date",
+        "sleep_quality",
+        "energy",
+        "muscle_soreness",
+        "available_time",
+        "daily_status",
+        "abnormal_pain",
+        "pain_followup",
+        "risk_summary",
+        "risk_version",
+        "created_at",
+        "updated_at",
+    ):
+        assert col in sql, f"missing column {col} in health_checkins"
+
+    # Core completed-check-in fields are NOT NULL; pain_followup is nullable.
+    assert "abnormal_pain BOOLEAN NOT NULL" in sql
+    assert "daily_status VARCHAR(30) NOT NULL" in sql
+    assert "risk_summary VARCHAR(30) NOT NULL" in sql
+    assert "local_date DATE NOT NULL" in sql
+    assert "pain_followup JSONB" in sql
+    assert "pain_followup JSONB NOT NULL" not in sql
+
+    # PK + FK + UNIQUE(user_id, local_date) daily uniqueness.
+    assert "PRIMARY KEY (id)" in sql
+    assert "FOREIGN KEY(user_id) REFERENCES users (id)" in sql
+    assert (
+        "CONSTRAINT uq_health_checkins_user_date UNIQUE (user_id, local_date)"
+        in sql
+    )
+
+
+def test_0005_downgrade_drops_health_checkins_table():
+    """0005 downgrade drops the health_checkins table."""
+    sql = _offline_downgrade_0005_sql()
+    assert "DROP TABLE health_checkins" in sql
+
+
+def test_0005_health_checkins_unique_constraint_in_metadata():
+    """ORM health_checkins carries UNIQUE(user_id, local_date) (daily
+    uniqueness) and the deterministic stored safety fields are NOT NULL."""
+    from sqlalchemy import UniqueConstraint
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+    import app.health.models  # noqa: F401
+
+    table = Base.metadata.tables["health_checkins"]
+
+    uniq = {
+        tuple(c.name for c in uc.columns)
+        for uc in table.constraints
+        if isinstance(uc, UniqueConstraint)
+    }
+    assert ("user_id", "local_date") in uniq
+
+    # pain_followup is nullable; the deterministic stored safety fields are not.
+    assert table.c["pain_followup"].nullable is True
+    for col in (
+        "local_date",
+        "daily_status",
+        "abnormal_pain",
+        "risk_summary",
+        "risk_version",
+        "user_id",
+    ):
+        assert table.c[col].nullable is False, f"{col} must be NOT NULL"

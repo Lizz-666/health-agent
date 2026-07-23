@@ -242,3 +242,143 @@ class HealthProfileDeleteResponse(BaseModel):
 
     deleted: bool
     configured: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Daily check-in (Phase 2 spec Domain Model, Daily Check-In; Task 3)
+# ---------------------------------------------------------------------------
+
+
+class SleepQuality(str, Enum):
+    poor = "poor"
+    ok = "ok"
+    good = "good"
+
+
+class Energy(str, Enum):
+    low = "low"
+    normal = "normal"
+    high = "high"
+
+
+class MuscleSoreness(str, Enum):
+    none = "none"
+    mild = "mild"
+    significant = "significant"
+
+
+class AvailableTime(str, Enum):
+    none = "none"
+    fifteen_min = "15_min"
+    thirty_min = "30_min"
+    forty_five_min_plus = "45_min_plus"
+
+
+class DailyStatus(str, Enum):
+    """Valid non-failure daily engagement states.
+
+    ``active_rest`` and ``safety_adjustment`` are valid health-management
+    states: they are NOT failures, gaps, or missed days (spec Domain Model,
+    Activity Grid). ``checked_in`` is the ordinary completed check-in.
+    """
+
+    checked_in = "checked_in"
+    active_rest = "active_rest"
+    safety_adjustment = "safety_adjustment"
+
+
+class PainStarted(str, Enum):
+    today = "today"
+    recent_days = "recent_days"
+    ongoing = "ongoing"
+    after_acute_event = "after_acute_event"
+
+
+class PainIntensity(str, Enum):
+    mild = "mild"
+    moderate = "moderate"
+    severe = "severe"
+
+
+class PainFollowup(BaseModel):
+    """Conditional follow-up required when ``abnormal_pain`` is true.
+
+    Only the structured boolean / enum fields drive the deterministic
+    ``red_flag`` classification (spec Safety). ``pain_note`` is untrusted
+    free text: it is NEVER a safety-rule source and must never be logged.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    pain_area: str = Field(..., min_length=1, max_length=60)
+    pain_started: PainStarted
+    pain_intensity: PainIntensity
+    has_neurological_symptom: bool
+    has_dizziness_or_chest_symptom: bool
+    has_acute_trauma: bool
+    pain_note: Optional[str] = Field(None, max_length=500)
+
+
+class CheckInCreate(BaseModel):
+    """PUT /api/v1/health/checkins/today request body.
+
+    ``local_date`` is the user-local date and the per-user daily uniqueness key.
+    ``abnormal_pain=true`` requires a complete ``pain_followup`` object (the
+    completeness gate is enforced deterministically in the service layer, which
+    raises ``pain_followup_required`` when it is missing). ``extra="forbid"``
+    rejects unknown fields; enums / bounds are validated by Pydantic.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    local_date: date
+    sleep_quality: SleepQuality
+    energy: Energy
+    muscle_soreness: MuscleSoreness
+    available_time: AvailableTime
+    daily_status: DailyStatus
+    abnormal_pain: bool
+    pain_followup: Optional[PainFollowup] = None
+
+
+class CheckInResponse(BaseModel):
+    """Stored daily check-in returned by the API.
+
+    ``risk_summary`` / ``risk_version`` are the deterministic tier and policy
+    version computed at write time and stored, so the stored and returned
+    values are always consistent. ``id`` / timestamps are server-managed.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    local_date: date
+    sleep_quality: SleepQuality
+    energy: Energy
+    muscle_soreness: MuscleSoreness
+    available_time: AvailableTime
+    daily_status: DailyStatus
+    abnormal_pain: bool
+    pain_followup: Optional[PainFollowup] = None
+    risk_summary: str
+    risk_version: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class CheckInTodayResultResponse(BaseModel):
+    """GET /api/v1/health/checkins/today response envelope.
+
+    ``checked_in`` is false and ``checkin`` is null when no check-in exists for
+    the requested local date (an explicit not-checked-in state; never a
+    fabricated 'normal').
+    """
+
+    checked_in: bool
+    checkin: Optional[CheckInResponse] = None
+
+
+class CheckInDeleteResponse(BaseModel):
+    """DELETE /api/v1/health/checkins/{checkin_id} response."""
+
+    deleted: bool

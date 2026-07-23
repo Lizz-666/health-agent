@@ -318,3 +318,126 @@ def test_health_update_component_has_editable_fields(openapi_schema):
     assert component.get("additionalProperties") is False, (
         "HealthProfileUpdate must forbid extra fields"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 Task 3: daily check-in OpenAPI contracts
+# ---------------------------------------------------------------------------
+
+CHECKIN_ROUTES = [
+    ("get", "/api/v1/health/checkins/today"),
+    ("put", "/api/v1/health/checkins/today"),
+    ("get", "/api/v1/health/checkins"),
+    ("delete", "/api/v1/health/checkins/{checkin_id}"),
+]
+
+
+@pytest.mark.parametrize("method,path", CHECKIN_ROUTES)
+def test_checkin_route_has_response_schema(method, path, openapi_schema):
+    """Each check-in route must expose a non-empty 200 JSON schema."""
+    paths = openapi_schema["paths"]
+    assert path in paths, f"Path {path} not found in OpenAPI paths"
+    operation = paths[path][method]
+    responses = operation["responses"]
+    assert "200" in responses, f"{method.upper()} {path} missing 200 response"
+    content = responses["200"]["content"]
+    assert "application/json" in content
+    schema = content["application/json"]["schema"]
+    assert schema not in (None, {}), f"{method.upper()} {path} has empty schema"
+
+
+@pytest.mark.parametrize("method,path", CHECKIN_ROUTES)
+def test_checkin_routes_are_protected(method, path, openapi_schema):
+    """All check-in routes must declare a security requirement (JWT-only;
+    ownership from token, never request body or path user_id)."""
+    operation = openapi_schema["paths"][path][method]
+    assert "security" in operation and len(operation["security"]) > 0, (
+        f"{method.upper()} {path} must require auth"
+    )
+
+
+def test_checkin_put_has_request_body(openapi_schema):
+    """PUT /api/v1/health/checkins/today must declare a requestBody schema."""
+    operation = openapi_schema["paths"]["/api/v1/health/checkins/today"]["put"]
+    assert "requestBody" in operation
+    content = operation["requestBody"]["content"]
+    assert "application/json" in content
+    schema = content["application/json"]["schema"]
+    assert schema not in (None, {})
+
+
+def test_checkin_today_get_response_shape(openapi_schema):
+    """GET /checkins/today response is the envelope: checked_in + checkin, and
+    the checkin component exposes the deterministic risk_summary field."""
+    schema = openapi_schema["paths"]["/api/v1/health/checkins/today"]["get"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    resolved = _resolve_ref(schema, openapi_schema)
+    props = resolved["properties"]
+    for field in ("checked_in", "checkin"):
+        assert field in props, f"GET /today response missing {field}"
+
+    checkin_ref = props["checkin"]
+    checkin_schema = _resolve_ref(checkin_ref, openapi_schema)
+    # ``checkin`` is nullable (anyOf with a $ref); resolve to the component.
+    if "anyOf" in checkin_schema:
+        for branch in checkin_schema["anyOf"]:
+            if "$ref" in branch:
+                checkin_schema = _resolve_ref(branch, openapi_schema)
+                break
+    assert "risk_summary" in checkin_schema["properties"], (
+        "CheckInResponse component must expose risk_summary"
+    )
+
+
+def test_checkin_today_put_response_shape(openapi_schema):
+    """PUT /checkins/today returns the stored CheckInResponse directly, which
+    must expose the deterministic risk_summary / risk_version fields."""
+    schema = openapi_schema["paths"]["/api/v1/health/checkins/today"]["put"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    resolved = _resolve_ref(schema, openapi_schema)
+    assert "risk_summary" in resolved["properties"], (
+        "PUT /today response must expose risk_summary"
+    )
+    assert "risk_version" in resolved["properties"]
+
+
+def test_checkin_response_component_fields(openapi_schema):
+    """The CheckInResponse component must carry the deterministic safety
+    fields and forbid extras (no client-settable risk_summary/risk_version)."""
+    component = openapi_schema["components"]["schemas"]["CheckInResponse"]
+    props = component["properties"]
+    for field in (
+        "id",
+        "local_date",
+        "sleep_quality",
+        "energy",
+        "muscle_soreness",
+        "available_time",
+        "daily_status",
+        "abnormal_pain",
+        "pain_followup",
+        "risk_summary",
+        "risk_version",
+    ):
+        assert field in props, f"CheckInResponse missing {field}"
+    assert component.get("additionalProperties") is False, (
+        "CheckInResponse must forbid extra fields"
+    )
+
+
+def test_pain_followup_component_fields(openapi_schema):
+    """PainFollowup must carry the structured red-flag boolean signals."""
+    component = openapi_schema["components"]["schemas"]["PainFollowup"]
+    props = component["properties"]
+    for field in (
+        "pain_area",
+        "pain_started",
+        "pain_intensity",
+        "has_neurological_symptom",
+        "has_dizziness_or_chest_symptom",
+        "has_acute_trauma",
+    ):
+        assert field in props, f"PainFollowup missing {field}"
+    assert component.get("additionalProperties") is False
