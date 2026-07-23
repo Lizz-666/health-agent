@@ -1,23 +1,26 @@
-"""Health profile application service (Phase 2 Task 2 / Task 3).
+"""Health profile application service (Phase 2 Task 2 / Task 3 / Task 4).
 
 Owns the GET / PUT / DELETE behaviour for the authenticated user's health
-profile and daily check-ins. Ownership comes ONLY from the JWT-derived
-``user_id`` (a string); the service converts it to ``UUID`` for DB queries. No
-method accepts a client-supplied ``user_id``, so cross-user access is
-impossible by construction (spec API And State Contracts, Safety).
+profile, daily check-ins, manual weight records, weight trend, and activity
+grid. Ownership comes ONLY from the JWT-derived ``user_id`` (a string); the
+service converts it to ``UUID`` for DB queries. No method accepts a
+client-supplied ``user_id``, so cross-user access is impossible by
+construction (spec API And State Contracts, Safety).
 
 Safety / privacy:
 - Readiness and check-in ``risk_summary`` are produced deterministically by
   ``app.health.risk`` only; free-text notes never affect the tier.
 - The service never logs raw sensitive fields (allergies, pain notes, diet
-  exclusions, follow-up payloads). Unhandled errors are reduced to a structured
-  503 by the global handler in ``app.main``.
+  exclusions, follow-up payloads, body-weight values). Unhandled errors are
+  reduced to a structured 503 by the global handler in ``app.main``.
 - Missing optional fields stay ``None``; nothing is fabricated.
 - ``abnormal_pain=true`` requires a complete ``pain_followup``; otherwise the
   service raises a deterministic ``pain_followup_required`` error.
+- Weight trend never emits plan/diet adjustments, warnings, or pass/fail
+  judgment; the activity grid projects Phase 2 check-in statuses only.
 """
 
-from datetime import date
+from datetime import date, datetime, time, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -25,9 +28,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, NotFound
-from app.health.models import DailyCheckIn, HealthProfile
+from app.health.models import DailyCheckIn, HealthProfile, WeightRecord
 from app.health.risk import classify_checkin, classify_readiness, restricted_reason
 from app.health.schemas import (
+    ActivityGridCell,
+    ActivityGridResponse,
     CheckInCreate,
     CheckInResponse,
     HealthProfileData,
@@ -35,7 +40,19 @@ from app.health.schemas import (
     HealthProfileResultResponse,
     HealthProfileUpdate,
     HealthReadinessResponse,
+    WeightRecordCreate,
+    WeightRecordResponse,
+    WeightRecordUpdate,
+    WeightTrendResponse,
 )
+from app.health.trends import compute_weight_trend
+
+# Phase 2 has only manual weight entry.
+WEIGHT_SOURCE_MANUAL = "manual"
+
+# Activity grid default window / cap (inclusive days).
+ACTIVITY_GRID_DEFAULT_DAYS = 28
+ACTIVITY_GRID_MAX_DAYS = 366
 
 
 def _to_uuid(user_id: str) -> UUID:
@@ -346,3 +363,232 @@ async def delete_checkin(db: AsyncSession, user_id: str, checkin_id: UUID) -> No
         raise NotFound("签到记录不存在")
     await db.delete(row)
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Weight records, trend, and activity grid (Task 4)
+# ---------------------------------------------------------------------------
+
+
+def _to_utc(dt: datetime) -> datetime:
+    """Canonicalize a ``recorded_at`` to a timezone-aware UTC datetime.
+
+    A naive datetime is assumed to be UTC. Storing a single canonical
+    representation keeps range filters deterministic across SQLite and
+    PostgreSQL. The raw value is never logged.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _weight_response(row: WeightRecord) -> WeightRecordResponse:
+    """Build the API response model from the ORM row.
+
+    ``weight_kg`` (Numeric(6,2)) is coerced to float for JSON; ``source`` is
+    always ``manual``. Raw values are returned to the owner only.
+    """
+    return WeightRecordResponse(
+        id=row.id,
+        recorded_at=row.recorded_at,
+        weight_kg=float(row.weight_kg),
+        source=row.source,
+        note=row.note,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _recorded_at_bounds(
+    start_date: Optional[date], end_date: Optional[date]
+) -> tuple[Optional[datetime], Optional[datetime]]:
+    """Build inclusive UTC datetime bounds from optional date params."""
+    start_dt = (
+        datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+        if start_date is not None
+        else None
+    )
+    end_dt = (
+        datetime.combine(end_date, time.max, tzinfo=timezone.utc)
+        if end_date is not None
+        else None
+    )
+    return start_dt, end_dt
+
+
+async def create_weight_record(
+    db: AsyncSession, user_id: str, data: WeightRecordCreate
+) -> WeightRecordResponse:
+    """Create one manual weight record for the caller.
+
+    ``source`` is forced to ``manual`` server-side (never client-set). Raw
+    weight values are never logged.
+    """
+    user_uuid = _to_uuid(user_id)
+    row = WeightRecord(
+        user_id=user_uuid,
+        recorded_at=_to_utc(data.recorded_at),
+        weight_kg=data.weight_kg,
+        source=WEIGHT_SOURCE_MANUAL,
+        note=data.note,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return _weight_response(row)
+
+
+async def list_weight_records(
+    db: AsyncSession,
+    user_id: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> List[WeightRecordResponse]:
+    """Return the caller's weight records, newest recorded_at first.
+
+    Optional inclusive ``start_date`` / ``end_date`` bound the range on
+    ``recorded_at``. Results are scoped to the caller.
+    """
+    user_uuid = _to_uuid(user_id)
+    start_dt, end_dt = _recorded_at_bounds(start_date, end_date)
+    stmt = select(WeightRecord).where(WeightRecord.user_id == user_uuid)
+    if start_dt is not None:
+        stmt = stmt.where(WeightRecord.recorded_at >= start_dt)
+    if end_dt is not None:
+        stmt = stmt.where(WeightRecord.recorded_at <= end_dt)
+    stmt = stmt.order_by(WeightRecord.recorded_at.desc(), WeightRecord.id.desc())
+    result = await db.execute(stmt)
+    return [_weight_response(row) for row in result.scalars().all()]
+
+
+async def _fetch_weight(
+    db: AsyncSession, user_id: str, record_id: UUID
+) -> Optional[WeightRecord]:
+    user_uuid = _to_uuid(user_id)
+    result = await db.execute(
+        select(WeightRecord).where(
+            WeightRecord.id == record_id,
+            WeightRecord.user_id == user_uuid,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_weight_record(
+    db: AsyncSession, user_id: str, record_id: UUID, data: WeightRecordUpdate
+) -> WeightRecordResponse:
+    """Full-replace the editable fields of one caller-owned record.
+
+    Ownership-scoped: a record belonging to another user (or a missing id)
+    surfaces as a deterministic 404.
+    """
+    row = await _fetch_weight(db, user_id, record_id)
+    if row is None:
+        raise NotFound("体重记录不存在")
+    row.recorded_at = _to_utc(data.recorded_at)
+    row.weight_kg = data.weight_kg
+    row.note = data.note
+    await db.commit()
+    await db.refresh(row)
+    return _weight_response(row)
+
+
+async def delete_weight_record(
+    db: AsyncSession, user_id: str, record_id: UUID
+) -> None:
+    """Delete one caller-owned weight record. Ownership-scoped: not-owned or
+    missing id surfaces as a deterministic 404."""
+    row = await _fetch_weight(db, user_id, record_id)
+    if row is None:
+        raise NotFound("体重记录不存在")
+    await db.delete(row)
+    await db.commit()
+
+
+async def get_weight_trend(
+    db: AsyncSession,
+    user_id: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    window: int = 7,
+) -> WeightTrendResponse:
+    """Return raw records plus the deterministic moving trend.
+
+    Records are range-filtered and ordered ascending by ``recorded_at``. The
+    trend is a point-based simple moving average over ``window`` records;
+    ``sufficient`` is false and ``trend`` is empty when fewer than ``window``
+    records exist. No recommendation / adjustment / warning text is produced.
+    """
+    user_uuid = _to_uuid(user_id)
+    start_dt, end_dt = _recorded_at_bounds(start_date, end_date)
+    stmt = select(WeightRecord).where(WeightRecord.user_id == user_uuid)
+    if start_dt is not None:
+        stmt = stmt.where(WeightRecord.recorded_at >= start_dt)
+    if end_dt is not None:
+        stmt = stmt.where(WeightRecord.recorded_at <= end_dt)
+    stmt = stmt.order_by(WeightRecord.recorded_at.asc(), WeightRecord.id.asc())
+    result = await db.execute(stmt)
+    records = [_weight_response(row) for row in result.scalars().all()]
+    return compute_weight_trend(records, window)
+
+
+def _resolve_grid_range(
+    start_date: Optional[date], end_date: Optional[date]
+) -> tuple[date, date]:
+    """Resolve the activity-grid date range with defaults + cap.
+
+    When omitted, defaults to the last ``ACTIVITY_GRID_DEFAULT_DAYS`` days
+    ending today. ``start`` must be on/before ``end`` and the inclusive span
+    must not exceed ``ACTIVITY_GRID_MAX_DAYS``.
+    """
+    if end_date is None:
+        end_date = date.today()
+    if start_date is None:
+        start_date = end_date - timedelta(days=ACTIVITY_GRID_DEFAULT_DAYS - 1)
+    if start_date > end_date:
+        raise AppException(
+            status_code=422,
+            detail="start_date 不能晚于 end_date",
+            code="invalid_date_range",
+        )
+    if (end_date - start_date).days + 1 > ACTIVITY_GRID_MAX_DAYS:
+        raise AppException(
+            status_code=422,
+            detail=f"日期范围不得超过 {ACTIVITY_GRID_MAX_DAYS} 天",
+            code="invalid_date_range",
+        )
+    return start_date, end_date
+
+
+async def get_activity_grid(
+    db: AsyncSession,
+    user_id: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> ActivityGridResponse:
+    """Project the user's daily check-ins onto a per-day grid.
+
+    Each day in the range gets a Phase 2 status only: ``checked_in``,
+    ``active_rest``, or ``safety_adjustment`` when a check-in exists (its
+    ``daily_status``), else ``none``. Plan-execution statuses
+    (``partial_execution`` / ``main_plan_completed``) are never produced.
+    ``active_rest`` and ``safety_adjustment`` are valid, non-failure states.
+    """
+    start, end = _resolve_grid_range(start_date, end_date)
+    user_uuid = _to_uuid(user_id)
+    result = await db.execute(
+        select(DailyCheckIn).where(
+            DailyCheckIn.user_id == user_uuid,
+            DailyCheckIn.local_date >= start,
+            DailyCheckIn.local_date <= end,
+        )
+    )
+    status_by_date = {row.local_date: row.daily_status for row in result.scalars().all()}
+
+    cells: List[ActivityGridCell] = []
+    day = start
+    while day <= end:
+        cells.append(ActivityGridCell(date=day, status=status_by_date.get(day, "none")))
+        day = day + timedelta(days=1)
+
+    return ActivityGridResponse(start_date=start, end_date=end, cells=cells)

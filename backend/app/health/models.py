@@ -2,7 +2,18 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -121,6 +132,57 @@ class DailyCheckIn(Base):
     # Deterministic check-in safety tier, computed and stored at write time.
     risk_summary: Mapped[str] = mapped_column(String(30), nullable=False)
     risk_version: Mapped[str] = mapped_column(String(40), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class WeightRecord(Base):
+    """A user's manual body-weight record (Phase 2 spec Domain Model, Weight
+    Record And Trend; Task 4).
+
+    Multiple records per user are allowed (no UNIQUE constraint). ``source`` is
+    always ``manual`` in Phase 2 (no wearable / device import) and is set
+    server-side, never accepted from the client. ``weight_kg`` is a bounded
+    positive decimal; the realistic bounds (20.0-300.0 kg) are enforced at the
+    Pydantic / application layer (no DB CHECK), keeping SQLite tests and
+    PostgreSQL in parity - same convention as the profile / posture domains.
+
+    ``weight_kg`` is sensitive (spec Privacy): raw values must NEVER be written
+    to ordinary logs or audit payloads. The service layer never logs them, and
+    unhandled errors are reduced to a structured 503 by the global handler.
+
+    The ``(user_id, recorded_at)`` index backs the per-user trend query.
+    Phase 2 trend output carries no plan/diet adjustments, no warnings, and no
+    pass/fail judgment from single-day changes.
+    """
+
+    __tablename__ = "weight_records"
+    __table_args__ = (
+        Index(
+            "ix_weight_records_user_recorded_at",
+            "user_id",
+            "recorded_at",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    weight_kg: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    # Phase 2 has only manual entry; server-set, never client-set.
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="manual")
+    note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

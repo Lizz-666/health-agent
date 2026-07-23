@@ -57,7 +57,7 @@ def _offline_downgrade_sql() -> str:
 
 
 # 全部表名（重命名后的 events 表 + 6 个新表 + 平台表 + Phase 2 health_profiles
-# + Phase 2 health_checkins）。
+# + Phase 2 health_checkins + Phase 2 weight_records）。
 ALL_TABLES = {
     "users",
     "verification_codes",
@@ -70,6 +70,7 @@ ALL_TABLES = {
     "purge_operations",
     "health_profiles",
     "health_checkins",
+    "weight_records",
 }
 
 # Phase 1 expand 阶段新增的 6 张表。
@@ -89,12 +90,12 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0005_health_checkins。"""
+    """Alembic 只有一个 head，且为 0006_health_weight_tracking。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0005_health_checkins", head_lines[0]
+    assert head_lines[0].split()[0] == "0006_health_weight_tracking", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
@@ -503,6 +504,7 @@ def test_metadata_indexes_match_offline_sql():
         "purge_operations",
         "health_profiles",
         "health_checkins",
+        "weight_records",
     }
 
     # 1. Base.metadata 中的索引名 + 命名 UNIQUE 约束名。
@@ -884,4 +886,80 @@ def test_0005_health_checkins_unique_constraint_in_metadata():
         "risk_version",
         "user_id",
     ):
+        assert table.c[col].nullable is False, f"{col} must be NOT NULL"
+
+
+# ---------------------------------------------------------------------------
+# 0006_health_weight_tracking specific tests (Phase 2 Task 4)
+# ---------------------------------------------------------------------------
+
+
+def _offline_upgrade_0006_sql() -> str:
+    proc = _run_alembic("upgrade", "0005_health_checkins:0006_health_weight_tracking", "--sql")
+    assert proc.returncode == 0, f"alembic upgrade 0005:0006 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def _offline_downgrade_0006_sql() -> str:
+    proc = _run_alembic("downgrade", "0006_health_weight_tracking:0005_health_checkins", "--sql")
+    assert proc.returncode == 0, f"alembic downgrade 0006:0005 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def test_0006_upgrade_creates_weight_records_table():
+    """0006 upgrade creates weight_records with required columns, the manual
+    source default, and the per-user trend index."""
+    sql = _offline_upgrade_0006_sql()
+    assert "CREATE TABLE weight_records" in sql
+
+    for col in (
+        "id",
+        "user_id",
+        "recorded_at",
+        "weight_kg",
+        "source",
+        "note",
+        "created_at",
+        "updated_at",
+    ):
+        assert col in sql, f"missing column {col} in weight_records"
+
+    # weight_kg is NUMERIC(6,2); recorded_at is a timestamp; note nullable.
+    assert "weight_kg NUMERIC(6, 2) NOT NULL" in sql
+    assert "recorded_at TIMESTAMP WITHOUT TIME ZONE" not in sql  # tz-aware
+    assert "source VARCHAR(20)" in sql
+    assert "DEFAULT 'manual'" in sql  # server-set manual source
+
+    # PK + FK; no UNIQUE constraint (multiple records per user).
+    assert "PRIMARY KEY (id)" in sql
+    assert "FOREIGN KEY(user_id) REFERENCES users (id)" in sql
+    assert "UNIQUE" not in sql.split("CREATE TABLE weight_records")[1].split(")")[0]
+
+    # Composite trend index exists.
+    assert "CREATE INDEX ix_weight_records_user_recorded_at" in sql
+    assert "ON weight_records (user_id, recorded_at)" in sql
+
+
+def test_0006_downgrade_drops_weight_records_table():
+    """0006 downgrade drops the weight_records table and its index."""
+    sql = _offline_downgrade_0006_sql()
+    assert "DROP TABLE weight_records" in sql
+    assert "DROP INDEX ix_weight_records_user_recorded_at" in sql
+
+
+def test_0006_weight_records_index_in_metadata():
+    """ORM weight_records carries the named (user_id, recorded_at) index and
+    nullable note; weight_kg / recorded_at / source are NOT NULL."""
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+    import app.health.models  # noqa: F401
+
+    table = Base.metadata.tables["weight_records"]
+
+    index_names = {idx.name for idx in table.indexes}
+    assert "ix_weight_records_user_recorded_at" in index_names
+
+    assert table.c["note"].nullable is True
+    for col in ("user_id", "recorded_at", "weight_kg", "source"):
         assert table.c[col].nullable is False, f"{col} must be NOT NULL"

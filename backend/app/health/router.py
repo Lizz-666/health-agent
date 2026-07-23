@@ -1,4 +1,5 @@
-"""Health profile and daily check-in REST routes (Phase 2 Task 2 / Task 3).
+"""Health profile, daily check-in, weight, and activity-grid REST routes
+(Phase 2 Task 2 / Task 3 / Task 4).
 
 JWT-only: ownership is derived exclusively from ``Depends(get_current_user)``.
 No endpoint accepts ``user_id`` as a request parameter, so cross-user read /
@@ -15,6 +16,7 @@ from app.core.dependencies import get_current_user
 from app.db.database import get_db
 from app.health import service
 from app.health.schemas import (
+    ActivityGridResponse,
     CheckInCreate,
     CheckInDeleteResponse,
     CheckInResponse,
@@ -22,6 +24,11 @@ from app.health.schemas import (
     HealthProfileDeleteResponse,
     HealthProfileResultResponse,
     HealthProfileUpdate,
+    WeightRecordCreate,
+    WeightRecordDeleteResponse,
+    WeightRecordResponse,
+    WeightRecordUpdate,
+    WeightTrendResponse,
 )
 
 router = APIRouter(prefix="/api/v1/health", tags=["health"])
@@ -143,3 +150,101 @@ async def delete_checkin(
     """
     await service.delete_checkin(db, user_id, checkin_id)
     return CheckInDeleteResponse(deleted=True)
+
+
+# ---------------------------------------------------------------------------
+# Weight records, trend, and activity grid (Task 4)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/weight-records", response_model=WeightRecordResponse)
+async def create_weight_record(
+    request: WeightRecordCreate,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create one manual weight record for the authenticated user.
+
+    ``weight_kg`` is bounded (20.0-300.0 kg); out-of-range or non-numeric
+    values produce a deterministic 422. ``source`` is server-set to ``manual``
+    and never accepted from the client. Raw weight values are never logged.
+    """
+    return await service.create_weight_record(db, user_id, request)
+
+
+@router.get("/weight-records", response_model=list[WeightRecordResponse])
+async def list_weight_records(
+    start_date: date = Query(None, description="Inclusive range start."),
+    end_date: date = Query(None, description="Inclusive range end."),
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the authenticated user's weight records (newest first).
+
+    Optional inclusive ``start_date`` / ``end_date`` bound the range. Results
+    are scoped to the caller.
+    """
+    return await service.list_weight_records(db, user_id, start_date, end_date)
+
+
+@router.put("/weight-records/{record_id}", response_model=WeightRecordResponse)
+async def update_weight_record(
+    record_id: UUID,
+    request: WeightRecordUpdate,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Full-replace the editable fields of one caller-owned weight record.
+
+    Ownership-scoped: a record belonging to another user (or a missing id)
+    surfaces as a deterministic 404; an invalid id format is a 422.
+    """
+    return await service.update_weight_record(db, user_id, record_id, request)
+
+
+@router.delete("/weight-records/{record_id}", response_model=WeightRecordDeleteResponse)
+async def delete_weight_record(
+    record_id: UUID,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete one caller-owned weight record.
+
+    Ownership-scoped: not-owned or missing id surfaces as a deterministic 404.
+    """
+    await service.delete_weight_record(db, user_id, record_id)
+    return WeightRecordDeleteResponse(deleted=True)
+
+
+@router.get("/trends/weight", response_model=WeightTrendResponse)
+async def get_weight_trend(
+    start_date: date = Query(None, description="Inclusive range start."),
+    end_date: date = Query(None, description="Inclusive range end."),
+    window: int = Query(7, ge=2, le=14, description="Moving-average window."),
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return raw weight records plus a deterministic moving trend.
+
+    The trend is a point-based simple moving average over ``window`` records.
+    When fewer than ``window`` records exist, ``sufficient`` is false and
+    ``trend`` is empty (insufficient data). Phase 2 emits no plan / diet
+    adjustments, warnings, or pass/fail judgment from this endpoint.
+    """
+    return await service.get_weight_trend(db, user_id, start_date, end_date, window)
+
+
+@router.get("/activity-grid", response_model=ActivityGridResponse)
+async def get_activity_grid(
+    start_date: date = Query(None, description="Inclusive range start."),
+    end_date: date = Query(None, description="Inclusive range end."),
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Project the authenticated user's daily check-ins onto a per-day grid.
+
+    Each day carries a Phase 2 status only: ``checked_in``, ``active_rest``,
+    ``safety_adjustment``, or ``none``. Plan-execution statuses are never
+    produced. Defaults to the last 28 days when no range is given (cap 366).
+    """
+    return await service.get_activity_grid(db, user_id, start_date, end_date)

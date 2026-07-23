@@ -149,17 +149,17 @@ def _run_alembic(*args):
     )
 
 
-def test_e2e_migration_head_is_0005():
-    """Point 1: Alembic head is exactly 0005_health_checkins.
+def test_e2e_migration_head_is_0006():
+    """Point 1: Alembic head is exactly 0006_health_weight_tracking.
 
-    Advanced from 0004_health_profile_tracking by Phase 2 Task 3 migration
-    0005_health_checkins (health_checkins table).
+    Advanced from 0005_health_checkins by Phase 2 Task 4 migration
+    0006_health_weight_tracking (weight_records table).
     """
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(lines) == 1, f"expected exactly one head, got: {lines}"
-    assert lines[0].split()[0] == "0005_health_checkins", lines[0]
+    assert lines[0].split()[0] == "0006_health_weight_tracking", lines[0]
 
 
 def test_e2e_schema_source_lifecycle_not_null_severity_nullable():

@@ -382,3 +382,141 @@ class CheckInDeleteResponse(BaseModel):
     """DELETE /api/v1/health/checkins/{checkin_id} response."""
 
     deleted: bool
+
+
+# ---------------------------------------------------------------------------
+# Weight records, trend, and activity grid (Phase 2 Task 4)
+# ---------------------------------------------------------------------------
+
+
+# Realistic adult body-weight bounds (kg); enforced at the application layer
+# (no DB CHECK). Out-of-range values yield a deterministic 422.
+WEIGHT_KG_MIN = 20.0
+WEIGHT_KG_MAX = 300.0
+
+
+class WeightSource(str, Enum):
+    """Origin of a weight record. Phase 2 supports only manual entry."""
+
+    manual = "manual"
+
+
+class WeightRecordCreate(BaseModel):
+    """POST /api/v1/health/weight-records request body.
+
+    ``source`` is server-set to ``manual`` (never accepted from the client).
+    ``weight_kg`` is a bounded positive decimal. ``extra="forbid"`` rejects
+    unknown fields (including a client-supplied ``source``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    recorded_at: datetime
+    weight_kg: float = Field(..., ge=WEIGHT_KG_MIN, le=WEIGHT_KG_MAX)
+    note: Optional[str] = Field(None, max_length=500)
+
+
+class WeightRecordUpdate(BaseModel):
+    """PUT /api/v1/health/weight-records/{record_id} request body.
+
+    Full replacement of the editable fields of one record. ``source`` remains
+    server-managed.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    recorded_at: datetime
+    weight_kg: float = Field(..., ge=WEIGHT_KG_MIN, le=WEIGHT_KG_MAX)
+    note: Optional[str] = Field(None, max_length=500)
+
+
+class WeightRecordResponse(BaseModel):
+    """Stored weight record returned by the API.
+
+    ``source`` is always ``manual`` in Phase 2. Raw weight values are returned
+    to the owner but are never logged.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    recorded_at: datetime
+    weight_kg: float
+    source: WeightSource
+    note: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class WeightRecordDeleteResponse(BaseModel):
+    """DELETE /api/v1/health/weight-records/{record_id} response."""
+
+    deleted: bool
+
+
+class WeightTrendPoint(BaseModel):
+    """One point of the moving trend series.
+
+    ``weight_kg`` is the simple moving average of the trailing ``window``
+    records up to and including ``recorded_at``. It is NOT a recommendation or
+    a pass/fail signal.
+    """
+
+    recorded_at: datetime
+    weight_kg: float
+
+
+class WeightTrendResponse(BaseModel):
+    """GET /api/v1/health/trends/weight response.
+
+    Carries the raw records in range plus a moving trend series. When there
+    are fewer than ``window`` records, ``sufficient`` is false and ``trend`` is
+    empty (an explicit ``insufficient_data`` state). Phase 2 never emits plan /
+    diet adjustments, warnings, or success/failure judgment from this endpoint.
+    """
+
+    records: List[WeightRecordResponse]
+    trend: List[WeightTrendPoint]
+    window: int
+    sufficient: bool
+
+
+class ActivityGridCell(BaseModel):
+    """One day of the activity grid projection.
+
+    ``status`` is one of the Phase 2 statuses only (``GridStatus``):
+    ``none``, ``checked_in``, ``active_rest``, ``safety_adjustment``.
+    Plan-execution statuses are never produced in Phase 2.
+    """
+
+    date: date
+    status: "GridStatus"
+
+
+class GridStatus(str, Enum):
+    """The Phase 2 activity-grid status set (spec Domain Model, Activity Grid).
+
+    ``active_rest`` and ``safety_adjustment`` are valid, non-failure engagement
+    states. Later training phases may add ``partial_execution`` and
+    ``main_plan_completed``; Phase 2 must NOT emit them (no plan exists).
+    """
+
+    none = "none"
+    checked_in = "checked_in"
+    active_rest = "active_rest"
+    safety_adjustment = "safety_adjustment"
+
+
+ActivityGridCell.model_rebuild()
+
+
+class ActivityGridResponse(BaseModel):
+    """GET /api/v1/health/activity-grid response.
+
+    A contiguous per-day projection over the user's daily check-ins.
+    ``active_rest`` and ``safety_adjustment`` are valid, non-failure states.
+    """
+
+    start_date: date
+    end_date: date
+    cells: List[ActivityGridCell]

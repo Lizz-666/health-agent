@@ -441,3 +441,125 @@ def test_pain_followup_component_fields(openapi_schema):
     ):
         assert field in props, f"PainFollowup missing {field}"
     assert component.get("additionalProperties") is False
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 Task 4: weight / trend / activity-grid OpenAPI contracts
+# ---------------------------------------------------------------------------
+
+WEIGHT_GRID_ROUTES = [
+    ("post", "/api/v1/health/weight-records"),
+    ("get", "/api/v1/health/weight-records"),
+    ("put", "/api/v1/health/weight-records/{record_id}"),
+    ("delete", "/api/v1/health/weight-records/{record_id}"),
+    ("get", "/api/v1/health/trends/weight"),
+    ("get", "/api/v1/health/activity-grid"),
+]
+
+
+@pytest.mark.parametrize("method,path", WEIGHT_GRID_ROUTES)
+def test_weight_grid_route_has_response_schema(method, path, openapi_schema):
+    """Each weight / trend / grid route must expose a non-empty 200 schema."""
+    paths = openapi_schema["paths"]
+    assert path in paths, f"Path {path} not found in OpenAPI paths"
+    operation = paths[path][method]
+    responses = operation["responses"]
+    assert "200" in responses, f"{method.upper()} {path} missing 200 response"
+    content = responses["200"]["content"]
+    assert "application/json" in content
+    schema = content["application/json"]["schema"]
+    assert schema not in (None, {}), f"{method.upper()} {path} has empty schema"
+
+
+@pytest.mark.parametrize("method,path", WEIGHT_GRID_ROUTES)
+def test_weight_grid_routes_are_protected(method, path, openapi_schema):
+    """All weight / trend / grid routes must require auth (JWT-only)."""
+    operation = openapi_schema["paths"][path][method]
+    assert "security" in operation and len(operation["security"]) > 0, (
+        f"{method.upper()} {path} must require auth"
+    )
+
+
+def test_weight_post_put_have_request_body(openapi_schema):
+    """POST and PUT weight-records must declare a requestBody schema."""
+    for method in ("post", "put"):
+        path = "/api/v1/health/weight-records" if method == "post" else (
+            "/api/v1/health/weight-records/{record_id}"
+        )
+        operation = openapi_schema["paths"][path][method]
+        assert "requestBody" in operation, f"{method.upper()} {path} missing body"
+        schema = operation["requestBody"]["content"]["application/json"]["schema"]
+        assert schema not in (None, {})
+
+
+def test_weight_record_component_fields(openapi_schema):
+    """WeightRecordResponse must carry weight_kg + source and forbid extras
+    (no client-settable id / source / timestamps)."""
+    component = openapi_schema["components"]["schemas"]["WeightRecordResponse"]
+    props = component["properties"]
+    for field in ("id", "recorded_at", "weight_kg", "source", "note", "created_at", "updated_at"):
+        assert field in props, f"WeightRecordResponse missing {field}"
+    assert component.get("additionalProperties") is False
+
+
+def test_weight_create_component_forbids_source(openapi_schema):
+    """WeightRecordCreate must NOT accept a client-supplied source (server-set
+    to manual); it carries the bounded weight_kg only."""
+    component = openapi_schema["components"]["schemas"]["WeightRecordCreate"]
+    props = component["properties"]
+    assert "weight_kg" in props
+    assert "source" not in props, "WeightRecordCreate must not accept source"
+    assert "id" not in props
+    assert component.get("additionalProperties") is False
+
+
+def test_weight_trend_response_shape(openapi_schema):
+    """GET /trends/weight response carries records + trend + window +
+    sufficient, and the trend point exposes recorded_at + weight_kg."""
+    schema = openapi_schema["paths"]["/api/v1/health/trends/weight"]["get"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    resolved = _resolve_ref(schema, openapi_schema)
+    for field in ("records", "trend", "window", "sufficient"):
+        assert field in resolved["properties"], f"trend response missing {field}"
+
+    trend_point = _resolve_ref(resolved["properties"]["trend"]["items"], openapi_schema)
+    assert "recorded_at" in trend_point["properties"]
+    assert "weight_kg" in trend_point["properties"]
+
+
+def test_activity_grid_response_shape(openapi_schema):
+    """GET /activity-grid response carries start_date + end_date + cells, and
+    the cell exposes date + status."""
+    schema = openapi_schema["paths"]["/api/v1/health/activity-grid"]["get"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    resolved = _resolve_ref(schema, openapi_schema)
+    for field in ("start_date", "end_date", "cells"):
+        assert field in resolved["properties"], f"grid response missing {field}"
+
+    cell = _resolve_ref(resolved["properties"]["cells"]["items"], openapi_schema)
+    assert "date" in cell["properties"]
+    assert "status" in cell["properties"]
+
+
+def test_activity_grid_status_enum_is_phase2_only(openapi_schema):
+    """The grid cell status enum must be exactly the Phase 2 set and must NOT
+    include plan-execution statuses (partial_execution / main_plan_completed)."""
+    schema = openapi_schema["paths"]["/api/v1/health/activity-grid"]["get"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    resolved = _resolve_ref(schema, openapi_schema)
+    cell = _resolve_ref(resolved["properties"]["cells"]["items"], openapi_schema)
+    status_ref = cell["properties"]["status"]
+    status_schema = _resolve_ref(status_ref, openapi_schema)
+
+    enum_values = set(status_schema.get("enum", []))
+    assert enum_values == {
+        "none",
+        "checked_in",
+        "active_rest",
+        "safety_adjustment",
+    }, f"unexpected grid status enum: {enum_values}"
+    assert "partial_execution" not in enum_values
+    assert "main_plan_completed" not in enum_values
