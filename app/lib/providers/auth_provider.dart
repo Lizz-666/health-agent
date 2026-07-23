@@ -5,10 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
 import '../core/storage.dart';
 import '../models/token.dart';
+import 'activity_grid_provider.dart';
 import 'assessment_provider.dart';
+import 'daily_checkin_provider.dart';
+import 'health_profile_provider.dart';
 import 'posture_profile_provider.dart';
 import 'posture_state_provider.dart';
 import 'user_provider.dart';
+import 'weight_trend_provider.dart';
 
 class AuthState {
   final bool isLoggedIn;
@@ -194,6 +198,12 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
       ref.invalidate(assessmentProvider);
       ref.invalidate(postureProfileProvider);
       ref.invalidate(postureStateProvider);
+      // Phase 2 health state: clear on logout / token failure / account switch
+      // so no previous user's health data is ever retained as current.
+      ref.invalidate(healthProfileProvider);
+      ref.invalidate(dailyCheckinProvider);
+      ref.invalidate(weightTrendProvider);
+      ref.invalidate(activityGridProvider);
     },
   );
 });

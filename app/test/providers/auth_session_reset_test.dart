@@ -4,11 +4,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posture_app/core/api_client.dart';
+import 'package:posture_app/providers/activity_grid_provider.dart';
 import 'package:posture_app/providers/assessment_provider.dart';
 import 'package:posture_app/providers/auth_provider.dart';
+import 'package:posture_app/providers/daily_checkin_provider.dart';
+import 'package:posture_app/providers/health_profile_provider.dart';
 import 'package:posture_app/providers/posture_profile_provider.dart';
 import 'package:posture_app/providers/posture_state_provider.dart';
 import 'package:posture_app/providers/user_provider.dart';
+import 'package:posture_app/providers/weight_trend_provider.dart';
 
 import '_test_dio.dart';
 
@@ -117,5 +121,127 @@ void main() {
     );
     await oldSessionRefresh;
     expect(container.read(assessmentProvider).history, isEmpty);
+  });
+
+  test('auth failure clears all Phase 2 health state and blocks stale repopulation',
+      () async {
+    final profile = <String, dynamic>{
+      'configured': true,
+      'profile': {
+        'id': 'health-user-a',
+        'fitness_goal': 'basic_strength',
+        'training_experience': null,
+        'weekly_frequency': null,
+        'session_duration_minutes': null,
+        'equipment': null,
+        'pain_injury_limitations': null,
+        'risk_screen': null,
+        'allergies': null,
+        'diet_exclusions': null,
+        'version': 1,
+        'updated_at': '2026-07-23T08:00:00Z',
+        'created_at': '2026-07-23T08:00:00Z',
+      },
+      'readiness': {
+        'readiness': 'ready',
+        'risk_version': '2026-07-22-v1',
+        'reason': 'synthetic',
+        'missing_fields': <String>[],
+        'restricted_reason': null,
+      },
+    };
+    final checkin = <String, dynamic>{
+      'checked_in': true,
+      'checkin': {
+        'id': 'checkin-user-a',
+        'local_date': '2026-07-23',
+        'sleep_quality': 'good',
+        'energy': 'normal',
+        'muscle_soreness': 'mild',
+        'available_time': '30_min',
+        'daily_status': 'checked_in',
+        'abnormal_pain': false,
+        'pain_followup': null,
+        'risk_summary': 'normal',
+        'risk_version': '2026-07-22-v1',
+        'created_at': '2026-07-23T08:00:00Z',
+        'updated_at': '2026-07-23T08:00:00Z',
+      },
+    };
+    final trend = <String, dynamic>{
+      'records': [
+        {
+          'id': 'weight-user-a',
+          'recorded_at': '2026-07-23T08:00:00Z',
+          'weight_kg': 70.0,
+          'source': 'manual',
+          'note': null,
+          'created_at': '2026-07-23T08:00:00Z',
+          'updated_at': '2026-07-23T08:00:00Z',
+        },
+      ],
+      'trend': <Map<String, dynamic>>[],
+      'window': 7,
+      'sufficient': false,
+    };
+    final grid = <String, dynamic>{
+      'start_date': '2026-07-20',
+      'end_date': '2026-07-23',
+      'cells': [
+        {'date': '2026-07-21', 'status': 'checked_in'},
+      ],
+    };
+
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => profile)
+      ..registerJson('GET', '/health/checkins/today', (_) => checkin)
+      ..registerJson('GET', '/health/trends/weight', (_) => trend)
+      ..registerJson('GET', '/health/activity-grid', (_) => grid);
+    final api = _apiWith(adapter);
+    final container = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(api)],
+    );
+    addTearDown(container.dispose);
+
+    // Wire the auth-failure reset callback.
+    container.read(authProvider);
+
+    // Seed synthetic user-A Phase 2 state.
+    await container.read(healthProfileProvider.notifier).fetchProfile();
+    await container
+        .read(dailyCheckinProvider.notifier)
+        .fetchToday(localDate: DateTime(2026, 7, 23));
+    await container.read(weightTrendProvider.notifier).fetchTrend();
+    await container.read(activityGridProvider.notifier).fetchGrid();
+
+    expect(container.read(healthProfileProvider).result?.profile?.id,
+        'health-user-a');
+    expect(container.read(dailyCheckinProvider).checkin?.id, 'checkin-user-a');
+    expect(container.read(weightTrendProvider).trend?.records.length, 1);
+    expect(container.read(activityGridProvider).grid?.cells.length, 1);
+
+    // Start a slow profile fetch (user A), then trigger the auth reset.
+    final pending = Completer<Response>();
+    adapter.register('GET', '/health/profile', (_) => pending.future);
+    final staleFetch =
+        container.read(healthProfileProvider.notifier).fetchProfile();
+    await Future<void>.delayed(Duration.zero);
+
+    api.onAuthFailed?.call();
+
+    // All Phase 2 state is cleared (fresh idle notifiers after invalidate).
+    expect(container.read(healthProfileProvider).result, isNull);
+    expect(container.read(dailyCheckinProvider).checkin, isNull);
+    expect(container.read(weightTrendProvider).trend, isNull);
+    expect(container.read(activityGridProvider).grid, isNull);
+
+    // A late user-A response must not repopulate the cleared state.
+    pending.complete(Response(
+      requestOptions: RequestOptions(path: '/health/profile'),
+      statusCode: 200,
+      data: profile,
+    ));
+    await staleFetch;
+    expect(container.read(healthProfileProvider).result, isNull);
   });
 }
