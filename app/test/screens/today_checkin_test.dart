@@ -218,7 +218,7 @@ void main() {
     expect(find.text('状态正常'), findsNothing);
   });
 
-  testWidgets('caution and restricted risk summaries are distinct', (
+  testWidgets('caution risk summary is distinct from normal/restricted', (
     tester,
   ) async {
     final cautionAdapter = FakeDioAdapter()
@@ -233,7 +233,11 @@ void main() {
     expect(find.text('需注意'), findsOneWidget);
     expect(find.text('受限'), findsNothing);
     expect(find.text('状态正常'), findsNothing);
+  });
 
+  testWidgets('restricted risk summary is distinct from normal/caution', (
+    tester,
+  ) async {
     final restrictedAdapter = FakeDioAdapter()
       ..registerJson(
         'GET',
