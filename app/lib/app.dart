@@ -16,6 +16,9 @@ import 'screens/result/result_screen.dart';
 import 'screens/history/history_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/profile/posture_profile_screen.dart';
+import 'screens/profile/health_profile_screen.dart';
+import 'screens/profile/weight_trend_screen.dart';
+import 'screens/profile/activity_grid_screen.dart';
 import 'screens/search/search_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -112,6 +115,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'posture',
                     builder: (_, _) => const PostureProfileScreen(),
+                  ),
+                  GoRoute(
+                    path: 'health',
+                    builder: (_, _) => const HealthProfileScreen(),
+                  ),
+                  GoRoute(
+                    path: 'weight',
+                    builder: (_, _) => const WeightTrendScreen(),
+                  ),
+                  GoRoute(
+                    path: 'grid',
+                    builder: (_, _) => const ActivityGridScreen(),
                   ),
                 ],
               ),

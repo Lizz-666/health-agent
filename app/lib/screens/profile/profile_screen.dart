@@ -66,6 +66,12 @@ class ProfileScreen extends ConsumerWidget {
               children: [
                 _menuItem('我的体态档案', Icons.assignment, () => context.push('/profile/posture')),
                 const Divider(height: 1),
+                _menuItem('健康档案', Icons.favorite_outline, () => context.push('/profile/health')),
+                const Divider(height: 1),
+                _menuItem('体重趋势', Icons.show_chart, () => context.push('/profile/weight')),
+                const Divider(height: 1),
+                _menuItem('活动记录', Icons.grid_view_outlined, () => context.push('/profile/grid')),
+                const Divider(height: 1),
                 _menuItem('评估历史', Icons.history, () => context.push('/history')),
                 const Divider(height: 1),
                 _menuItem('关于', Icons.info_outline, () => _showAbout(context)),
