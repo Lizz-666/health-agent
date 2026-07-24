@@ -8,6 +8,7 @@ import 'providers/user_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/today/today_screen.dart';
 import 'screens/issues/issue_list_screen.dart';
 import 'screens/issues/issue_detail_screen.dart';
 import 'screens/test/self_test_screen.dart';
@@ -79,7 +80,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onOnboarding = state.matchedLocation == '/onboarding';
 
       if (!authState.isLoggedIn && !onLogin) return '/login';
-      if (authState.isLoggedIn && onLogin) return '/';
+      if (authState.isLoggedIn && onLogin) return '/today';
       if (authState.isLoggedIn &&
           userState.profile != null &&
           userState.profile!.hasProfile != true &&
@@ -95,6 +96,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _, navigationShell) =>
             AppShell(navigationShell: navigationShell),
         branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/today',
+                builder: (_, _) => const TodayScreen(),
+              ),
+            ],
+          ),
           StatefulShellBranch(
             routes: [GoRoute(path: '/', builder: (_, _) => const HomeScreen())],
           ),
@@ -206,6 +215,11 @@ class AppShell extends StatelessWidget {
           );
         },
         destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.today_outlined),
+            selectedIcon: Icon(Icons.today),
+            label: '今日',
+          ),
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
