@@ -2,7 +2,7 @@
 
 体态评估为核心的个人健康教练，Flutter + FastAPI 架构。
 
-当前阶段：阶段 0 已完成，下一步为阶段 1 规格设计
+当前阶段：阶段 2（健康档案、签到与趋势）自动化验证与 PostgreSQL 集成已通过，待 Android 冒烟补齐后收尾；详见 `docs/reports/phase2-exit-audit-2026-07-26.md`
 
 ## 运行时要求
 
@@ -185,14 +185,14 @@ start ms-settings:developers   # 打开设置并启用开发者模式
 
 | 验证项 | 结果 | 日期 |
 | --- | --- | --- |
-| 后端 pytest | 81 passed | 2026-07-11 |
-| Alembic 离线 upgrade/downgrade SQL | 通过 | 2026-07-11 |
-| 真实 PostgreSQL 迁移演练 | 通过（upgrade/downgrade base/re-upgrade + schema 核验） | 2026-07-11 |
-| Flutter analyze | No issues found | 2026-07-11 |
-| Flutter test | 7 passed | 2026-07-11 |
-| 当前源码 APK 构建 | 成功（app-debug.apk，构建日志无 KGP 兼容性警告） | 2026-07-11 |
-| 真实后端 API 流程 | 通过（health/login/issues/detail/assess/history） | 2026-07-11 |
-| Android 完整业务冒烟 | 通过（登录→问题→详情→自测→结果→历史） | 2026-07-11 |
+| 后端 pytest（全量，含真实 PostgreSQL 16 集成） | 798 passed，0 skipped | 2026-07-26 |
+| 后端 Phase 2 E2E + OpenAPI + 迁移 | 137 passed（含 Phase 2 E2E 6 项） | 2026-07-26 |
+| Alembic 迁移头/CLI 升级 | 单一头 `0006_health_weight_tracking`；一次性 PG16 容器 `upgrade head/current` 通过 | 2026-07-26 |
+| 真实 PostgreSQL 集成（UUID/JSONB/advisory lock） | 11 passed，0 skipped（Docker `postgres:16`） | 2026-07-26 |
+| 后端 ruff（`app tests`） | All checks passed | 2026-07-26 |
+| Flutter analyze | No issues found | 2026-07-26 |
+| Flutter test | 300 passed | 2026-07-26 |
+| Android 完整业务冒烟（阶段 2） | 未执行（`Pixel_6` AVD 可列出，但未跑目标平台流程）→ 阶段 2 暂不标记完成 | 2026-07-26 |
 
 ### 依赖升级记录
 

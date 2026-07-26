@@ -220,6 +220,15 @@ flowchart TB
 - 切换账号或退出后不残留上一用户的健康数据
 - 用户可查阅、更正和删除真实健康档案，保存期限规则可验证
 
+### 完成状态
+
+阶段 2 **尚未标记完成**（2026-07-26 Task 8 退出审计）：自动化验证与 PostgreSQL 真实集成证据齐备，但 **Android 模拟器冒烟未执行**，按 Task 8 契约与 §13 规则暂不标记完成，状态为“有条件通过，待 Android 冒烟补齐”。证据与逐条核对见 `docs/reports/phase2-exit-audit-2026-07-26.md`。
+
+- 后端 `798 passed`（含真实 PostgreSQL 16 集成，0 skipped）；Phase 2 E2E `6 passed`；迁移单一头 `0006_health_weight_tracking`。
+- 后端 ruff `app tests` clean；一次性 PG16 容器裸 CLI `alembic upgrade head/current` 通过。
+- Flutter `analyze` 无问题；`flutter test` `300 passed`。
+- 待补：Android 模拟器冒烟（登录→我的健康档案→今日签到→异常疼痛追问→体重→趋势/网格→登出/账号切换）。
+
 ## 7. 阶段 3：训练知识与安全引擎
 
 ### 目标

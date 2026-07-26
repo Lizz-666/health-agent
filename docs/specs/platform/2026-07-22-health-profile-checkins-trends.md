@@ -1,5 +1,7 @@
 # Phase 2 Health Profile, Check-Ins, And Trends
 
+> 状态（2026-07-26）：Task 8 退出审计完成。自动化验证（后端 798 passed、ruff clean、Flutter 300 passed）与真实 PostgreSQL 16 集成证据齐备；**Android 模拟器冒烟未执行**，阶段 2 暂不标记完成（有条件通过）。详见 `docs/reports/phase2-exit-audit-2026-07-26.md`。本行为说明保持当前规格事实，未改动行为定义。
+
 ## Outcome
 
 Phase 2 establishes the structured health data needed by later training adjustments without relying on chat history, wearable data, or AI inference.

@@ -1,5 +1,7 @@
 # Phase 2 Health Profile, Check-Ins, And Trends Implementation Plan
 
+> 状态（2026-07-26）：Tasks 1–7 已合并于 `codex/phase2-spec-plan`（Task 8 base `26f785f`）。Task 8 退出审计完成：新增 `backend/tests/test_phase2_e2e.py`（6 项），后端 798 passed、ruff clean、Flutter 300 passed、真实 PG16 集成 11 passed、一次性 PG16 容器裸 CLI `alembic upgrade head/current` 通过；**Android 冒烟未执行**，阶段 2 不标记完成。详见 `docs/reports/phase2-exit-audit-2026-07-26.md`。
+
 **Goal:** Deliver a verified Phase 2 vertical slice where users can maintain structured health profile data, complete daily check-ins, record optional weight, and review trends/grid data without AI inference or training-plan generation.
 
 **Spec:** `docs/specs/platform/2026-07-22-health-profile-checkins-trends.md`
