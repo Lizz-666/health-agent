@@ -105,7 +105,7 @@ def test_manifest_unsupported_version_fails():
 
 
 def test_valid_fixture_loads_all_ready(tmp_path):
-    catalog = load_catalog(FIXTURE)
+    catalog = load_catalog(FIXTURE, verify_release=False)
     assert catalog.catalog_id == "phase3-fixture-catalog"
     index = build_index(catalog)
     ready = [e for e in catalog.exercises
@@ -165,6 +165,14 @@ def test_load_catalog_raises_does_not_yield_empty(tmp_path):
     p.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(CatalogValidationError):
         load_catalog(p)
+
+
+def test_strict_loader_rejects_missing_source_manifest(tmp_path):
+    p = tmp_path / "exercises.v1.json"
+    p.write_text(json.dumps(_catalog_dict()), encoding="utf-8")
+    with pytest.raises(CatalogValidationError) as exc:
+        load_catalog(p)
+    assert "source_manifest_missing" in _codes(exc.value.issues)
 
 
 # ---------------------------------------------------------------------------

@@ -19,6 +19,7 @@ from app.training.schemas import (
     IllustrationProvenance,
     ImportedExerciseDraft,
     PrescriptionBounds,
+    PostureGoalSnapshot,
     ReviewScope,
     ReviewStatus,
     SourceManifest,
@@ -106,12 +107,24 @@ def test_illustration_has_no_url_field_structurally():
     "https://host/a.svg",                     # remote url
     "ftp://host/a.svg",                       # url
     "other/dir/a.svg",                        # wrong location
+    "assets/training/illustrations/../secret.svg",  # traversal
+    "assets\\training\\illustrations\\a.svg",     # platform escape
 ])
 def test_asset_key_must_be_local_svg(bad_key):
     ex = _minimal_exercise()
     ex["illustration"]["asset_key"] = bad_key
     with pytest.raises(ValidationError):
         Exercise.model_validate(ex)
+
+
+def test_active_posture_goal_requires_confirmation_controls():
+    with pytest.raises(ValidationError):
+        PostureGoalSnapshot.model_validate({"issue_id": "LL-18", "active": True})
+
+    inactive = PostureGoalSnapshot.model_validate({
+        "issue_id": "LL-18", "active": False,
+    })
+    assert inactive.active is False
 
 
 def test_content_hash_must_be_sha256_hex():

@@ -2,12 +2,11 @@
 #
 # Layered verification per docs/product/roadmap.md section 13.1 and the Phase 3
 # implementation plan:
-#   - fast : ruff + SQLite backend tests + git diff --check. Runs on push / PR
-#            to the Phase 3 implementation branches and on manual dispatch.
+#   - fast : ruff + targeted Phase 3 SQLite tests + git diff --check. Runs on
+#            push / PR to the implementation branches and manual dispatch.
 #   - full : ruff + COMPLETE backend tests on a real PostgreSQL 16 service,
-#            enforcing zero PostgreSQL skips (VERIFY_REQUIRE_PG=1). Manual only
-#            (workflow_dispatch with run_full=true) so it is used at integration
-#            / phase-exit nodes.
+#            enforcing exact PG execution and zero skips. Runs on every PR or
+#            by workflow_dispatch with run_full=true.
 #
 # Constraints:
 #   - Least permissions: contents: read only. No deployment, release, package
@@ -28,10 +27,9 @@ name: ci
 on:
   push:
     branches:
+      - "main"
       - "codex/phase3-*"
   pull_request:
-    branches:
-      - "codex/phase3-*"
   workflow_dispatch:
     inputs:
       run_full:
@@ -49,6 +47,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.9.13"
+  VERIFY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
   # Pinned dev/CI tools kept OUT of backend/requirements.txt by design (they
   # are not runtime dependencies). Both are reproducible, immutable versions.
   RUFF_VERSION: "0.15.22"
@@ -62,6 +61,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
@@ -72,10 +73,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install ruff==${{ env.RUFF_VERSION }}
+          pip install ruff==${{ env.RUFF_VERSION }} hypothesis==${{ env.HYPOTHESIS_VERSION }}
       - name: Fast verify (lint + SQLite tests + git diff --check)
         env:
           VERIFY_SUMMARY_FILE: fast-summary.txt
+          VERIFY_ARTIFACT_NAME: ci-fast-summary
+          VERIFY_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: python scripts/verify.py fast
       - name: Upload summary artifact
         if: always()
@@ -88,16 +91,15 @@ jobs:
 
   full:
     name: Full (complete tests + PostgreSQL 16)
-    # Manual only: triggered at integration / phase-exit nodes. Keeps Full CI
-    # cost for when it is the authoritative gate.
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_full }}
+    # Every PR gets the authoritative integration gate. Manual dispatch remains
+    # available once the workflow exists on the default branch.
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.run_full) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
       postgres:
-        # postgres:16 tag is the same image the repo's own conftest_pg.py uses
-        # for local Docker-backed PG tests; pinned tag (not floating latest).
-        image: postgres:16
+        # PostgreSQL 16 image pinned to an immutable reviewed digest.
+        image: postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: testpass
@@ -119,9 +121,13 @@ jobs:
       # PostgreSQL-backed tests actually ran (zero PG skips).
       VERIFY_REQUIRE_PG: "1"
       VERIFY_SUMMARY_FILE: full-summary.txt
+      VERIFY_ARTIFACT_NAME: ci-full-summary
+      VERIFY_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:

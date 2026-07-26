@@ -9,16 +9,18 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from app.auth.models import User
 from app.health.models import DailyCheckIn, HealthProfile
-from app.posture.models import PostureUserGoal
+from app.posture.models import PostureProfileEntry, PostureUserGoal
+from app.posture.service import get_priority_suggestions
 from app.training.candidates import select_candidates
 from app.training.context import build_context
 from app.training.knowledge import build_index, load_catalog
 from app.training.policy import load_training_policy
 from app.training.safety import classify_safety, load_safety_policy
+from app.training.tool_contracts import ValidateTrainingPlanRequest
 from app.training.schemas import (
     PlanPrescription, PlanSession, RequestSnapshot, TrainingPlanDraft,
 )
@@ -62,10 +64,18 @@ async def _setup_eligible(db, phone="13900000010"):
         muscle_soreness="none", available_time="30_min",
         daily_status="checked_in", abnormal_pain=False, pain_followup=None,
         risk_summary="normal", risk_version="2026-07-22-v1"))
+    db.add(PostureProfileEntry(
+        user_id=uid, issue_id="LL-18", combined_severity="mild",
+        certainty="confirmed", sources={}, has_conflict=False,
+        risk_tier="normal", risk_version="2026-07-16-v4"))
+    await db.commit()
+    suggestions = await get_priority_suggestions(db, str(uid), now=EVAL_AT)
     db.add(PostureUserGoal(
-        user_id=uid, issue_id="lower_limb", priority_rank=1,
-        confirmed_at=EVAL_AT, suggestion_id="s", profile_version="pv",
-        rule_version="rv", risk_version="2026-07-16-v4", superseded_at=None))
+        user_id=uid, issue_id="LL-18", priority_rank=1,
+        confirmed_at=EVAL_AT, suggestion_id=suggestions["suggestion_id"],
+        profile_version=suggestions["profile_version"],
+        rule_version=suggestions["rule_version"],
+        risk_version=suggestions["risk_version"], superseded_at=None))
     await db.commit()
     return uid
 
@@ -97,7 +107,21 @@ def _request():
     return RequestSnapshot(fitness_goal="basic_strength",
                            equipment_bodyweight=True,
                            equipment_resistance_band=False,
+                           weekly_frequency=3,
+                           session_duration_minutes=30,
                            iana_timezone="Asia/Shanghai")
+
+
+def test_tool_request_cannot_supply_or_override_principal_user_id():
+    assert "user_id" not in ValidateTrainingPlanRequest.model_fields
+    with pytest.raises(Exception):
+        ValidateTrainingPlanRequest.model_validate({
+            "user_id": "attacker-controlled",
+            "draft": _build_valid_draft(
+                type("Decision", (), {"fingerprint": "fingerprint"})(),
+                CATALOG.exercises[0].exercise_id),
+            "request": _request(),
+        })
 
 
 @pytest.mark.asyncio
@@ -164,16 +188,30 @@ async def test_tool_recomputes_per_call_and_writes_nothing():
         draft = _build_valid_draft(decision, cand.candidates[0].exercise_id)
 
         profiles_before = (await db.execute(select(HealthProfile))).scalars().all()
-        result1 = await validate_training_plan(
-            db, str(uid), draft, request=_request(), catalog=CATALOG,
-            safety_policy=SPOLICY, training_policy=TPOLICY,
-            source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
-        result2 = await validate_training_plan(
-            db, str(uid), draft, request=_request(), catalog=CATALOG,
-            safety_policy=SPOLICY, training_policy=TPOLICY,
-            source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
+        writes = []
+
+        def capture_writes(_conn, _cursor, statement, _params, _ctx, _many):
+            if statement.lstrip().upper().startswith(
+                    ("INSERT", "UPDATE", "DELETE")):
+                writes.append(statement)
+
+        event.listen(db.bind.sync_engine, "before_cursor_execute", capture_writes)
+        try:
+            result1 = await validate_training_plan(
+                db, str(uid), draft, request=_request(), catalog=CATALOG,
+                safety_policy=SPOLICY, training_policy=TPOLICY,
+                source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
+            result2 = await validate_training_plan(
+                db, str(uid), draft, request=_request(), catalog=CATALOG,
+                safety_policy=SPOLICY, training_policy=TPOLICY,
+                source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
+        finally:
+            event.remove(
+                db.bind.sync_engine, "before_cursor_execute", capture_writes)
         # Recompute is deterministic for unchanged data.
         assert result1.valid is True and result2.valid is True
         # No persistence: the profile/checkin rows are unchanged.
         profiles_after = (await db.execute(select(HealthProfile))).scalars().all()
         assert len(profiles_before) == len(profiles_after)
+        assert writes == []
+        assert not db.new and not db.dirty and not db.deleted

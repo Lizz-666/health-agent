@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
+from app.posture.safety import compute_signals_digest
 from app.training.context import (
     checkin_token,
     derive_local_date,
@@ -80,3 +81,21 @@ def test_checkin_token_excludes_pain_note_and_is_deterministic():
     # Token changes when the recomputed risk changes.
     t3 = checkin_token(_checkin(note="note A"), "caution")
     assert t3 != t1
+
+
+def test_checkin_token_normalizes_equivalent_instants_to_utc():
+    utc_checkin = _checkin()
+    offset_checkin = _checkin()
+    offset_checkin.updated_at = datetime.fromisoformat("2026-07-26T09:30:00+08:00")
+    assert checkin_token(utc_checkin, "normal") == checkin_token(
+        offset_checkin, "normal")
+
+
+def test_posture_signal_digest_is_order_independent():
+    a = SimpleNamespace(
+        signal_type="pain", severity_hint="caution", body_region="knee",
+        lifecycle="active", related_issue_id="LL-18")
+    b = SimpleNamespace(
+        signal_type="neurological", severity_hint="red_flag",
+        body_region=None, lifecycle="active", related_issue_id=None)
+    assert compute_signals_digest([a, b]) == compute_signals_digest([b, a])

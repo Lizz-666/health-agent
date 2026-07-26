@@ -116,7 +116,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -129,6 +129,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/7660/exercise-at-home-with-youtube-videos-to-avoid-and-videos-to-watch/",
+      "license": null,
+      "scope": "Item review for ex_warmup_march_in_place (March in Place). March-in-place warm-up review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -139,7 +159,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -247,7 +267,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -260,6 +280,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/5779/the-common-mistakes-people-make-when-warming-up/",
+      "license": null,
+      "scope": "Item review for ex_warmup_arm_circles (Arm Circles). Arm-circle warm-up review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -269,7 +309,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -380,7 +420,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -393,6 +433,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/6289/4-stretches-to-prevent-injury/",
+      "license": null,
+      "scope": "Item review for ex_warmup_leg_swing (Leg Swings). Leg-swing dynamic warm-up review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -402,7 +462,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -514,7 +574,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -527,6 +587,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/equipment/resistance-bands-cables/",
+      "license": null,
+      "scope": "Item review for ex_warmup_band_pull_apart (Band Pull-Apart). Resistance-band pull-apart equipment and movement review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -537,7 +617,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -652,8 +732,28 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/15/cat-cow/",
+      "license": null,
+      "scope": "Item review for ex_mobility_cat_cow (Cat-Cow). Cat-Cow setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
       "verified_date": "2026-07-26"
      }
     ],
@@ -662,7 +762,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -775,8 +875,28 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/5779/the-common-mistakes-people-make-when-warming-up/",
+      "license": null,
+      "scope": "Item review for ex_mobility_thoracic_rotation (Thoracic Rotation). Thoracic-rotation warm-up review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
       "verified_date": "2026-07-26"
      }
     ],
@@ -785,7 +905,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -905,7 +1025,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -918,6 +1038,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/6289/4-stretches-to-prevent-injury/",
+      "license": null,
+      "scope": "Item review for ex_mobility_worlds_greatest_stretch (World's Greatest Stretch). World's Greatest Stretch movement review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -927,7 +1067,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -1043,7 +1183,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -1056,6 +1196,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/142/kneeling-hip-flexor-stretch/",
+      "license": null,
+      "scope": "Item review for ex_mobility_hip_flexor_stretch (Hip Flexor Stretch). Kneeling hip-flexor stretch setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -1065,7 +1225,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -1178,8 +1338,28 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/experience/beginner/",
+      "license": null,
+      "scope": "Item review for ex_mobility_neck_nods (Neck Nods). Beginner neck-mobility scope review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
       "verified_date": "2026-07-26"
      }
     ],
@@ -1188,7 +1368,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -1310,7 +1490,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -1323,6 +1503,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/135/bodyweight-squat/",
+      "license": null,
+      "scope": "Item review for ex_strength_bodyweight_squat (Bodyweight Squat). Bodyweight squat setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -1334,7 +1534,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -1451,7 +1651,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -1464,6 +1664,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/49/glute-bridge/",
+      "license": null,
+      "scope": "Item review for ex_strength_glute_bridge (Glute Bridge). Glute bridge setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -1474,7 +1694,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -1592,7 +1812,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -1605,6 +1825,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/41/push-up/",
+      "license": null,
+      "scope": "Item review for ex_strength_push_up (Push-Up). Push-up setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -1615,7 +1855,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -1734,7 +1974,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -1747,6 +1987,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/32/front-plank/",
+      "license": null,
+      "scope": "Item review for ex_strength_plank (Plank). Front plank setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -1756,7 +2016,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -1874,7 +2134,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -1887,6 +2147,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/94/forward-lunge/",
+      "license": null,
+      "scope": "Item review for ex_strength_lunge (Lunge). Forward lunge setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -1897,7 +2177,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -2012,7 +2292,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -2025,6 +2305,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/48/seated-row/",
+      "license": null,
+      "scope": "Item review for ex_strength_band_seated_row (Band Seated Row). Seated row setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -2036,7 +2336,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -2146,7 +2446,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -2159,6 +2459,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/equipment/resistance-bands-cables/",
+      "license": null,
+      "scope": "Item review for ex_strength_band_front_press (Band Front Press). Resistance-band front press equipment and movement review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -2169,7 +2489,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -2276,7 +2596,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -2289,6 +2609,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/322/standing-bicep-curl/",
+      "license": null,
+      "scope": "Item review for ex_strength_band_bicep_curl (Band Bicep Curl). Standing band bicep curl setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -2299,7 +2639,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -2412,8 +2752,28 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/124/supine-snow-angel-wipers-exercise/",
+      "license": null,
+      "scope": "Item review for ex_corrective_wall_angel (Wall Angel). Snow-angel movement used to review wall-angel form intent. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
       "verified_date": "2026-07-26"
      }
     ],
@@ -2422,7 +2782,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -2533,8 +2893,28 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/147/supine-dead-bug/",
+      "license": null,
+      "scope": "Item review for ex_corrective_dead_bug (Dead Bug). Supine dead-bug setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
       "verified_date": "2026-07-26"
      }
     ],
@@ -2543,7 +2923,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -2659,8 +3039,28 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/14/bird-dog/",
+      "license": null,
+      "scope": "Item review for ex_corrective_bird_dog (Bird-Dog). Bird-dog setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
       "verified_date": "2026-07-26"
      }
     ],
@@ -2669,7 +3069,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -2784,7 +3184,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -2797,6 +3197,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/equipment/resistance-bands-cables/",
+      "license": null,
+      "scope": "Item review for ex_corrective_band_face_pull (Band Face Pull). Resistance-band face-pull equipment and movement review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -2807,7 +3227,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -2923,8 +3343,28 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/227/childs-pose/",
+      "license": null,
+      "scope": "Item review for ex_recovery_child_pose (Child's Pose). Child's Pose setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
       "verified_date": "2026-07-26"
      }
     ],
@@ -2933,7 +3373,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -3035,8 +3475,28 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/continuing-education/certified/july-2024/8662/stress-and-low-back-pain-breaking-the-cycle/",
+      "license": null,
+      "scope": "Item review for ex_recovery_deep_breathing (Deep Breathing). Diaphragmatic breathing practice review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
       "verified_date": "2026-07-26"
      }
     ],
@@ -3045,7 +3505,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   },
   {
@@ -3157,7 +3617,7 @@
       "name": "Health project Phase 3 training catalog (project-authored)",
       "pinned_version": "content v1, 2026-07-26",
       "url": "backend/app/training/data/exercises.v1.json",
-      "license": "Project-authored (repository license)",
+      "license": null,
       "scope": "Project-authored curated content for personal-development validation.",
       "verified_date": "2026-07-26"
      },
@@ -3170,6 +3630,26 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/3761/how-to-improve-flexibility-and-maintain-it/",
+      "license": null,
+      "scope": "Item review for ex_recovery_band_hamstring_stretch (Band Hamstring Stretch). Hamstring flexibility practice review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -3180,7 +3660,7 @@
     "review_scope": "personal_development",
     "reviewer_role": "project_reviewer",
     "reviewed_at": "2026-07-26",
-    "content_version": "v1"
+    "content_version": "2026-07-26-v1"
    }
   }
  ]

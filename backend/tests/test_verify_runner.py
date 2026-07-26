@@ -94,3 +94,29 @@ def test_runner_itself_is_lint_clean():
     assert hasattr(verify, "_parse_junit")
     assert hasattr(verify, "RUFF_PIN")
     assert callable(verify.main)
+
+
+def test_missing_junit_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.setattr(verify.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(verify, "_run", lambda *args, **kwargs: (0, "ok", ""))
+    result = verify._run_pytest("fast")
+    assert result.ok is False
+    assert "no JUnit" in result.detail
+
+
+def test_corrupt_junit_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.setattr(verify.tempfile, "gettempdir", lambda: str(tmp_path))
+
+    def fake_run(*args, **kwargs):
+        (tmp_path / "verify-junit.xml").write_text("<broken", encoding="utf-8")
+        return 0, "ok", ""
+
+    monkeypatch.setattr(verify, "_run", fake_run)
+    result = verify._run_pytest("fast")
+    assert result.ok is False
+
+
+def test_all_zero_diff_base_uses_default_branch(tmp_path, monkeypatch):
+    monkeypatch.setenv("VERIFY_DEFAULT_BRANCH", "main")
+    monkeypatch.setattr(verify, "_run", lambda *args, **kwargs: (0, "", ""))
+    assert verify._resolve_diff_base("0" * 40) == "origin/main"

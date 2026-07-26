@@ -15,12 +15,15 @@ Covers the Task 3 acceptance criteria against the real
 from __future__ import annotations
 
 import hashlib
+import json
 import re
+import shutil
 from pathlib import Path
 
 import pytest
 
 from app.training.knowledge import (
+    CatalogValidationError,
     build_index,
     load_catalog,
     recommendation_ready,
@@ -163,9 +166,24 @@ def test_every_exercise_has_traceable_personal_dev_provenance(catalog):
         assert p.review_scope == ReviewScope.personal_development
         assert p.reviewer_role and p.reviewer_role.strip()
         assert p.reviewed_at <= catalog.published_at
+        assert any(s.source_type.value in {
+            "guideline", "position_stand", "professional_reference"
+        } for s in p.sources), ex.exercise_id
         for s in p.sources:
             assert s.source_id and s.pinned_version and s.url
             assert s.verified_date
+
+
+def test_every_exercise_has_item_level_ace_and_acsm_evidence(catalog):
+    ace_urls = set()
+    for ex in catalog.exercises:
+        sources = {source.source_id: source for source in ex.provenance.sources}
+        ace = sources["ace-exercise-references-2026"]
+        assert ex.exercise_id in ace.scope
+        assert ace.url != "https://www.acefitness.org/"
+        ace_urls.add(ace.url)
+        assert "acsm-resistance-training-2026" in sources
+    assert len(ace_urls) >= 12
 
 
 def test_no_public_or_professional_approval_claim(catalog):
@@ -183,9 +201,78 @@ def test_source_manifest_and_notices_pinned():
     notices_path = Path("app/training/data/THIRD_PARTY_NOTICES.md")
     assert manifest_path.exists() and notices_path.exists()
     text = notices_path.read_text(encoding="utf-8")
-    # The pinned upstream commit and the MIT notice must be retained verbatim.
+    # The pinned upstream commit and complete license blocks are byte-pinned.
     assert "7455efae41b330c265e7cd4b78dfa848e7ce5ebd" in text
-    assert "MIT License" in text
-    # The Gym visual media exception must be present (media is excluded).
-    assert "Gym visual" in text
+    blocks = re.findall(r"```\n(.*?)\n```", text, flags=re.DOTALL)
+    assert len(blocks) == 2
+    hashes = [hashlib.sha256(block.encode("utf-8")).hexdigest()
+              for block in blocks]
+    assert hashes == [
+        "cf559f90770b54ee0b1c689d128017a5b1761a6fab0d6abd67c48a2af2354700",
+        "45450fa8a861ee7855ab831f64069e1a228c0b0a99c07ad3cde8ca21b0c7812b",
+    ]
+    assert "MEDIA EXCEPTION" in blocks[0]
     assert "77f25a922b51be7d96bd051c5d2096959f0d61a8" in text
+    assert "Copyright (c) 2026 Hasan Emir Yıldırım" in text
+    assert "Copyright (c) 2023 Mathias Bradiceanu" in text
+
+
+def _copy_release(tmp_path):
+    root = tmp_path / "release"
+    data_dir = root / "backend" / "app" / "training" / "data"
+    assets = root / "assets" / "training" / "illustrations"
+    data_dir.mkdir(parents=True)
+    shutil.copy(CATALOG_PATH, data_dir / CATALOG_PATH.name)
+    shutil.copy(
+        CATALOG_PATH.with_name("source_manifest.v1.json"),
+        data_dir / "source_manifest.v1.json")
+    shutil.copytree(
+        REPO_ROOT / "assets" / "training" / "illustrations", assets)
+    return data_dir / CATALOG_PATH.name, assets
+
+
+def test_release_loader_rejects_tampered_illustration(tmp_path):
+    catalog_path, assets = _copy_release(tmp_path)
+    data = json.loads(catalog_path.read_text(encoding="utf-8"))
+    asset = assets / Path(data["exercises"][0]["illustration"]["asset_key"]).name
+    asset.write_text(asset.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    with pytest.raises(CatalogValidationError) as exc:
+        load_catalog(catalog_path)
+    assert "illustration_hash_mismatch" in [i.code for i in exc.value.issues]
+
+
+def test_release_loader_rejects_unsafe_svg_even_with_matching_hash(tmp_path):
+    catalog_path, assets = _copy_release(tmp_path)
+    data = json.loads(catalog_path.read_text(encoding="utf-8"))
+    illustration = data["exercises"][0]["illustration"]
+    asset = assets / Path(illustration["asset_key"]).name
+    unsafe = b'<svg xmlns="http://www.w3.org/2000/svg"><script/></svg>'
+    asset.write_bytes(unsafe)
+    illustration["provenance"]["content_hash"] = hashlib.sha256(unsafe).hexdigest()
+    catalog_path.write_text(
+        json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(CatalogValidationError) as exc:
+        load_catalog(catalog_path)
+    assert "illustration_unsafe_content" in [i.code for i in exc.value.issues]
+
+
+def test_release_loader_rejects_unregistered_item_source(tmp_path):
+    catalog_path, _ = _copy_release(tmp_path)
+    data = json.loads(catalog_path.read_text(encoding="utf-8"))
+    data["exercises"][0]["provenance"]["sources"][0]["source_id"] = "ghost"
+    catalog_path.write_text(
+        json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(CatalogValidationError) as exc:
+        load_catalog(catalog_path)
+    assert "unregistered_source" in [i.code for i in exc.value.issues]
+
+
+def test_release_loader_rejects_source_pin_mismatch(tmp_path):
+    catalog_path, _ = _copy_release(tmp_path)
+    data = json.loads(catalog_path.read_text(encoding="utf-8"))
+    data["exercises"][0]["provenance"]["sources"][0]["pinned_version"] = "old"
+    catalog_path.write_text(
+        json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(CatalogValidationError) as exc:
+        load_catalog(catalog_path)
+    assert "source_manifest_mismatch" in [i.code for i in exc.value.issues]

@@ -143,4 +143,9 @@ async def client():
 
 
 # Register PG fixtures from conftest_pg (pytest only auto-discovers conftest.py)
-from tests.conftest_pg import pg_dsn, pg_session, pg_session_factory  # noqa: F401, E402
+from tests.conftest_pg import (  # noqa: F401, E402
+    pg_dsn,
+    pg_session,
+    pg_session_factory,
+    record_pg_test_execution,
+)

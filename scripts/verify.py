@@ -3,15 +3,15 @@
 
 Usage (from the repository root, on Windows or Linux):
 
-    python scripts/verify.py fast   # ruff + SQLite backend tests + git diff --check
+    python scripts/verify.py fast   # ruff + targeted Phase 3 SQLite tests + diff
     python scripts/verify.py full   # ruff + complete backend tests (+ PostgreSQL 16
                                     #   when available) + git diff --check
 
 Design contract (docs/product/roadmap.md section 13.1 and the Phase 3 plan):
 
-- ``fast`` is the fast feedback layer: deterministic targeted lint + the backend
-  test suite on SQLite (PostgreSQL-backed tests skip when no Docker/DSN is
-  available - this is the designed gate, never a hidden failure).
+- ``fast`` is the fast feedback layer: deterministic lint + targeted Phase 3
+  tests on SQLite. PostgreSQL-backed cases are explicitly disabled in this
+  layer and remain mandatory in Full.
 - ``full`` is the integration / phase-exit layer: it runs the COMPLETE backend
   suite. When ``PG_TEST_DSN`` is set (or Docker is reachable) the real
   PostgreSQL 16 tests execute. When the caller additionally sets
@@ -49,6 +49,21 @@ BACKEND_DIR = REPO_ROOT / "backend"
 # the runtime dependency set by design). CI installs this exact pinned version;
 # locally the runner only requires that SOME ruff answers ``--version``.
 RUFF_PIN = "0.15.22"
+FAST_TEST_TARGETS = [
+    "tests/test_training_schema.py",
+    "tests/test_training_sources.py",
+    "tests/test_training_catalog.py",
+    "tests/test_training_context.py",
+    "tests/test_training_safety.py",
+    "tests/test_training_policy.py",
+    "tests/test_training_candidates.py",
+    "tests/test_training_properties.py",
+    "tests/test_training_validator.py",
+    "tests/test_training_tools.py",
+    "tests/test_training_integration.py",
+    "tests/test_phase3_e2e.py",
+    "tests/test_verify_runner.py",
+]
 
 
 class StepResult:
@@ -149,18 +164,71 @@ def _parse_junit(path: Path) -> Tuple[int, int, int, int]:
     return total, passed, failed, skipped
 
 
+def _first_junit_error(path: Path) -> str:
+    """Return the first actionable failure/error from a JUnit report."""
+    root = ET.parse(path).getroot()
+    for case in root.iter("testcase"):
+        problem = case.find("failure")
+        if problem is None:
+            problem = case.find("error")
+        if problem is not None:
+            node = "::".join(filter(None, (
+                case.get("classname"), case.get("name"))))
+            message = (problem.get("message") or problem.text or "").strip()
+            first_line = message.splitlines()[0] if message else "test failed"
+            return f"first failure: {node}: {first_line[:500]}"
+    return ""
+
+
+def _collect_expected_pg_tests(env: dict) -> Tuple[bool, int, str]:
+    """Collect the explicitly marked PostgreSQL tests before Full execution."""
+    rc, out, err = _run(
+        [sys.executable, "-m", "pytest", "tests", "--collect-only", "-q",
+         "-m", "requires_pg"],
+        BACKEND_DIR,
+        env=env,
+    )
+    nodeids = {
+        line.strip() for line in out.splitlines()
+        if "::" in line and line.strip().startswith("tests/")
+    }
+    detail = (out + err).strip()
+    return rc == 0 and bool(nodeids), len(nodeids), detail
+
+
 def _run_pytest(mode: str) -> StepResult:
     """Run the backend suite. ``mode`` is ``fast`` or ``full``."""
     junit_path = Path(tempfile.gettempdir()) / "verify-junit.xml"
     if junit_path.exists():
         junit_path.unlink()
     env = {"PYTHONDONTWRITEBYTECODE": "1"}
+    targets = ["tests"] if mode == "full" else FAST_TEST_TARGETS
+    if mode == "fast":
+        env["VERIFY_SKIP_PG"] = "1"
+    require_pg = (
+        mode == "full"
+        and os.environ.get("VERIFY_REQUIRE_PG", "").strip() == "1"
+    )
+    pg_evidence_path = Path(tempfile.gettempdir()) / "verify-pg-evidence.txt"
+    if require_pg:
+        if pg_evidence_path.exists():
+            pg_evidence_path.unlink()
+        env["PG_TEST_EVIDENCE_FILE"] = str(pg_evidence_path)
+        collected, expected_pg, collection_detail = _collect_expected_pg_tests(env)
+        if not collected:
+            return StepResult(
+                "pytest backend", ok=False,
+                detail=("PostgreSQL test collection failed or found no "
+                        "requires_pg tests:\n" + collection_detail[-2000:]),
+            )
+    else:
+        expected_pg = 0
     rc, out, err = _run(
         [
             sys.executable,
             "-m",
             "pytest",
-            "tests",
+            *targets,
             "-q",
             f"--junitxml={junit_path}",
         ],
@@ -176,27 +244,39 @@ def _run_pytest(mode: str) -> StepResult:
         except ET.ParseError:
             parsed = False
 
-    # Base success on pytest's own return code: 0 == all passed (pytest returns
-    # 0 only when nothing failed/errored, regardless of skips).
-    ok = rc == 0
+    ok = rc == 0 and parsed
     if not parsed:
         tail = (out + err).strip().splitlines()
         detail = "pytest produced no JUnit report:\n" + "\n".join(tail[-12:])
-        return StepResult("pytest backend", ok=ok, detail=detail)
+        return StepResult("pytest backend", ok=False, detail=detail)
 
     # Full CI contract: when the caller demands PostgreSQL, ANY skip is a hard
     # failure (the guarded DSN must make every PG-backed test run).
-    require_pg = os.environ.get("VERIFY_REQUIRE_PG", "").strip() == "1"
-    if mode == "full" and require_pg and skipped > 0:
+    pg_actual = 0
+    pg_version_present = False
+    if require_pg and pg_evidence_path.exists():
+        evidence = pg_evidence_path.read_text(encoding="utf-8").splitlines()
+        pg_actual = len({line[5:] for line in evidence if line.startswith("TEST:")})
+        pg_version_present = any(line.startswith("VERSION:") for line in evidence)
+    if require_pg and (
+        skipped > 0 or not pg_version_present or pg_actual != expected_pg
+    ):
         ok = False
 
     detail = (
         f"{passed} passed, {failed} failed, {skipped} skipped "
         f"(of {total})"
     )
-    if mode == "full" and require_pg:
-        detail += " [VERIFY_REQUIRE_PG=1: skips are hard failures]"
+    if require_pg:
+        detail += (
+            " [VERIFY_REQUIRE_PG=1: skips are hard failures; "
+            f"PostgreSQL expected={expected_pg} actual={pg_actual} "
+            f"version_evidence={'present' if pg_version_present else 'MISSING'}]"
+        )
     if not ok:
+        first_error = _first_junit_error(junit_path)
+        if first_error:
+            detail += "\n" + first_error
         tail = (out + err).strip().splitlines()
         detail += "\n" + "\n".join(tail[-20:])
     return StepResult(
@@ -210,21 +290,59 @@ def _run_pytest(mode: str) -> StepResult:
 
 
 def _run_git_diff_check() -> StepResult:
-    rc, out, err = _run(
-        ["git", "diff", "--check"], REPO_ROOT
+    commands = [
+        ["git", "diff", "--check"],
+        ["git", "diff", "--cached", "--check"],
+    ]
+    diff_base = _resolve_diff_base(
+        os.environ.get("VERIFY_DIFF_BASE", "").strip())
+    commands.append(
+        ["git", "diff", "--check", f"{diff_base}...HEAD"]
+        if diff_base
+        else ["git", "show", "--check", "--format=", "HEAD"]
     )
-    tail = (out + err).strip()
+    outputs = []
+    ok = True
+    for command in commands:
+        rc, out, err = _run(command, REPO_ROOT)
+        ok = ok and rc == 0
+        if (out + err).strip():
+            outputs.append((out + err).strip())
+    tail = "\n".join(outputs)
     return StepResult(
-        "git diff --check",
-        ok=rc == 0,
-        detail=tail or "clean (no whitespace errors / conflict markers)",
+        "git candidate diff --check",
+        ok=ok,
+        detail=tail or "working, staged, and candidate diff are clean",
     )
+
+
+def _resolve_diff_base(diff_base: str) -> str:
+    """Resolve GitHub's all-zero first-push base to a real fetched ref."""
+    if diff_base and set(diff_base) == {"0"}:
+        default_branch = os.environ.get("VERIFY_DEFAULT_BRANCH", "").strip()
+        candidate = f"origin/{default_branch}" if default_branch else ""
+        if candidate:
+            rc, _, _ = _run(
+                ["git", "rev-parse", "--verify", candidate], REPO_ROOT)
+            if rc == 0:
+                return candidate
+        return "HEAD^"
+    return diff_base
 
 
 def _print_summary(mode: str, steps: List[StepResult]) -> int:
     lines: List[str] = []
     lines.append("=" * 72)
     lines.append(f"verify.py {mode}  (LOCAL evidence, not GitHub CI)")
+    lines.append(
+        f"workflow={os.environ.get('GITHUB_WORKFLOW', 'local')} "
+        f"sha={os.environ.get('GITHUB_SHA', 'local')} "
+        f"job={os.environ.get('GITHUB_JOB', 'local')}"
+    )
+    lines.append(
+        f"diff_base={_resolve_diff_base(os.environ.get('VERIFY_DIFF_BASE', '').strip()) or 'HEAD'} "
+        f"artifact={os.environ.get('VERIFY_ARTIFACT_NAME', 'none')}"
+    )
     lines.append("=" * 72)
     for s in steps:
         counts = ""

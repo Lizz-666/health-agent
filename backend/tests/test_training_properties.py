@@ -60,12 +60,18 @@ def _build(goal, bw, band, posture_goals, pain_regions, experience):
         "checkin": {"present": True, "local_date": "2026-07-26",
                     "recomputed_risk": "normal", "token": "t"},
         "retained_pain": [],
-        "posture": {"active_signals_digest": None, "global_risk_tier": "normal",
+        "posture": {"active_signals_digest": "empty-signals-digest", "global_risk_tier": "normal",
                     "risk_version": "rv",
-                    "goals": [{"issue_id": i, "active": True, "blocked": False}
+                    "goals": [{
+                        "issue_id": i, "active": True, "blocked": False,
+                        "confirmed_at": EVAL_AT, "suggestion_id": "s1",
+                        "profile_version": "pv1", "rule_version": "rv1",
+                        "risk_version": "rv",
+                    }
                               for i in posture_goals]},
         "request": {"fitness_goal": goal, "equipment_bodyweight": bw,
                     "equipment_resistance_band": band,
+                    "weekly_frequency": 3, "session_duration_minutes": 30,
                     "iana_timezone": "Asia/Shanghai"},
         "versions": {"policy_version": "v1", "catalog_version":
                      CATALOG.content_version, "source_manifest_version": "v1",

@@ -23,6 +23,7 @@ from typing import Dict, List, Optional
 
 from app.training.knowledge import build_index, recommendation_ready
 from app.training.policy import TrainingPolicy
+from app.training.safety import SafetyPolicy, classify_safety, compose_fingerprint
 from app.training.schemas import (
     CandidateResult,
     ExerciseCatalog,
@@ -55,11 +56,18 @@ def validate_plan(
     candidate_result: CandidateResult,
     catalog: ExerciseCatalog,
     policy: TrainingPolicy,
+    safety_policy: SafetyPolicy,
 ) -> PlanValidationResult:
     """Validate a draft plan. Pure; never mutates ``draft``."""
+    supplied_decision = decision
+    decision = classify_safety(context, safety_policy)
     gate = decision.gate_status
     conservative = gate is GateStatus.eligible_conservative
     violations: List[PlanViolation] = []
+    if supplied_decision != decision:
+        violations.append(_v(
+            "stale_safety_decision", "plan",
+            "supplied decision does not match current safety classification"))
 
     # Blocked context -> invalid (fail closed, no candidate checks).
     if gate in _BLOCKING_GATES:
@@ -73,7 +81,22 @@ def validate_plan(
             catalog_version=catalog.content_version,
             policy_version=policy.policy_version)
 
-    # Fingerprint + version freshness.
+    # Fingerprint + version freshness. Every layer is bound to the same current
+    # context; callers cannot splice an eligible decision or candidate set from
+    # another user/version into this validation.
+    current_fingerprint = compose_fingerprint(context)
+    if decision.fingerprint != current_fingerprint:
+        violations.append(_v(
+            "stale_context_fingerprint", "plan",
+            "decision fingerprint != current context fingerprint"))
+    if candidate_result.decision_fingerprint != current_fingerprint:
+        violations.append(_v(
+            "stale_candidate_result", "plan",
+            "candidate fingerprint != current context fingerprint"))
+    if candidate_result.gate_status != gate:
+        violations.append(_v(
+            "stale_candidate_result", "plan",
+            "candidate gate != current safety gate"))
     if draft.source_context_fingerprint != decision.fingerprint:
         violations.append(_v(
             "stale_context_fingerprint", "plan",
@@ -81,16 +104,35 @@ def validate_plan(
     if draft.catalog_version != catalog.content_version:
         violations.append(_v(
             "version_mismatch", "plan", "catalog_version mismatch"))
-    if draft.policy_version != context.versions.policy_version:
+    if (draft.policy_version != context.versions.policy_version
+            or draft.policy_version != policy.policy_version
+            or candidate_result.policy_version != policy.policy_version):
         violations.append(_v(
             "version_mismatch", "plan", "policy_version mismatch"))
-    if draft.source_manifest_version != context.versions.source_manifest_version:
+    if (draft.source_manifest_version != context.versions.source_manifest_version
+            or draft.source_manifest_version != catalog.source_manifest_version):
         violations.append(_v(
             "version_mismatch", "plan", "source_manifest_version mismatch"))
-    if (draft.profile_version is not None
-            and draft.profile_version != context.health.profile_version):
+    if draft.profile_version != context.health.profile_version:
         violations.append(_v(
             "version_mismatch", "plan", "profile_version mismatch"))
+    if candidate_result.catalog_version != catalog.content_version:
+        violations.append(_v(
+            "stale_candidate_result", "plan",
+            "candidate catalog_version mismatch"))
+    if context.versions.catalog_version != catalog.content_version:
+        violations.append(_v(
+            "version_mismatch", "plan", "context catalog_version mismatch"))
+    if policy.policy_version not in catalog.policy_compatibility:
+        violations.append(_v(
+            "version_mismatch", "plan", "catalog/policy compatibility mismatch"))
+    requested_goal = context.request.fitness_goal
+    if hasattr(requested_goal, "value"):
+        requested_goal = requested_goal.value
+    if not requested_goal or draft.requested_goal != requested_goal:
+        violations.append(_v(
+            "requested_goal_mismatch", "plan",
+            "draft requested_goal != current request goal"))
 
     # Timeline: exactly weeks 1-4; session_order unique within each week.
     weeks_present = sorted({s.week_index for s in draft.sessions})
@@ -107,6 +149,12 @@ def validate_plan(
             violations.append(_v(
                 "timeline_invalid", f"week{week}",
                 "duplicate session_order within the week"))
+        chronological = sorted(sess, key=lambda item: item.day_of_week)
+        expected_orders = list(range(1, len(chronological) + 1))
+        if [item.session_order for item in chronological] != expected_orders:
+            violations.append(_v(
+                "timeline_invalid", f"week{week}",
+                "session_order must be contiguous and follow day_of_week"))
 
     index = build_index(catalog)
     ready_ids = {
@@ -131,6 +179,21 @@ def validate_plan(
             violations.append(_v(
                 "duplicate_exercise_in_session", scope,
                 "same exercise appears more than once in the session"))
+        ex_id_set = set(ex_ids)
+        incompatible_pairs = set()
+        for exercise_id in ex_id_set:
+            exercise = index.get(exercise_id)
+            if exercise is None:
+                continue
+            related = set(
+                exercise.progression_ids + exercise.regression_ids
+                + exercise.substitution_ids)
+            for other in ex_id_set & related:
+                incompatible_pairs.add(tuple(sorted((exercise_id, other))))
+        for first, second in sorted(incompatible_pairs):
+            violations.append(_v(
+                "incompatible_combination", scope,
+                f"{first} and related variant {second} share one session"))
         for p in s.prescriptions:
             _check_prescription(
                 p, index, ready_ids, candidate_ids, conservative,
@@ -166,10 +229,20 @@ def validate_plan(
         prev_ord = ordinal
 
     exercise_days: Dict[str, List[int]] = defaultdict(list)
+    exercise_week_days: Dict[tuple, set] = defaultdict(set)
+    pattern_uses: Dict[str, Dict[int, tuple]] = defaultdict(dict)
     for s in draft.sessions:
         ordinal = (s.week_index - 1) * 7 + (s.day_of_week - 1)
         for p in s.prescriptions:
             exercise_days[p.exercise_id].append(ordinal)
+            exercise_week_days[(p.exercise_id, s.week_index)].add(ordinal)
+            ex = index.get(p.exercise_id)
+            if ex is not None:
+                for pattern in ex.movement_patterns:
+                    existing = pattern_uses[pattern].get(ordinal)
+                    floor = ex.prescription.recovery_hours_min
+                    if existing is None or floor > existing[0]:
+                        pattern_uses[pattern][ordinal] = (floor, p.exercise_id)
     for eid, days in exercise_days.items():
         ex = index.get(eid)
         floor = ex.prescription.recovery_hours_min if ex else 0
@@ -179,6 +252,25 @@ def validate_plan(
                 violations.append(_v(
                     "recovery_violation", f"exercise:{eid}",
                     f"re-used before its recovery_hours_min ({floor}h) elapsed"))
+    for (eid, week), days in exercise_week_days.items():
+        ex = index.get(eid)
+        if ex and len(days) > ex.prescription.weekly_sessions_max:
+            violations.append(_v(
+                "weekly_exercise_frequency_exceeded", f"week{week}",
+                f"{eid} exceeds weekly_sessions_max "
+                f"{ex.prescription.weekly_sessions_max}"))
+    for pattern, uses_by_day in pattern_uses.items():
+        ordered_uses = sorted(
+            (day, floor, eid)
+            for day, (floor, eid) in uses_by_day.items())
+        for previous, current in zip(ordered_uses, ordered_uses[1:]):
+            prev_day, prev_floor, prev_eid = previous
+            day, floor, eid = current
+            required = max(prev_floor, floor)
+            if (day - prev_day) * 24 < required:
+                violations.append(_v(
+                    "movement_pattern_recovery_violation", f"pattern:{pattern}",
+                    f"{prev_eid} -> {eid} repeats before {required}h"))
 
     return PlanValidationResult(
         valid=not violations,
@@ -244,11 +336,29 @@ def _check_prescription(p, index, ready_ids, candidate_ids, conservative,
             violations.append(_v(
                 "relation_misuse", scope,
                 f"{p.exercise_id} relation_reason {reason!r} unknown"))
-        elif reason in ("progression", "regression", "substitution"):
-            rel_ids = {"progression": ex.progression_ids,
-                       "regression": ex.regression_ids,
-                       "substitution": ex.substitution_ids}[reason]
-            if not rel_ids:
+        elif reason == "primary":
+            if p.relation_source_exercise_id is not None:
                 violations.append(_v(
                     "relation_misuse", scope,
-                    f"{p.exercise_id} has no {reason} relation defined"))
+                    "primary exercise cannot declare a relation source"))
+        elif reason in ("progression", "regression", "substitution"):
+            source = index.get(p.relation_source_exercise_id or "")
+            if source is None:
+                violations.append(_v(
+                    "relation_misuse", scope,
+                    f"{reason} requires a valid relation_source_exercise_id"))
+            else:
+                rel_ids = {
+                    "progression": source.progression_ids,
+                    "regression": source.regression_ids,
+                    "substitution": source.substitution_ids,
+                }[reason]
+                if p.exercise_id not in rel_ids:
+                    violations.append(_v(
+                        "relation_misuse", scope,
+                        f"{p.exercise_id} is not a {reason} of "
+                        f"{source.exercise_id}"))
+    elif p.relation_source_exercise_id is not None:
+        violations.append(_v(
+            "relation_misuse", scope,
+            "relation_source_exercise_id requires relation_reason"))

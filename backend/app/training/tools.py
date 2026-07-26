@@ -35,7 +35,7 @@ from app.training.validator import validate_plan
 
 async def validate_training_plan(
     db: AsyncSession,
-    user_id: str,
+    principal_user_id: str,
     draft: TrainingPlanDraft,
     *,
     request: RequestSnapshot,
@@ -53,7 +53,7 @@ async def validate_training_plan(
     mutated.
     """
     context = await build_context(
-        db, user_id, request=request, policy=safety_policy,
+        db, principal_user_id, request=request, policy=safety_policy,
         catalog_version=catalog_version or catalog.content_version,
         source_manifest_version=source_manifest_version,
         evaluated_at_utc=evaluated_at_utc,
@@ -62,4 +62,5 @@ async def validate_training_plan(
     candidate_result = select_candidates(
         context, decision, catalog, training_policy, safety_policy)
     return validate_plan(
-        draft, context, decision, candidate_result, catalog, training_policy)
+        draft, context, decision, candidate_result, catalog, training_policy,
+        safety_policy)

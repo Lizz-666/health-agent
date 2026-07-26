@@ -27,9 +27,10 @@ from __future__ import annotations
 
 from typing import List
 
+from app.posture.knowledge import get_issue_by_id
 from app.training.knowledge import build_index, recommendation_ready
 from app.training.policy import TrainingPolicy
-from app.training.safety import SafetyPolicy
+from app.training.safety import SafetyPolicy, classify_safety, compose_fingerprint
 from app.training.schemas import (
     Candidate,
     CandidateResult,
@@ -63,6 +64,54 @@ def _requested_equipment(ctx: TrainingSafetyContext) -> set:
     return out
 
 
+def _context_is_current(
+    ctx: TrainingSafetyContext,
+    decision: TrainingSafetyDecision,
+    catalog: ExerciseCatalog,
+    policy: TrainingPolicy,
+    safety_policy: SafetyPolicy,
+) -> bool:
+    """Bind selection to one complete, current request and version set."""
+    request = ctx.request
+    request_goal = (
+        request.fitness_goal.value
+        if hasattr(request.fitness_goal, "value") else request.fitness_goal
+    )
+    request_equipment = _requested_equipment(ctx)
+    available_equipment = set()
+    if ctx.health.equipment_bodyweight:
+        available_equipment.add("bodyweight")
+    if ctx.health.equipment_resistance_band:
+        available_equipment.add("resistance_band")
+    if any(value is None for value in (
+            request_goal, request.weekly_frequency,
+            request.session_duration_minutes)):
+        return False
+    if not request_equipment or not request_equipment.issubset(available_equipment):
+        return False
+    if request_goal != ctx.health.fitness_goal:
+        return False
+    if request.weekly_frequency != ctx.health.weekly_frequency:
+        return False
+    if request.session_duration_minutes != ctx.health.session_duration_minutes:
+        return False
+    if decision != classify_safety(ctx, safety_policy):
+        return False
+    if decision.training_policy_version != ctx.versions.policy_version:
+        return False
+    if safety_policy.policy_version != ctx.versions.policy_version:
+        return False
+    if policy.policy_version != ctx.versions.policy_version:
+        return False
+    if catalog.content_version != ctx.versions.catalog_version:
+        return False
+    if catalog.source_manifest_version != ctx.versions.source_manifest_version:
+        return False
+    if policy.policy_version not in catalog.policy_compatibility:
+        return False
+    return True
+
+
 def _exclude_reasons(
     ex: Exercise, ctx: TrainingSafetyContext, policy: TrainingPolicy,
     conservative: bool, ready_ids: set,
@@ -78,13 +127,18 @@ def _exclude_reasons(
         reasons.append("equipment_incompatible")
 
     goal = ctx.request.fitness_goal
+    if hasattr(goal, "value"):
+        goal = goal.value
     ex_goals = {g.value for g in ex.goals}
     if goal and goal not in ex_goals:
         reasons.append("goal_not_matched")
 
-    active_goal_issues = {
-        g.issue_id for g in ctx.posture.goals if g.active and not g.blocked
-    }
+    active_goal_issues = set()
+    for goal in ctx.posture.goals:
+        if not goal.active or goal.blocked:
+            continue
+        issue = get_issue_by_id(goal.issue_id)
+        active_goal_issues.add(issue["category"] if issue else goal.issue_id)
     applicable = set(ex.applicable_posture_signals)
     # General exercises (no posture mapping) are applicable to any goal; a
     # specific exercise must intersect at least one confirmed goal signal.
@@ -118,7 +172,7 @@ def select_candidates(
     decision: TrainingSafetyDecision,
     catalog: ExerciseCatalog,
     policy: TrainingPolicy,
-    safety_policy: SafetyPolicy,  # noqa: ARG001  (reserved for future rule hooks)
+    safety_policy: SafetyPolicy,
 ) -> CandidateResult:
     """Select a deterministic candidate set for an eligible user."""
     gate = decision.gate_status
@@ -129,6 +183,18 @@ def select_candidates(
         return CandidateResult(
             gate_status=gate,
             decision_fingerprint=decision.fingerprint,
+            candidates=[],
+            excluded=[],
+            policy_version=policy.policy_version,
+            catalog_version=catalog.content_version,
+            conservative=False,
+        )
+
+    if not _context_is_current(
+            ctx, decision, catalog, policy, safety_policy):
+        return CandidateResult(
+            gate_status=GateStatus.clarification_required,
+            decision_fingerprint=compose_fingerprint(ctx),
             candidates=[],
             excluded=[],
             policy_version=policy.policy_version,
@@ -152,19 +218,19 @@ def select_candidates(
         else:
             survivors.append(ex)
 
-    # Stable sort by deterministic priority, then de-duplicate by movement
-    # purpose set (keep the lowest sort key = highest priority).
+    # Stable sort by deterministic priority, then de-duplicate any overlapping
+    # movement purpose (keep the lowest sort key = highest priority).
     survivors.sort(key=lambda ex: _sort_key(ex, policy))
     deduped: List[Exercise] = []
-    seen_purpose_sets = set()
+    seen_purposes = set()
     for ex in survivors:
-        key = frozenset(ex.movement_purposes)
-        if key in seen_purpose_sets:
+        purposes = set(ex.movement_purposes)
+        if purposes & seen_purposes:
             excluded.append(ExcludedExercise(
                 exercise_id=ex.exercise_id,
                 reason_codes=[policy.dedup_reason_code]))
             continue
-        seen_purpose_sets.add(key)
+        seen_purposes.update(purposes)
         deduped.append(ex)
 
     candidates = [

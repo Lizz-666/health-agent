@@ -16,10 +16,12 @@ import uuid
 from datetime import date, datetime, timezone
 
 import pytest
+from sqlalchemy import select
 
 from app.auth.models import User
 from app.health.models import DailyCheckIn, HealthProfile
-from app.posture.models import PostureUserGoal
+from app.posture.models import PostureProfileEntry, PostureUserGoal
+from app.posture.service import get_priority_suggestions
 from app.training.candidates import select_candidates
 from app.training.context import build_context
 from app.training.knowledge import build_index, load_catalog
@@ -40,6 +42,17 @@ EVAL_AT = datetime(2026, 7, 26, 1, 30, tzinfo=timezone.utc)
 TODAY = date(2026, 7, 26)
 PRIOR = date(2026, 7, 20)
 HEALTH_RISK_VERSION = "2026-07-22-v1"
+
+
+def _tool_request():
+    return RequestSnapshot(
+        fitness_goal="basic_strength",
+        equipment_bodyweight=True,
+        equipment_resistance_band=False,
+        weekly_frequency=3,
+        session_duration_minutes=30,
+        iana_timezone="Asia/Shanghai",
+    )
 
 
 def _all_no_screen():
@@ -80,12 +93,24 @@ async def _add_checkin(db, uid, local_date, *, abnormal=False,
     await db.commit()
 
 
-async def _add_goal(db, uid, issue_id="lower_limb"):
+async def _add_goal(db, uid, issue_id="LL-18"):
+    db.add(PostureProfileEntry(
+        user_id=uid, issue_id=issue_id, combined_severity="mild",
+        certainty="confirmed", sources={}, has_conflict=False,
+        risk_tier="normal", risk_version="2026-07-16-v4"))
+    await db.commit()
+    suggestions = await get_priority_suggestions(db, str(uid), now=EVAL_AT)
+    candidate = next(
+        item for item in suggestions["normal_candidates"]
+        if item["issue_id"] == issue_id)
+    assert candidate
     db.add(PostureUserGoal(
         user_id=uid, issue_id=issue_id, priority_rank=1,
         confirmed_at=datetime(2026, 7, 10, tzinfo=timezone.utc),
-        suggestion_id="sugg-1", profile_version="pv-1",
-        rule_version="rv-1", risk_version="2026-07-16-v4",
+        suggestion_id=suggestions["suggestion_id"],
+        profile_version=suggestions["profile_version"],
+        rule_version=suggestions["rule_version"],
+        risk_version=suggestions["risk_version"],
         superseded_at=None))
     await db.commit()
 
@@ -99,13 +124,22 @@ def _red_flag_followup():
     }
 
 
+def _unknown_caution_followup():
+    return {
+        "pain_area": "unknown-zone", "pain_started": "recent_days",
+        "pain_intensity": "mild", "has_neurological_symptom": False,
+        "has_dizziness_or_chest_symptom": False, "has_acute_trauma": False,
+        "pain_note": "synthetic note",
+    }
+
+
 async def _assert_eligible_adapter(db):
     uid = await _create_user(db, "13900000001")
     await _add_profile(db, uid)
     await _add_checkin(db, uid, TODAY)
     await _add_goal(db, uid)
     ctx = await build_context(
-        db, str(uid), request=RequestSnapshot(iana_timezone="Asia/Shanghai"),
+        db, str(uid), request=_tool_request(),
         policy=POLICY, catalog_version="v1cat",
         source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
     assert ctx.health.configured
@@ -113,7 +147,7 @@ async def _assert_eligible_adapter(db):
     assert ctx.checkin.present
     assert ctx.checkin.recomputed_risk == "normal"
     assert ctx.posture.goals, "narrow active-goal read must find the goal"
-    assert ctx.posture.goals[0].issue_id == "lower_limb"
+    assert ctx.posture.goals[0].issue_id == "LL-18"
     assert ctx.posture.goals[0].active is True
     decision = classify_safety(ctx, POLICY)
     assert decision.gate_status is GateStatus.eligible
@@ -126,6 +160,7 @@ async def test_adapter_builds_eligible_context_sqlite():
 
 
 @requires_pg
+@pytest.mark.requires_pg
 @pytest.mark.asyncio
 async def test_adapter_builds_eligible_context_postgresql(pg_session):
     await _assert_eligible_adapter(pg_session)
@@ -141,7 +176,7 @@ async def test_adapter_account_isolation_sqlite():
         await _add_goal(db, a)
         # User B has nothing of their own.
         ctx_b = await build_context(
-            db, str(b), request=RequestSnapshot(iana_timezone="Asia/Shanghai"),
+            db, str(b), request=_tool_request(),
             policy=POLICY, catalog_version="v1cat",
             source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
         assert ctx_b.health.configured is False
@@ -151,7 +186,7 @@ async def test_adapter_account_isolation_sqlite():
                 is GateStatus.clarification_required)
         # User A still resolves to eligible.
         ctx_a = await build_context(
-            db, str(a), request=RequestSnapshot(iana_timezone="Asia/Shanghai"),
+            db, str(a), request=_tool_request(),
             policy=POLICY, catalog_version="v1cat",
             source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
         assert classify_safety(ctx_a, POLICY).gate_status is GateStatus.eligible
@@ -163,7 +198,7 @@ async def test_adapter_missing_profile_yields_clarification():
         uid = await _create_user(db, "13900000003")
         # No profile / checkin / goal.
         ctx = await build_context(
-            db, str(uid), request=RequestSnapshot(iana_timezone="Asia/Shanghai"),
+            db, str(uid), request=_tool_request(),
             policy=POLICY, catalog_version="v1cat",
             source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
         assert ctx.health.configured is False
@@ -179,7 +214,7 @@ async def test_adapter_missing_current_checkin_yields_clarification():
         await _add_goal(db, uid)
         # No check-in for TODAY.
         ctx = await build_context(
-            db, str(uid), request=RequestSnapshot(iana_timezone="Asia/Shanghai"),
+            db, str(uid), request=_tool_request(),
             policy=POLICY, catalog_version="v1cat",
             source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
         d = classify_safety(ctx, POLICY)
@@ -195,12 +230,70 @@ async def test_adapter_missing_posture_goal_yields_clarification():
         await _add_checkin(db, uid, TODAY)
         # No posture goal.
         ctx = await build_context(
-            db, str(uid), request=RequestSnapshot(iana_timezone="Asia/Shanghai"),
+            db, str(uid), request=_tool_request(),
             policy=POLICY, catalog_version="v1cat",
             source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
         d = classify_safety(ctx, POLICY)
         assert d.gate_status is GateStatus.clarification_required
         assert "confirmed_posture_goal" in d.missing_fields
+
+
+@pytest.mark.asyncio
+async def test_adapter_invalidates_goal_when_profile_is_no_longer_confirmed():
+    async with TestSession() as db:
+        uid = await _create_user(db, "13900000015")
+        await _add_profile(db, uid)
+        await _add_checkin(db, uid, TODAY)
+        await _add_goal(db, uid)
+        entry = await db.scalar(select(PostureProfileEntry).where(
+            PostureProfileEntry.user_id == uid,
+            PostureProfileEntry.issue_id == "LL-18"))
+        entry.certainty = "provisional"
+        await db.commit()
+        ctx = await build_context(
+            db, str(uid), request=_tool_request(),
+            policy=POLICY, catalog_version="v1cat",
+            source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
+        assert ctx.posture.goals[0].active is False
+        assert (classify_safety(ctx, POLICY).gate_status
+                is GateStatus.clarification_required)
+
+
+@pytest.mark.asyncio
+async def test_adapter_unknown_current_pain_area_requires_clarification():
+    async with TestSession() as db:
+        uid = await _create_user(db, "13900000016")
+        await _add_profile(db, uid)
+        await _add_goal(db, uid)
+        await _add_checkin(
+            db, uid, TODAY, abnormal=True,
+            followup=_unknown_caution_followup(), risk_summary="normal")
+        ctx = await build_context(
+            db, str(uid), request=_tool_request(),
+            policy=POLICY, catalog_version="v1cat",
+            source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
+        assert ctx.checkin.pain_area_canonical is None
+        assert (classify_safety(ctx, POLICY).gate_status
+                is GateStatus.clarification_required)
+
+
+@pytest.mark.asyncio
+async def test_adapter_unknown_retained_pain_area_requires_clarification():
+    async with TestSession() as db:
+        uid = await _create_user(db, "13900000017")
+        await _add_profile(db, uid)
+        await _add_goal(db, uid)
+        await _add_checkin(db, uid, TODAY)
+        await _add_checkin(
+            db, uid, PRIOR, abnormal=True,
+            followup=_unknown_caution_followup(), risk_summary="normal")
+        ctx = await build_context(
+            db, str(uid), request=_tool_request(),
+            policy=POLICY, catalog_version="v1cat",
+            source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
+        assert ctx.retained_pain[0].pain_area_canonical is None
+        assert (classify_safety(ctx, POLICY).gate_status
+                is GateStatus.clarification_required)
 
 
 @pytest.mark.asyncio
@@ -216,7 +309,7 @@ async def test_adapter_recomputes_retained_red_flag_not_trusting_stored_label():
                            followup=_red_flag_followup(),
                            risk_summary="normal")  # stored label deliberately wrong
         ctx = await build_context(
-            db, str(uid), request=RequestSnapshot(iana_timezone="Asia/Shanghai"),
+            db, str(uid), request=_tool_request(),
             policy=POLICY, catalog_version="v1cat",
             source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
         assert any(r.recomputed_risk == "red_flag" for r in ctx.retained_pain)
@@ -233,7 +326,7 @@ async def test_adapter_source_correction_clears_retained_red_flag():
         await _add_checkin(db, uid, TODAY)
         await _add_goal(db, uid)
         ctx = await build_context(
-            db, str(uid), request=RequestSnapshot(iana_timezone="Asia/Shanghai"),
+            db, str(uid), request=_tool_request(),
             policy=POLICY, catalog_version="v1cat",
             source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
         assert ctx.retained_pain == []
@@ -269,13 +362,6 @@ def _valid_tool_draft(decision, candidate_id):
         "sessions": sessions})
 
 
-def _tool_request():
-    return RequestSnapshot(fitness_goal="basic_strength",
-                           equipment_bodyweight=True,
-                           equipment_resistance_band=False,
-                           iana_timezone="Asia/Shanghai")
-
-
 async def _assert_tool_validates(db):
     uid = await _create_user(db, "13900000020")
     await _add_profile(db, uid)
@@ -303,6 +389,7 @@ async def test_tool_validates_valid_draft_sqlite():
 
 
 @requires_pg
+@pytest.mark.requires_pg
 @pytest.mark.asyncio
 async def test_tool_validates_valid_draft_postgresql(pg_session):
     await _assert_tool_validates(pg_session)

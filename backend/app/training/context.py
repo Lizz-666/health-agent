@@ -127,7 +127,12 @@ def checkin_token(checkin: Any, recomputed_risk: str) -> str:
 
 
 def _iso(value: Any) -> Optional[str]:
-    return value.isoformat() if value is not None else None
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return aware.astimezone(timezone.utc).isoformat()
+    return value.isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +172,7 @@ def _pain_limitations(
 
 
 async def _active_goals(
-    db: AsyncSession, user_id: str, blocked_issue_ids: set
+    db: AsyncSession, user_id: str, suggestions: Dict[str, Any]
 ) -> List[PostureGoalSnapshot]:
     """Narrow ownership-filtered read of active confirmed posture goals.
 
@@ -182,10 +187,30 @@ async def _active_goals(
         ).order_by(PostureUserGoal.priority_rank)
     )
     rows = list(result.scalars().all())
+    current_candidate_ids = {
+        item.get("issue_id") for item in suggestions.get("normal_candidates", [])
+        if item.get("issue_id")
+    }
+    blocked_issue_ids = {
+        item.get("issue_id") for key in ("safety_blocked", "retest_required")
+        for item in suggestions.get(key, []) if item.get("issue_id")
+    }
     return [
         PostureGoalSnapshot(
-            issue_id=r.issue_id, active=True,
-            blocked=r.issue_id in blocked_issue_ids)
+            issue_id=r.issue_id,
+            active=(
+                r.issue_id in current_candidate_ids
+                and r.suggestion_id == suggestions.get("suggestion_id")
+                and r.profile_version == suggestions.get("profile_version")
+                and r.rule_version == suggestions.get("rule_version")
+                and r.risk_version == suggestions.get("risk_version")
+            ),
+            blocked=r.issue_id in blocked_issue_ids,
+            confirmed_at=r.confirmed_at,
+            suggestion_id=r.suggestion_id,
+            profile_version=r.profile_version,
+            rule_version=r.rule_version,
+            risk_version=r.risk_version)
         for r in rows
     ]
 
@@ -241,9 +266,15 @@ async def build_context(
     if current is not None:
         risk = classify_checkin(current, restricted_qualifier=qualifier)
         token = checkin_token(current, risk.risk_summary)
+        followup = current.pain_followup
         checkin_snap = CheckInSnapshot(
             present=True, local_date=current.local_date,
-            recomputed_risk=risk.risk_summary, token=token)
+            recomputed_risk=risk.risk_summary, token=token,
+            abnormal_pain=current.abnormal_pain,
+            pain_area_canonical=(
+                policy.normalize_body_area(followup.pain_area)
+                if current.abnormal_pain and followup is not None else None
+            ))
     else:
         checkin_snap = CheckInSnapshot(present=False)
 
@@ -254,23 +285,24 @@ async def build_context(
         if current_local is not None and c.local_date == current_local:
             continue  # current day is handled by the checkin snapshot
         risk = classify_checkin(c, restricted_qualifier=qualifier)
+        followup = c.pain_followup
         retained.append(RetainedPainRecord(
             token=checkin_token(c, risk.risk_summary),
             recomputed_risk=risk.risk_summary,
             local_date=c.local_date,
+            pain_area_canonical=(
+                policy.normalize_body_area(followup.pain_area)
+                if followup is not None else None
+            ),
         ))
 
     # --- Posture: active signals digest, global risk, priority suggestions,
     #     and the narrow active-goal read ---
     signals = await load_active_signals(db, user_id)
-    digest = compute_signals_digest(signals) if signals else None
+    digest = compute_signals_digest(signals)
     classification = await compute_profile_risk(db, user_id, None)
-    suggestions = await get_priority_suggestions(db, user_id)
-    blocked_ids = {
-        item.get("issue_id") for item in (suggestions.get("safety_blocked") or [])
-        if item.get("issue_id")
-    }
-    goals = await _active_goals(db, user_id, blocked_ids)
+    suggestions = await get_priority_suggestions(db, user_id, now=now)
+    goals = await _active_goals(db, user_id, suggestions)
     posture_snap = PostureSnapshot(
         active_signals_digest=digest,
         global_risk_tier=classification.risk_tier,

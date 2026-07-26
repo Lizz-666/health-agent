@@ -24,9 +24,10 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
+from pathlib import PurePosixPath
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # Phase 3 vocabulary (enumerations)
@@ -118,6 +119,7 @@ class SourceType(str, Enum):
     guideline = "guideline"
     position_stand = "position_stand"
     questionnaire_reference = "questionnaire_reference"
+    professional_reference = "professional_reference"
     project_authored = "project_authored"
 
 
@@ -191,10 +193,13 @@ class Illustration(BaseModel):
     @classmethod
     def _asset_key_is_local_svg(cls, v: str) -> str:
         v = v.strip()
+        path = PurePosixPath(v)
         if not v.endswith(".svg"):
             raise ValueError("asset_key must reference a .svg asset")
-        if "://" in v or v.startswith("//"):
+        if "\\" in v or "://" in v or v.startswith("//") or path.is_absolute():
             raise ValueError("asset_key must be a local path, not a URL")
+        if any(part in {".", ".."} for part in path.parts):
+            raise ValueError("asset_key must not contain traversal segments")
         if not v.startswith("assets/training/illustrations/"):
             raise ValueError(
                 "asset_key must live under assets/training/illustrations/"
@@ -551,6 +556,14 @@ class SafetyRiskTier(str, Enum):
     red_flag = "red_flag"
 
 
+class SafetyAnswer(str, Enum):
+    """Closed vocabulary for deterministic health risk-screen answers."""
+
+    yes = "yes"
+    no = "no"
+    unknown = "unknown"
+
+
 class PainLimitationSnapshot(BaseModel):
     """A user-stated pain limitation with normalization results filled in.
 
@@ -579,9 +592,22 @@ class HealthProfileSnapshot(BaseModel):
     equipment_bodyweight: Optional[bool] = None
     equipment_resistance_band: Optional[bool] = None
     pain_limitations: Optional[List[PainLimitationSnapshot]] = None
-    risk_screen: Optional[Dict[str, Optional[str]]] = None
+    risk_screen: Optional[Dict[str, Optional[SafetyAnswer]]] = None
     profile_version: Optional[int] = None
     profile_updated_at: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def _risk_screen_has_only_supported_qualifiers(self):
+        if self.risk_screen is not None:
+            supported = {
+                "underage", "pregnancy_or_postpartum",
+                "recent_surgery_or_major_injury", "major_chronic_condition",
+                "eating_disorder_concern",
+                "professional_instruction_limitations",
+            }
+            if not set(self.risk_screen).issubset(supported):
+                raise ValueError("risk_screen contains an unsupported qualifier")
+        return self
 
 
 class CheckInSnapshot(BaseModel):
@@ -591,8 +617,10 @@ class CheckInSnapshot(BaseModel):
 
     present: bool = False
     local_date: Optional[date] = None
-    recomputed_risk: Optional[str] = None
+    recomputed_risk: Optional[SafetyRiskTier] = None
     token: Optional[str] = None
+    abnormal_pain: bool = False
+    pain_area_canonical: Optional[str] = None
 
 
 class RetainedPainRecord(BaseModel):
@@ -601,8 +629,9 @@ class RetainedPainRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     token: str = Field(..., min_length=1)
-    recomputed_risk: str = Field(..., min_length=1)
+    recomputed_risk: SafetyRiskTier
     local_date: Optional[date] = None
+    pain_area_canonical: Optional[str] = None
 
 
 class PostureGoalSnapshot(BaseModel):
@@ -613,6 +642,22 @@ class PostureGoalSnapshot(BaseModel):
     issue_id: str = Field(..., min_length=1, max_length=30)
     active: bool = True
     blocked: bool = False
+    confirmed_at: Optional[datetime] = None
+    suggestion_id: Optional[str] = None
+    profile_version: Optional[str] = None
+    rule_version: Optional[str] = None
+    risk_version: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _active_goal_has_confirmation_controls(self):
+        controls = (
+            self.confirmed_at, self.suggestion_id, self.profile_version,
+            self.rule_version, self.risk_version,
+        )
+        if self.active and any(value is None for value in controls):
+            raise ValueError(
+                "active posture goal requires confirmation/version controls")
+        return self
 
 
 class PostureSnapshot(BaseModel):
@@ -621,7 +666,7 @@ class PostureSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     active_signals_digest: Optional[str] = None
-    global_risk_tier: Optional[str] = None
+    global_risk_tier: Optional[SafetyRiskTier] = None
     risk_version: Optional[str] = None
     goals: List[PostureGoalSnapshot] = Field(default_factory=list)
 
@@ -631,11 +676,11 @@ class RequestSnapshot(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    fitness_goal: Optional[str] = None
+    fitness_goal: Optional[GoalTag] = None
     equipment_bodyweight: Optional[bool] = None
     equipment_resistance_band: Optional[bool] = None
-    weekly_frequency: Optional[int] = None
-    session_duration_minutes: Optional[int] = None
+    weekly_frequency: Optional[int] = Field(None, ge=2, le=5)
+    session_duration_minutes: Optional[int] = Field(None, ge=15, le=60)
     iana_timezone: Optional[str] = None
     client_local_date: Optional[date] = None
 
@@ -758,6 +803,8 @@ class PlanPrescription(BaseModel):
     duration_seconds: Optional[int] = Field(None, ge=5, le=3600)
     rest_seconds: int = Field(..., ge=0, le=600)
     relation_reason: Optional[str] = Field(None, max_length=30)
+    relation_source_exercise_id: Optional[str] = Field(
+        None, min_length=1, max_length=60)
 
 
 class PlanSession(BaseModel):
@@ -795,7 +842,7 @@ class TrainingPlanDraft(BaseModel):
     draft_id: str = Field(..., min_length=1, max_length=60)
     requested_goal: str = Field(..., min_length=1, max_length=30)
     source_context_fingerprint: str = Field(..., min_length=1)
-    profile_version: Optional[int] = None
+    profile_version: int = Field(..., ge=1)
     catalog_version: str = Field(..., min_length=1, max_length=40)
     policy_version: str = Field(..., min_length=1, max_length=20)
     source_manifest_version: str = Field(..., min_length=1, max_length=20)

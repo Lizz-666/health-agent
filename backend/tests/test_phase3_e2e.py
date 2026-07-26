@@ -49,13 +49,19 @@ def _ctx(**over):
         "checkin": {"present": True, "local_date": "2026-07-26",
                     "recomputed_risk": "normal", "token": "t"},
         "retained_pain": [],
-        "posture": {"active_signals_digest": None, "global_risk_tier": "normal",
+        "posture": {"active_signals_digest": "empty-signals-digest", "global_risk_tier": "normal",
                     "risk_version": "rv",
-                    "goals": [{"issue_id": "lower_limb", "active": True,
-                               "blocked": False}]},
+                    "goals": [{
+                        "issue_id": "lower_limb", "active": True,
+                        "blocked": False, "confirmed_at": EVAL_AT,
+                        "suggestion_id": "s1", "profile_version": "pv1",
+                        "rule_version": "rv1", "risk_version": "rv",
+                    }]},
         "request": {"fitness_goal": "basic_strength",
                     "equipment_bodyweight": True,
                     "equipment_resistance_band": False,
+                    "weekly_frequency": 3,
+                    "session_duration_minutes": 30,
                     "iana_timezone": "Asia/Shanghai"},
         "versions": {"policy_version": "v1", "catalog_version":
                      CATALOG.content_version, "source_manifest_version": "v1",
@@ -187,16 +193,24 @@ def test_candidate_set_is_deterministic():
 
 
 def test_multi_posture_conflict_is_deterministic_and_deduped():
+    health = _ctx().health.model_dump()
+    health["fitness_goal"] = "posture_improvement"
+    goal_controls = {
+        "active": True, "blocked": False, "confirmed_at": EVAL_AT,
+        "suggestion_id": "s1", "profile_version": "pv1",
+        "rule_version": "rv1", "risk_version": "rv",
+    }
     _, cand = _run(_ctx(
-        posture={"active_signals_digest": None, "global_risk_tier": "normal",
+        health=health,
+        posture={"active_signals_digest": "empty-signals-digest", "global_risk_tier": "normal",
                  "risk_version": "rv",
-                 "goals": [{"issue_id": "shoulder_thorax", "active": True,
-                            "blocked": False},
-                           {"issue_id": "pelvis_spine", "active": True,
-                            "blocked": False}]},
+                 "goals": [{"issue_id": "shoulder_thorax", **goal_controls},
+                           {"issue_id": "pelvis_spine", **goal_controls}]},
         request={"fitness_goal": "posture_improvement",
                  "equipment_bodyweight": True,
                  "equipment_resistance_band": False,
+                 "weekly_frequency": 3,
+                 "session_duration_minutes": 30,
                  "iana_timezone": "Asia/Shanghai"}))
     ids = [c.exercise_id for c in cand.candidates]
     assert len(ids) == len(set(ids))
@@ -205,15 +219,16 @@ def test_multi_posture_conflict_is_deterministic_and_deduped():
     assert len(purpose_sets) == len(set(purpose_sets))
     # Deterministic re-run.
     _, cand2 = _run(_ctx(
-        posture={"active_signals_digest": None, "global_risk_tier": "normal",
+        health=health,
+        posture={"active_signals_digest": "empty-signals-digest", "global_risk_tier": "normal",
                  "risk_version": "rv",
-                 "goals": [{"issue_id": "shoulder_thorax", "active": True,
-                            "blocked": False},
-                           {"issue_id": "pelvis_spine", "active": True,
-                            "blocked": False}]},
+                 "goals": [{"issue_id": "shoulder_thorax", **goal_controls},
+                           {"issue_id": "pelvis_spine", **goal_controls}]},
         request={"fitness_goal": "posture_improvement",
                  "equipment_bodyweight": True,
                  "equipment_resistance_band": False,
+                 "weekly_frequency": 3,
+                 "session_duration_minutes": 30,
                  "iana_timezone": "Asia/Shanghai"}))
     assert ids == [c.exercise_id for c in cand2.candidates]
 
@@ -226,7 +241,8 @@ def test_multi_posture_conflict_is_deterministic_and_deduped():
 def test_valid_draft_passes_validation():
     decision, cand = _run(_ctx())
     draft = _valid_draft(decision, cand.candidates[0].exercise_id)
-    result = validate_plan(draft, _ctx(), decision, cand, CATALOG, TPOLICY)
+    result = validate_plan(
+        draft, _ctx(), decision, cand, CATALOG, TPOLICY, SPOLICY)
     assert result.valid is True
 
 
@@ -236,7 +252,8 @@ def test_invalid_draft_out_of_bounds_fails():
     draft.sessions[0].prescriptions[0] = PlanPrescription(
         exercise_id=draft.sessions[0].prescriptions[0].exercise_id,
         sets=10, reps=10, rest_seconds=60)
-    result = validate_plan(draft, _ctx(), decision, cand, CATALOG, TPOLICY)
+    result = validate_plan(
+        draft, _ctx(), decision, cand, CATALOG, TPOLICY, SPOLICY)
     assert result.valid is False
     assert "prescription_out_of_bounds" in [v.code for v in result.violations]
 
@@ -245,7 +262,8 @@ def test_stale_catalog_version_fails_validation():
     decision, cand = _run(_ctx())
     draft = _valid_draft(decision, cand.candidates[0].exercise_id)
     draft = draft.model_copy(update={"catalog_version": "stale-version"})
-    result = validate_plan(draft, _ctx(), decision, cand, CATALOG, TPOLICY)
+    result = validate_plan(
+        draft, _ctx(), decision, cand, CATALOG, TPOLICY, SPOLICY)
     assert result.valid is False
     assert "version_mismatch" in [v.code for v in result.violations]
 
@@ -273,7 +291,7 @@ def test_red_flag_cannot_be_bypassed_by_validation():
             prescriptions=[PlanPrescription(exercise_id=safe_ex.exercise_id,
                 sets=1, reps=8, rest_seconds=60)])
             for w in (2, 3, 4)]})
-    result = validate_plan(draft, red_ctx, red_decision, red_cand,
-                           CATALOG, TPOLICY)
+    result = validate_plan(
+        draft, red_ctx, red_decision, red_cand, CATALOG, TPOLICY, SPOLICY)
     assert result.valid is False
     assert "blocked_context" in [v.code for v in result.violations]

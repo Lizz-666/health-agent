@@ -130,6 +130,16 @@
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
       "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-library-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness Exercise Library",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/",
+      "license": null,
+      "scope": "Healthy-adult exercise setup and general form review only.",
+      "verified_date": "2026-07-26"
      }
     ],
     "imported_fields": [
@@ -264,6 +274,16 @@
       "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-library-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness Exercise Library",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/",
+      "license": null,
+      "scope": "Healthy-adult exercise setup and general form review only.",
       "verified_date": "2026-07-26"
      }
     ],
@@ -400,6 +420,16 @@
       "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
       "license": "MIT",
       "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-library-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness Exercise Library",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/",
+      "license": null,
+      "scope": "Healthy-adult exercise setup and general form review only.",
       "verified_date": "2026-07-26"
      }
     ],

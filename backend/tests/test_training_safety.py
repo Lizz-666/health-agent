@@ -59,11 +59,21 @@ def _ctx(**over):
         },
         "retained_pain": [],
         "posture": {
-            "active_signals_digest": None,
+            "active_signals_digest": "empty-signals-digest",
             "global_risk_tier": "normal", "risk_version": "posture-rv",
-            "goals": [{"issue_id": "lower_limb", "active": True, "blocked": False}],
+            "goals": [{
+                "issue_id": "lower_limb", "active": True, "blocked": False,
+                "confirmed_at": EVAL_AT, "suggestion_id": "s1",
+                "profile_version": "pv1", "rule_version": "rv1",
+                "risk_version": "posture-rv",
+            }],
         },
-        "request": {"iana_timezone": "Asia/Shanghai"},
+        "request": {
+            "fitness_goal": "basic_strength", "equipment_bodyweight": True,
+            "equipment_resistance_band": False, "weekly_frequency": 3,
+            "session_duration_minutes": 30,
+            "iana_timezone": "Asia/Shanghai",
+        },
         "versions": {"policy_version": "v1", "catalog_version": "v1cat",
                      "source_manifest_version": "v1", "schema_version": "v1"},
         "eval": {"evaluated_at_utc": EVAL_AT, "iana_timezone": "Asia/Shanghai",
@@ -109,6 +119,20 @@ def test_clarification_when_required_field_missing():
     assert "weekly_frequency" in d.missing_fields
 
 
+def test_clarification_when_request_is_incomplete_or_mismatched():
+    incomplete = _ctx().request.model_dump()
+    incomplete["weekly_frequency"] = None
+    decision = classify_safety(_ctx(request=incomplete), POLICY)
+    assert decision.gate_status is GateStatus.clarification_required
+    assert "recommendation_request" in decision.missing_fields
+
+    mismatched = _ctx().request.model_dump()
+    mismatched["weekly_frequency"] = 5
+    decision = classify_safety(_ctx(request=mismatched), POLICY)
+    assert decision.gate_status is GateStatus.clarification_required
+    assert "recommendation_request" in decision.missing_fields
+
+
 def test_clarification_when_pain_limitations_null_vs_empty():
     # None = not answered -> clarification.
     health = _ctx().health.model_dump()
@@ -149,8 +173,59 @@ def test_clarification_when_current_checkin_missing():
     assert "current_day_checkin" in d.missing_fields
 
 
+def test_clarification_when_current_pain_area_cannot_be_normalized():
+    d = classify_safety(_ctx(checkin={
+        "present": True, "local_date": TODAY, "recomputed_risk": "caution",
+        "token": "t", "abnormal_pain": True,
+        "pain_area_canonical": None}), POLICY)
+    assert d.gate_status is GateStatus.clarification_required
+    assert "current_checkin.pain_area" in d.missing_fields
+
+
+def test_clarification_when_retained_pain_area_cannot_be_normalized():
+    d = classify_safety(_ctx(retained_pain=[{
+        "token": "old", "recomputed_risk": "caution",
+        "local_date": date(2026, 7, 20), "pain_area_canonical": None,
+    }]), POLICY)
+    assert d.gate_status is GateStatus.clarification_required
+    assert "retained_pain.pain_area" in d.missing_fields
+
+
+@pytest.mark.parametrize("field", ["catalog_version", "source_manifest_version"])
+def test_clarification_when_release_version_is_missing(field):
+    versions = _ctx().versions.model_dump()
+    versions[field] = None
+    d = classify_safety(_ctx(versions=versions), POLICY)
+    assert d.gate_status is GateStatus.clarification_required
+
+
+@pytest.mark.parametrize("path,value", [
+    ("checkin", "danger"),
+    ("posture", "danger"),
+])
+def test_context_schema_rejects_unknown_risk_tier(path, value):
+    payload = _ctx().model_dump()
+    if path == "checkin":
+        payload[path]["recomputed_risk"] = value
+    else:
+        payload[path]["global_risk_tier"] = value
+    with pytest.raises(Exception):
+        TrainingSafetyContext.model_validate(payload)
+
+
+def test_context_schema_rejects_unknown_risk_screen_answer():
+    payload = _ctx().model_dump()
+    payload["health"]["risk_screen"]["underage"] = "maybe"
+    with pytest.raises(Exception):
+        TrainingSafetyContext.model_validate(payload)
+
+
 def test_clarification_when_no_qualifying_posture_goal():
-    for goals in ([], [{"issue_id": "x", "active": True, "blocked": True}],
+    blocked_goal = {
+        **_ctx().posture.goals[0].model_dump(),
+        "issue_id": "x", "blocked": True,
+    }
+    for goals in ([], [blocked_goal],
                   [{"issue_id": "x", "active": False, "blocked": False}]):
         posture = _ctx().posture.model_dump()
         posture["goals"] = goals
@@ -276,6 +351,11 @@ def test_fingerprint_is_deterministic_and_version_sensitive():
     # Changing profile_version changes the fingerprint.
     changed = _ctx(health={**ctx.health.model_dump(), "profile_version": 2})
     assert compose_fingerprint(changed) != fp1
+    goal = ctx.posture.goals[0].model_dump()
+    goal["suggestion_id"] = "new-suggestion"
+    posture = ctx.posture.model_dump()
+    posture["goals"] = [goal]
+    assert compose_fingerprint(_ctx(posture=posture)) != fp1
 
 
 def test_decision_has_no_candidate_ids():
@@ -303,3 +383,15 @@ def test_safety_policy_rejects_ambiguous_alias():
             "caution_sources": {},
             "recovery": {},
         })
+
+
+@pytest.mark.parametrize("field,bad_value", [
+    ("required_profile_fields", ["fitness_goal"]),
+    ("caution_sources", {}),
+    ("recovery", {}),
+])
+def test_safety_policy_rejects_incomplete_control_sets(field, bad_value):
+    payload = POLICY.model_dump()
+    payload[field] = bad_value
+    with pytest.raises(Exception):
+        SafetyPolicy.model_validate(payload)

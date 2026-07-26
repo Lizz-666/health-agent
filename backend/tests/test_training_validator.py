@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
+
 from app.training.candidates import select_candidates
 from app.training.knowledge import build_index, load_catalog
 from app.training.policy import load_training_policy
@@ -43,13 +45,19 @@ def _ctx():
         "checkin": {"present": True, "local_date": "2026-07-26",
                     "recomputed_risk": "normal", "token": "t"},
         "retained_pain": [],
-        "posture": {"active_signals_digest": None, "global_risk_tier": "normal",
+        "posture": {"active_signals_digest": "empty-signals-digest", "global_risk_tier": "normal",
                     "risk_version": "rv",
-                    "goals": [{"issue_id": "lower_limb", "active": True,
-                               "blocked": False}]},
+                    "goals": [{
+                        "issue_id": "lower_limb", "active": True,
+                        "blocked": False, "confirmed_at": EVAL_AT,
+                        "suggestion_id": "s1", "profile_version": "pv1",
+                        "rule_version": "rv1", "risk_version": "rv",
+                    }]},
         "request": {"fitness_goal": "basic_strength",
                     "equipment_bodyweight": True,
                     "equipment_resistance_band": False,
+                    "weekly_frequency": 3,
+                    "session_duration_minutes": 30,
                     "iana_timezone": "Asia/Shanghai"},
         "versions": {"policy_version": "v1", "catalog_version":
                      CATALOG.content_version, "source_manifest_version": "v1",
@@ -100,7 +108,8 @@ def _valid_draft(exercise_id=CAND_ID, fingerprint=None, **over):
 
 
 def _validate(draft, ctx=CTX, decision=DECISION, cand=CANDIDATES):
-    return validate_plan(draft, ctx, decision, cand, CATALOG, TPOLICY)
+    return validate_plan(
+        draft, ctx, decision, cand, CATALOG, TPOLICY, SPOLICY)
 
 
 def test_valid_draft_passes():
@@ -119,11 +128,40 @@ def test_blocked_context_is_invalid():
     assert "blocked_context" in codes
 
 
+def test_validator_recomputes_and_rejects_forged_eligible_decision():
+    blocked = CTX.model_copy(update={"checkin": CTX.checkin.model_copy(
+        update={"recomputed_risk": "red_flag"})})
+    result = _validate(_valid_draft(), ctx=blocked, decision=DECISION)
+    codes = [v.code for v in result.violations]
+    assert result.valid is False
+    assert result.gate_status.value == "red_flag"
+    assert "stale_safety_decision" in codes
+    assert "blocked_context" in codes
+
+
 def test_stale_fingerprint_is_invalid():
     draft = _valid_draft(fingerprint="stale-not-current")
     result = _validate(draft)
     assert result.valid is False
     assert "stale_context_fingerprint" in [v.code for v in result.violations]
+
+
+def test_stale_candidate_result_is_invalid():
+    stale = CANDIDATES.model_copy(update={"decision_fingerprint": "old"})
+    result = _validate(_valid_draft(), cand=stale)
+    assert "stale_candidate_result" in [v.code for v in result.violations]
+
+
+def test_requested_goal_mismatch_is_invalid():
+    result = _validate(_valid_draft(requested_goal="fat_loss"))
+    assert "requested_goal_mismatch" in [v.code for v in result.violations]
+
+
+def test_profile_version_is_required_by_draft_schema():
+    payload = _valid_draft().model_dump()
+    payload.pop("profile_version")
+    with pytest.raises(Exception):
+        TrainingPlanDraft.model_validate(payload)
 
 
 def test_catalog_version_mismatch_is_invalid():
@@ -197,6 +235,17 @@ def test_recovery_violation_consecutive_days():
     result = _validate(draft)
     codes = [v.code for v in result.violations]
     assert "recovery_violation" in codes
+    assert "movement_pattern_recovery_violation" in codes
+
+
+def test_exercise_weekly_frequency_limit_is_enforced():
+    catalog = CATALOG.model_copy(deep=True)
+    exercise = next(e for e in catalog.exercises if e.exercise_id == CAND_ID)
+    exercise.prescription.weekly_sessions_max = 1
+    result = validate_plan(
+        _valid_draft(), CTX, DECISION, CANDIDATES, catalog, TPOLICY, SPOLICY)
+    assert "weekly_exercise_frequency_exceeded" in [
+        v.code for v in result.violations]
 
 
 def test_duplicate_exercise_in_session():
@@ -206,6 +255,16 @@ def test_duplicate_exercise_in_session():
     result = _validate(draft)
     assert "duplicate_exercise_in_session" in [
         v.code for v in result.violations]
+
+
+def test_related_variants_in_one_session_are_incompatible():
+    draft = _valid_draft()
+    source = INDEX[CAND_ID]
+    related_id = (source.progression_ids + source.regression_ids
+                  + source.substitution_ids)[0]
+    draft.sessions[0].prescriptions.append(_presc(related_id))
+    result = _validate(draft)
+    assert "incompatible_combination" in [v.code for v in result.violations]
 
 
 def test_relation_misuse_unknown_reason():
@@ -234,6 +293,16 @@ def test_timeline_invalid_only_three_weeks():
         "profile_version": CTX.health.profile_version,
         "catalog_version": CATALOG.content_version, "policy_version": "v1",
         "source_manifest_version": "v1", "sessions": sessions})
+    result = _validate(draft)
+    assert "timeline_invalid" in [v.code for v in result.violations]
+
+
+def test_session_order_must_follow_day_chronology():
+    draft = _valid_draft()
+    week_one = [s for s in draft.sessions if s.week_index == 1]
+    week_one[0].session_order = 3
+    week_one[1].session_order = 1
+    week_one[2].session_order = 2
     result = _validate(draft)
     assert "timeline_invalid" in [v.code for v in result.violations]
 

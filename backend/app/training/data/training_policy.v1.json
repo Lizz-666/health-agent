@@ -18,12 +18,12 @@
   "difficulty_priority": ["beginner", "intermediate", "advanced"],
   "conservative_requires_conservative_eligible": true,
   "dedup": {
-    "by": "movement_purposes_set",
+    "by": "movement_purpose_overlap",
     "reason_code": "duplicate_movement_purpose"
   },
   "conflict_resolution": {
     "pick": "lowest_sort_key",
-    "note": "When several exercises share a movement_purpose set, the one with the lowest deterministic sort key (role priority, then difficulty, then exercise_id) is kept; others are excluded as duplicates."
+    "note": "When exercises share any movement_purpose, the one with the lowest deterministic sort key (role priority, then difficulty, then exercise_id) is kept; others are excluded as duplicates."
   },
   "session_volume": {
     "max_exercises_per_session": 8,

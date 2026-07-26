@@ -4,8 +4,8 @@ This module is the authoritative typed contract for the Phase 3 validator Tool
 that Phase 4 plan generation will reuse. The Tool:
 
 - accepts typed, schema-validated inputs only (``TrainingPlanDraft``);
-- authorizes and loads the current user context in the application adapter
-  before entering the pure validator (ownership comes from ``user_id``);
+- receives the authenticated principal separately from model-controlled input
+  and loads only that principal's current context before pure validation;
 - recomputes safety and candidate eligibility for every call;
 - returns structured ``PlanValidationResult`` violations;
 - has NO write side effect, NO LLM call, NO automatic repair;
@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Optional, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.training.schemas import (
     PlanValidationResult,
@@ -32,7 +32,6 @@ class ValidateTrainingPlanRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    user_id: str = Field(..., min_length=1, max_length=80)
     draft: TrainingPlanDraft
     request: RequestSnapshot
 
@@ -43,7 +42,7 @@ class ValidateTrainingPlanTool(Protocol):
     async def __call__(
         self,
         db,
-        user_id: str,
+        principal_user_id: str,
         draft: TrainingPlanDraft,
         *,
         request: RequestSnapshot,

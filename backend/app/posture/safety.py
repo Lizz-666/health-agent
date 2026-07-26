@@ -203,7 +203,7 @@ def compute_signals_digest(signals: List[PostureSafetySignal]) -> str:
     of the *current* active set (excluding the target signal) so a resolution
     can never be driven by a stale view of the user's signals.
     """
-    items = [
+    items = sorted([
         {
             "signal_type": s.signal_type,
             "severity_hint": s.severity_hint,
@@ -212,7 +212,10 @@ def compute_signals_digest(signals: List[PostureSafetySignal]) -> str:
             "related_issue_id": s.related_issue_id,
         }
         for s in signals
-    ]
+    ], key=lambda item: (
+        item["signal_type"], item["severity_hint"], item["body_region"],
+        item["lifecycle"], item["related_issue_id"] or "",
+    ))
     payload = json.dumps(items, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 

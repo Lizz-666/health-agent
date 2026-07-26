@@ -49,13 +49,19 @@ def _ctx(goal="basic_strength", bodyweight=True, band=False,
         "checkin": {"present": True, "local_date": "2026-07-26",
                     "recomputed_risk": "normal", "token": "t"},
         "retained_pain": [],
-        "posture": {"active_signals_digest": None, "global_risk_tier": "normal",
+        "posture": {"active_signals_digest": "empty-signals-digest", "global_risk_tier": "normal",
                     "risk_version": "rv",
-                    "goals": [{"issue_id": i, "active": True, "blocked": False}
+                    "goals": [{
+                        "issue_id": i, "active": True, "blocked": False,
+                        "confirmed_at": EVAL_AT, "suggestion_id": "s1",
+                        "profile_version": "pv1", "rule_version": "rv1",
+                        "risk_version": "rv",
+                    }
                               for i in posture_goals]},
         "request": {"fitness_goal": goal, "equipment_bodyweight": bodyweight,
-                    "equipment_resistance_band": band, "iana_timezone":
-                    "Asia/Shanghai"},
+                    "equipment_resistance_band": band, "weekly_frequency": 3,
+                    "session_duration_minutes": 30,
+                    "iana_timezone": "Asia/Shanghai"},
         "versions": {"policy_version": "v1", "catalog_version":
                      CATALOG.content_version, "source_manifest_version": "v1",
                      "schema_version": "v1"},
@@ -97,9 +103,9 @@ def test_equipment_filter_band_only():
     _, result = _select(_ctx(goal="posture_improvement", bodyweight=False,
                              band=True, posture_goals=("shoulder_thorax",)))
     ids = {c.exercise_id for c in result.candidates}
-    # Two band pulling/face-pull exercises serve posture improvement + shoulder.
-    assert "ex_strength_band_seated_row" in ids
+    # Overlapping movement purposes are de-duplicated by deterministic priority.
     assert "ex_corrective_band_face_pull" in ids
+    assert "ex_strength_band_seated_row" not in ids
     for c in result.candidates:
         ex = next(e for e in CATALOG.exercises if e.exercise_id == c.exercise_id)
         assert "resistance_band" in {q.value for q in ex.equipment}
@@ -156,14 +162,14 @@ def test_non_eligible_gates_return_zero_candidates(gate_health, checkin, expecte
     assert result.excluded == []  # no candidate IDs exposed
 
 
-def test_dedup_no_two_candidates_share_movement_purpose_set():
+def test_dedup_no_two_candidates_share_any_movement_purpose():
     _, result = _select(_ctx(goal="basic_strength", bodyweight=True,
                              posture_goals=("lower_limb",)))
     seen = set()
     for c in result.candidates:
-        key = frozenset(c.movement_purposes)
-        assert key not in seen, f"duplicate purpose set for {c.exercise_id}"
-        seen.add(key)
+        purposes = set(c.movement_purposes)
+        assert not purposes & seen, f"overlapping purpose for {c.exercise_id}"
+        seen.update(purposes)
     # Excluded carries the dedup reason for the dropped duplicates.
     deduped = [e for e in result.excluded
                if "duplicate_movement_purpose" in e.reason_codes]
@@ -194,3 +200,25 @@ def test_multi_posture_goal_is_deterministic():
         posture_goals=("shoulder_thorax", "pelvis_spine")))
     assert [c.exercise_id for c in result.candidates] == [
         c.exercise_id for c in result2.candidates]
+
+
+def test_incomplete_request_returns_no_candidates():
+    ctx = _ctx()
+    ctx = ctx.model_copy(update={"request": ctx.request.model_copy(
+        update={"weekly_frequency": None})})
+    decision = classify_safety(ctx, SPOLICY)
+    result = select_candidates(ctx, decision, CATALOG, TPOLICY, SPOLICY)
+    assert result.gate_status is GateStatus.clarification_required
+    assert result.candidates == []
+
+
+def test_stale_decision_or_incompatible_catalog_returns_no_candidates():
+    ctx = _ctx()
+    decision = classify_safety(ctx, SPOLICY)
+    changed = ctx.model_copy(update={"request": ctx.request.model_copy(
+        update={"session_duration_minutes": 45})})
+    stale = select_candidates(changed, decision, CATALOG, TPOLICY, SPOLICY)
+    assert stale.candidates == []
+    incompatible = CATALOG.model_copy(update={"policy_compatibility": ["v2"]})
+    result = select_candidates(ctx, decision, incompatible, TPOLICY, SPOLICY)
+    assert result.candidates == []

@@ -27,7 +27,9 @@ Everything here is PURE: no HTTP, no DB, no LLM, no network.
 from __future__ import annotations
 
 import json
+import hashlib
 import re
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -38,6 +40,10 @@ from app.training.schemas import (
     ExerciseCatalog,
     SourceManifest,
 )
+
+_ITEM_REVIEW_SOURCE_TYPES = frozenset({
+    "guideline", "position_stand", "professional_reference",
+})
 
 SUPPORTED_CATALOG_SCHEMA_VERSIONS = frozenset({"v1"})
 SUPPORTED_MANIFEST_VERSIONS = frozenset({"v1"})
@@ -312,6 +318,16 @@ def recommendation_ready(
     prov = exercise.provenance
     ill = exercise.illustration.provenance
 
+    if prov.content_version == "" or not prov.content_version:
+        issues.append(CatalogIssue(
+            eid, "content_version_missing", "provenance content_version missing"))
+    if not any(source.source_type.value in _ITEM_REVIEW_SOURCE_TYPES
+               for source in prov.sources):
+        issues.append(CatalogIssue(
+            eid, "item_review_source_missing",
+            "approved item lacks a guideline, position stand, or professional "
+            "exercise reference"))
+
     if prov.review_status.value != "approved":
         issues.append(CatalogIssue(eid, "review_status_not_approved",
                                    f"provenance review_status="
@@ -374,7 +390,120 @@ def validate_catalog(catalog: ExerciseCatalog) -> List[CatalogIssue]:
     return _validate_structure(catalog)
 
 
-def load_catalog(path: Union[str, Path]) -> ExerciseCatalog:
+def _validate_release_files(
+    catalog: ExerciseCatalog, catalog_path: Path
+) -> List[CatalogIssue]:
+    """Cross-check the canonical release against its manifest and local art."""
+    manifest_path = catalog_path.with_name("source_manifest.v1.json")
+    if not manifest_path.exists():
+        return [CatalogIssue(
+            "catalog", "source_manifest_missing",
+            "strict catalog loading requires source_manifest.v1.json")]
+    manifest = load_source_manifest(manifest_path)
+    issues: List[CatalogIssue] = []
+    if manifest.manifest_version != catalog.source_manifest_version:
+        issues.append(CatalogIssue(
+            "catalog", "source_manifest_version_mismatch",
+            "catalog and source manifest versions differ"))
+    registered = {entry.source_id: entry for entry in manifest.sources}
+    for exercise in catalog.exercises:
+        if exercise.provenance.content_version != catalog.content_version:
+            issues.append(CatalogIssue(
+                exercise.exercise_id, "content_version_mismatch",
+                "exercise provenance is not bound to catalog content_version"))
+        for source in exercise.provenance.sources:
+            manifest_source = registered.get(source.source_id)
+            item_reference = source.source_id == "ace-exercise-references-2026"
+            url_matches = (
+                source.url.startswith(manifest_source.url)
+                if manifest_source is not None and item_reference
+                else manifest_source is not None
+                and source.url == manifest_source.url
+            )
+            if manifest_source is None:
+                issues.append(CatalogIssue(
+                    exercise.exercise_id, "unregistered_source",
+                    f"source {source.source_id!r} is absent from manifest"))
+            elif (
+                source.source_type != manifest_source.source_type
+                or source.pinned_version != manifest_source.pinned_version
+                or not url_matches
+                or source.license != manifest_source.license
+            ):
+                issues.append(CatalogIssue(
+                    exercise.exercise_id, "source_manifest_mismatch",
+                    f"source {source.source_id!r} does not match its manifest pin"))
+
+    repo_root = next(
+        (parent for parent in catalog_path.resolve().parents
+         if (parent / "assets" / "training" / "illustrations").is_dir()),
+        None,
+    )
+    if repo_root is None:
+        issues.append(CatalogIssue(
+            "catalog", "asset_root_missing", "repository asset root not found"))
+        return issues
+    asset_root = (repo_root / "assets" / "training" / "illustrations").resolve()
+    for exercise in catalog.exercises:
+        asset = (repo_root / exercise.illustration.asset_key).resolve()
+        try:
+            asset.relative_to(asset_root)
+        except ValueError:
+            issues.append(CatalogIssue(
+                exercise.exercise_id, "illustration_path_escape",
+                "illustration asset resolves outside the approved asset root"))
+            continue
+        if not asset.is_file():
+            issues.append(CatalogIssue(
+                exercise.exercise_id, "illustration_missing",
+                f"local asset {exercise.illustration.asset_key!r} is missing"))
+            continue
+        digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+        if digest != exercise.illustration.provenance.content_hash:
+            issues.append(CatalogIssue(
+                exercise.exercise_id, "illustration_hash_mismatch",
+                f"local asset {exercise.illustration.asset_key!r} hash differs"))
+        issues.extend(_validate_svg_content(exercise.exercise_id, asset))
+    return issues
+
+
+def _validate_svg_content(exercise_id: str, asset: Path) -> List[CatalogIssue]:
+    """Reject active, embedded, or externally referenced SVG content."""
+    raw = asset.read_bytes()
+    lowered = raw.lower()
+    if b"<!doctype" in lowered or b"<!entity" in lowered:
+        return [CatalogIssue(
+            exercise_id, "illustration_unsafe_content",
+            "SVG declarations and entities are forbidden")]
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        return [CatalogIssue(
+            exercise_id, "illustration_unsafe_content", "SVG is not valid XML")]
+    forbidden_tags = {"script", "image", "foreignobject"}
+    forbidden_values = (
+        "javascript:", "data:", "url(", "http://", "https://", "//",
+    )
+    for element in root.iter():
+        local_tag = element.tag.rsplit("}", 1)[-1].lower()
+        if local_tag in forbidden_tags:
+            return [CatalogIssue(
+                exercise_id, "illustration_unsafe_content",
+                f"SVG element {local_tag!r} is forbidden")]
+        values = list(element.attrib.values())
+        if element.text:
+            values.append(element.text)
+        if any(token in value.lower() for value in values
+               for token in forbidden_values):
+            return [CatalogIssue(
+                exercise_id, "illustration_unsafe_content",
+                "SVG contains an embedded or external reference")]
+    return []
+
+
+def load_catalog(
+    path: Union[str, Path], *, verify_release: bool = True
+) -> ExerciseCatalog:
     """Load + structurally validate a catalog. Fail-closed (raises on issues)."""
     data = _read_json(path)
     try:
@@ -382,6 +511,8 @@ def load_catalog(path: Union[str, Path]) -> ExerciseCatalog:
     except Exception:  # noqa: BLE001 - surface as a single structured error
         raise
     issues = validate_catalog(catalog)
+    if verify_release:
+        issues.extend(_validate_release_files(catalog, Path(path)))
     if issues:
         raise CatalogValidationError(issues)
     return catalog

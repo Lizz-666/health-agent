@@ -20,12 +20,12 @@
   media (`images/`, `videos/`, GIFs, thumbnails, `image`, `gif_url`,
   `media_id`, media attribution payloads).
 
-### MIT License (retained verbatim from the pinned commit)
+### License and media exception (retained verbatim from the pinned commit)
 
 ```
 MIT License
 
-Copyright (c) 2026 Hasan Emir Yildirim
+Copyright (c) 2026 Hasan Emir Yıldırım
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation and data files (the "Software"),
@@ -44,37 +44,61 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+------------------------------------------------------------------------------
+MEDIA EXCEPTION
+------------------------------------------------------------------------------
+
+The MIT license above covers ONLY the code, tooling, dataset structure, and
+instruction text/translations in this repository.
+
+It DOES NOT cover the exercise media in the `images/` and `videos/`
+directories. That media is © Gym visual (https://gymvisual.com/) and is
+included here with the rights holder's written permission, at 180×180
+resolution, and must retain the attribution "© Gym visual —
+https://gymvisual.com/". Its use and reuse are governed by Gym visual's Terms
+& Conditions (https://gymvisual.com/content/3-terms-and-conditions-of-use) and
+by `NOTICE.md` in this repository — NOT by the MIT license above. Cloning this
+repository does not grant you any license to the media; obtain your own from
+Gym visual.
 ```
-
-### Media exception (retained verbatim from the pinned LICENSE)
-
-The MIT license above covers **ONLY** the code, tooling, dataset structure, and
-instruction text / translations in that repository. It **DOES NOT** cover the
-exercise media in the `images/` and `videos/` directories. That media is
-© Gym visual (https://gymvisual.com/) and is included upstream with the rights
-holder's written permission, at 180×180 resolution, and must retain the
-attribution "© Gym visual – https://gymvisual.com/". Its use and reuse are
-governed by Gym visual's Terms & Conditions
-(https://gymvisual.com/content/3-terms-and-conditions-of-use) — **NOT** by the
-MIT license above.
 
 **Phase 3 position:** The Health project does **not** clone, copy, or reuse any
 of that media. The Phase 3 import adapter explicitly strips and rejects all
 media fields; Phase 3 illustrations are original, project-authored local SVGs.
-Cloning the upstream dataset grants no media license to this project, and none
-is asserted.
+No license to the upstream media is asserted.
 
 ## 2. Snouzy/workout-cool — comparison only, no content copied
 
 - **Pinned version:** commit `77f25a922b51be7d96bd051c5d2096959f0d61a8`
 - **URL:** https://github.com/Snouzy/workout-cool/tree/77f25a922b51be7d96bd051c5d2096959f0d61a8
-- **License:** not applicable — no code or data is copied.
+- **License:** MIT (upstream repository; no code or data is copied here).
 - **Use in Phase 3:** read-only structural comparison of the Prisma exercise,
   program, program-week, session, set, enrollment and progress relationships,
   to contrast plan / execution separation concepts.
 - **Excluded:** no code or data is copied; the project does not inherit
   workout-cool's absent risk tier, missing-data gate, contraindications, stop
   conditions, provenance, policy version, or validator model.
+
+### MIT License (retained verbatim from the pinned commit)
+
+```
+MIT License
+
+Copyright (c) 2023 Mathias Bradiceanu
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
+following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
 
 ## 3. Authoritative references (cited concepts, not copied media)
 
@@ -98,4 +122,5 @@ The curated exercise catalog (`backend/app/training/data/exercises.v1.json`)
 and all illustrations (`assets/training/illustrations/*.svg`) are
 **project-authored** original content, reviewed for the personal-development
 validation scope only. They are not a clinical endorsement, professional
-certification, or public-release approval.
+certification, or public-release approval. The repository currently declares
+no distribution license for this project-authored content.

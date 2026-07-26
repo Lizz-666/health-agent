@@ -29,6 +29,7 @@ from tests.conftest_pg import pg_available, requires_pg, skip_reason
 # genuinely unavailable — never because the SQLite patch is active).
 pytestmark = [
     requires_pg,
+    pytest.mark.requires_pg,
     pytest.mark.asyncio,
 ]
 

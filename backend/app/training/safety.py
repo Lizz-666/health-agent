@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -73,6 +74,47 @@ class SafetyPolicy(BaseModel):
 
     @model_validator(mode="after")
     def _build_reverse_maps(self):
+        expected_qualifiers = {
+            "underage", "pregnancy_or_postpartum",
+            "recent_surgery_or_major_injury", "major_chronic_condition",
+            "eating_disorder_concern", "professional_instruction_limitations",
+        }
+        if set(self.all_risk_screen_qualifiers) != expected_qualifiers:
+            raise ValueError("all_risk_screen_qualifiers must match the approved set")
+        if set(self.restricted_risk_screen_qualifiers) != expected_qualifiers:
+            raise ValueError(
+                "restricted_risk_screen_qualifiers must match the approved set")
+        if self.risk_precedence != [
+            "red_flag", "restricted", "clarification_required",
+            "eligible_conservative", "eligible",
+        ]:
+            raise ValueError("risk_precedence does not match the approved order")
+        if set(self.red_flag_followup_signals) != {
+            "has_neurological_symptom", "has_dizziness_or_chest_symptom",
+            "has_acute_trauma",
+        }:
+            raise ValueError("red_flag_followup_signals must match the approved set")
+        if self.required_profile_fields != [
+            "fitness_goal", "training_experience", "weekly_frequency",
+            "session_duration_minutes", "equipment",
+        ]:
+            raise ValueError("required_profile_fields must match the approved set")
+        if self.caution_sources != {
+            "training_experience_beginner": True,
+            "non_empty_pain_limitations": True,
+            "checkin_caution": True,
+            "retained_pain_caution": True,
+            "posture_cautious": True,
+        }:
+            raise ValueError("caution_sources must match the approved controls")
+        if self.recovery != {
+            "requires_source_correction_or_deletion": True,
+            "no_manual_override": True,
+            "time_elapsed_does_not_clear": True,
+            "acknowledgement_does_not_clear": True,
+            "newer_normal_checkin_alone_does_not_clear": True,
+        }:
+            raise ValueError("recovery must match the approved controls")
         body_index: Dict[str, str] = {}
         status_index: Dict[str, str] = {}
         for canonical, aliases in self.body_region_aliases.items():
@@ -126,7 +168,14 @@ def _is_missing_profile_field(hp, field_name: str) -> bool:
 
 def _goal_fingerprint(goals) -> str:
     active = [g for g in goals if g.active]
-    parts = [f"{g.issue_id}:{int(g.blocked)}" for g in active]
+    parts = [
+        ":".join([
+            g.issue_id, str(int(g.blocked)), _iso(g.confirmed_at) or "",
+            g.suggestion_id or "", g.profile_version or "",
+            g.rule_version or "", g.risk_version or "",
+        ])
+        for g in active
+    ]
     return "|".join(sorted(parts))
 
 
@@ -143,6 +192,9 @@ def compose_fingerprint(ctx: TrainingSafetyContext) -> str:
             sorted(r.token for r in ctx.retained_pain)),
         "posture_signals_digest": ctx.posture.active_signals_digest,
         "posture_goal_fingerprint": _goal_fingerprint(ctx.posture.goals),
+        "current_checkin_risk": ctx.checkin.recomputed_risk,
+        "posture_risk_tier": ctx.posture.global_risk_tier,
+        "request": ctx.request.model_dump(mode="json"),
         "policy_version": ctx.versions.policy_version,
         "catalog_version": ctx.versions.catalog_version,
         "source_manifest_version": ctx.versions.source_manifest_version,
@@ -154,7 +206,12 @@ def compose_fingerprint(ctx: TrainingSafetyContext) -> str:
 
 
 def _iso(value: Any) -> Optional[str]:
-    return value.isoformat() if value is not None else None
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return aware.astimezone(timezone.utc).isoformat()
+    return value.isoformat()
 
 
 def classify_safety(
@@ -230,9 +287,57 @@ def classify_safety(
     if not ctx.checkin.present:
         missing.append("current_day_checkin")
         reason.append("current_checkin_missing")
+    elif ctx.checkin.token is None or ctx.checkin.recomputed_risk not in {
+            NORMAL, CAUTION, RESTRICTED, RED_FLAG}:
+        missing.append("current_day_checkin")
+        reason.append("current_checkin_invalid")
+    elif (ctx.checkin.abnormal_pain
+          and ctx.checkin.pain_area_canonical is None):
+        missing.append("current_checkin.pain_area")
+        reason.append("current_pain_area_unnormalizable")
+    for rec in ctx.retained_pain:
+        if rec.recomputed_risk not in {NORMAL, CAUTION, RESTRICTED, RED_FLAG}:
+            missing.append("retained_pain.risk")
+            reason.append("retained_pain_invalid")
+        if rec.pain_area_canonical is None:
+            missing.append("retained_pain.pain_area")
+            reason.append("retained_pain_area_unnormalizable")
     if not any(g.active and not g.blocked for g in ctx.posture.goals):
         missing.append("confirmed_posture_goal")
         reason.append("posture_goal_missing_or_blocked")
+    if not ctx.posture.active_signals_digest or not ctx.posture.risk_version:
+        missing.append("posture_source_version")
+        reason.append("posture_source_version_missing")
+    if hp.configured and (hp.profile_version is None or hp.profile_updated_at is None):
+        missing.append("health_profile_version")
+        reason.append("health_profile_version_missing")
+    if not ctx.versions.catalog_version:
+        missing.append("catalog_version")
+        reason.append("catalog_version_missing")
+    if not ctx.versions.source_manifest_version:
+        missing.append("source_manifest_version")
+        reason.append("source_manifest_version_missing")
+    request = ctx.request
+    if any(value is None for value in (
+        request.fitness_goal, request.equipment_bodyweight,
+        request.equipment_resistance_band, request.weekly_frequency,
+        request.session_duration_minutes,
+    )):
+        missing.append("recommendation_request")
+        reason.append("recommendation_request_incomplete")
+    elif not (request.equipment_bodyweight
+              or request.equipment_resistance_band):
+        missing.append("recommendation_request.equipment")
+        reason.append("recommendation_request_equipment_missing")
+    elif (
+        request.fitness_goal.value != hp.fitness_goal
+        or request.equipment_bodyweight != hp.equipment_bodyweight
+        or request.equipment_resistance_band != hp.equipment_resistance_band
+        or request.weekly_frequency != hp.weekly_frequency
+        or request.session_duration_minutes != hp.session_duration_minutes
+    ):
+        missing.append("recommendation_request")
+        reason.append("recommendation_request_profile_mismatch")
 
     has_clarification = bool(missing)
 
