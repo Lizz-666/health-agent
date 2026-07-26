@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
 from app.auth.models import User, VerificationCode
 from app.core.config import settings
-from app.core.exceptions import BadRequest, TooManyRequests
+from app.core.exceptions import TooManyRequests
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ async def verify_code(db: AsyncSession, phone: str, code: str) -> bool:
         .where(
             VerificationCode.phone == phone,
             VerificationCode.code == code,
-            VerificationCode.used == False,
+            VerificationCode.used.is_(False),
             VerificationCode.expires_at > now,
         )
         .values(used=True)

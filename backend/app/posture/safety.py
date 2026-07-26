@@ -22,7 +22,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AppException, BadRequest, ServiceUnavailable
+from app.core.exceptions import AppException, ServiceUnavailable
 from app.posture import risk_rules
 from app.posture.models import (
     IdempotencyRecord,

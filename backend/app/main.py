@@ -3,8 +3,12 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.core.exceptions import AppException
 from app.auth.router import router as auth_router
+from app.core.exceptions import AppException
+from app.health.router import router as health_router
+from app.posture.router import router as posture_router
+from app.upload.router import router as upload_router
+from app.user.router import router as user_router
 
 logger = logging.getLogger("app.main")
 
@@ -53,21 +57,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(auth_router)
-
-from app.user.router import router as user_router
-
 app.include_router(user_router)
-
-from app.posture.router import router as posture_router
-
 app.include_router(posture_router)
-
-from app.upload.router import router as upload_router
-
 app.include_router(upload_router)
-
-from app.health.router import router as health_router
-
 app.include_router(health_router)
 
 

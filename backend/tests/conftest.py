@@ -1,10 +1,9 @@
 import os
 import uuid as _uuid
 import sqlite3
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy import String, event
+from sqlalchemy import String
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 # Determine the test DB URL (default: SQLite for fast local testing).
@@ -110,9 +109,9 @@ if "sqlite" in TEST_DB_URL:
     aiosqlite.core.Connection._execute = _patched_execute
 
 
-from app.db.base import Base
-from app.db.database import get_db
-from app.main import app
+from app.db.base import Base  # noqa: E402
+from app.db.database import get_db  # noqa: E402
+from app.main import app  # noqa: E402
 
 test_engine = create_async_engine(TEST_DB_URL, echo=False)
 
