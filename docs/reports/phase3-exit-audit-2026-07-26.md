@@ -7,15 +7,15 @@
 
 ## 1. Decision and SHAs
 
-Phase 3 is **verified and committed locally**. It is eligible for local
-integration. There are no unresolved P0, P1, or P2 findings.
+Phase 3 is **complete, verified, committed, and locally integrated**. There are
+no unresolved P0, P1, or P2 findings.
 
 | Item | SHA |
 | --- | --- |
 | Comparison base | `c49eb618759ff85d7235f515b57c9d3fad38d6cb` |
 | OpenCode final handoff | `9ccaa3587c1bd258a04f326271db46c16994989b` |
 | Codex acceptance fixes | `423bf55f1a54215f4f0ece0506c7d3b5259441fd` |
-| Status/report commit | commit containing this report |
+| Final report/status before integration | `663f262` |
 
 The complete accepted range through `423bf55` changes 69 files with 11,784
 insertions and 10 deletions. No Flutter runtime, public router, training DB
@@ -150,4 +150,4 @@ from reaching final review with coupled defects.
 
 Only synthetic test data was used. No real health data, photo, credential,
 production key, deployment, push, PR, or external write occurred. Phase 3
-meets the roadmap exit criteria locally and is ready for local integration.
+meets the roadmap exit criteria locally and has been fast-forward integrated.

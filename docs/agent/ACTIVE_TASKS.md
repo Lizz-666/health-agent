@@ -5,7 +5,7 @@
 
 ## Current Initiative
 
-- 阶段：Phase 3 训练知识与安全引擎。
+- 阶段：Phase 3 训练知识与安全引擎已完成并本地集成；下一阶段尚未启动。
 - 规格：`docs/specs/training/2026-07-26-training-knowledge-safety-engine.md`
 - 计划：`docs/plans/training/2026-07-26-training-knowledge-safety-engine.md`
 - Phase 2 最终证据：`docs/reports/phase2-exit-audit-2026-07-26.md`；Final Closure commit `1818e74`。用户接受的残余风险仍是 Android 人工逐屏业务回放未执行，不改写为已通过。
@@ -24,11 +24,11 @@
 | Task | Executor | Branch / worktree | Base SHA | Status | Scope and coordination note |
 | --- | --- | --- | --- | --- | --- |
 | Phase 3 Task 0 | Codex coordinator | `codex/phase3-spec-plan` / root worktree | `1818e74` | `committed` | 规格、来源/许可 pin、workout.cool 对照矩阵、Tasks 0-7 charters、CI 分层和实验评价口径；独立复核的 4 P1、5 P2、2 P3 已全部关闭；commit `2ed211a`。 |
-| Phase 3 Tasks 1-7 | OpenCode + Claude implementation; Codex final acceptance and fixes | `codex/phase3-opencode-implementation` / `health-worktrees/phase3-opencode-implementation` | `c49eb618759ff85d7235f515b57c9d3fad38d6cb` | `committed` | OpenCode handoff `9ccaa35` failed first-pass acceptance. Codex closed safety, validator, source/media/license and CI-evidence findings in `423bf55`; local Full: `989 passed`, 0 failed, 0 skipped, PostgreSQL `13/13`, ruff/diff clean. Report and collaboration recommendation: `docs/reports/phase3-exit-audit-2026-07-26.md`. Remote CI remains `not authorized/not run`; branch is ready for local integration. |
+| Phase 3 Tasks 1-7 | OpenCode + Claude implementation; Codex final acceptance and fixes | `codex/phase3-opencode-implementation` / `health-worktrees/phase3-opencode-implementation` | `c49eb618759ff85d7235f515b57c9d3fad38d6cb` | `merged` | OpenCode handoff `9ccaa35` failed first-pass acceptance. Codex closed safety, validator, source/media/license and CI-evidence findings in `423bf55`; local Full: `989 passed`, 0 failed, 0 skipped, PostgreSQL `13/13`, ruff/diff clean. Final report/status `663f262` was fast-forward integrated into `codex/phase3-spec-plan`. Remote CI remains `not authorized/not run`. |
 
 ## Integration Order
 
-1. Task 0 approved baseline -> OpenCode 在同一分支依次完成 Tasks 1-7 -> 整阶段完成报告 -> Codex 最终两轮审查、重新验证、必要修复/退回 -> 本地集成。
+1. Phase 3 已按既定顺序完成：Task 0 基线 -> OpenCode Tasks 1-7 -> Codex 终验与修复 -> 本地 fast-forward 集成。
 2. 内部 Task 完成后 OpenCode 先自审、运行 focused verification 并创建内聚本地 commit，再继续下一项；不等待 Codex 例行验收。
 3. Task 1 实现 CI foundation；push/PR 仍需用户明确授权，未授权前远程 CI 证据必须标记 `not authorized/not run`。
 4. rebase、冲突修复、catalog/policy 内容变化或最终集成后，受影响的旧验证证据失效并在新 SHA 上重跑。
@@ -36,7 +36,7 @@
 
 ## Worktree State
 
-- `health` 根 worktree：当前 `codex/phase3-spec-plan` 协调分支。未跟踪 `.opencode/package-lock.json` 与 Phase 3 无关，保持未暂存、未提交。
+- `health` 根 worktree：当前 `codex/phase3-spec-plan`，Phase 3 已本地集成。未跟踪 `.opencode/package-lock.json` 与 Phase 3 无关，保持未暂存、未提交。
 - Phase 3 单一实现 worktree 为 `health-worktrees/phase3-opencode-implementation`，分支 `codex/phase3-opencode-implementation`，从 `c49eb618759ff85d7235f515b57c9d3fad38d6cb` 创建；旧 Task 1 worktree/分支已在确认干净后移除。
 - Phase 2 Task worktree 是干净历史实现/审计 tip，不是 Phase 3 基线；可在独立 housekeeping 中移除，分支和历史保留。
 - `starlit-galaxy-rolls-21h55` 及列出的 Phase 1 历史 worktree 含未提交或冻结改动，不得删除、覆盖、提交或用作 Phase 3 基线。

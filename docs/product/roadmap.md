@@ -232,7 +232,7 @@ flowchart TB
 
 ## 7. 阶段 3：训练知识与安全引擎
 
-> 状态（2026-07-26）：**已验证并本地提交，等待本地集成。**
+> 状态（2026-07-26）：**已完成、验证并本地集成。**
 > OpenCode 完成 Tasks 1-7 后，Codex 对完整 diff 做独立终验，首次交付未通过；阻断项在 `423bf55` 关闭。新鲜本地证据为 `989 passed`、0 failed、0 skipped、PostgreSQL expected/actual `13/13`、ruff 与 diff 检查通过。远程 GitHub CI 未授权、未运行；退出与协作实验评价见 `docs/reports/phase3-exit-audit-2026-07-26.md`。
 > 当前规格：`docs/specs/training/2026-07-26-training-knowledge-safety-engine.md`。
 > 当前计划：`docs/plans/training/2026-07-26-training-knowledge-safety-engine.md`。
