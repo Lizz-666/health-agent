@@ -1,0 +1,155 @@
+# Phase 3 CI foundation (Task 1).
+#
+# Layered verification per docs/product/roadmap.md section 13.1 and the Phase 3
+# implementation plan:
+#   - fast : ruff + SQLite backend tests + git diff --check. Runs on push / PR
+#            to the Phase 3 implementation branches and on manual dispatch.
+#   - full : ruff + COMPLETE backend tests on a real PostgreSQL 16 service,
+#            enforcing zero PostgreSQL skips (VERIFY_REQUIRE_PG=1). Manual only
+#            (workflow_dispatch with run_full=true) so it is used at integration
+#            / phase-exit nodes.
+#
+# Constraints:
+#   - Least permissions: contents: read only. No deployment, release, package
+#     write, production secret, real photo, or real health data.
+#   - Third-party actions are pinned to reviewed immutable commit SHAs (no
+#     floating tags). SHAs verified 2026-07-26 against each action repository.
+#   - Same-branch runs cancel stale runs; every job has an explicit timeout;
+#     caches hold no secrets (pip download cache only).
+#   - Synthetic data only. CI never dumps env values, health payloads, raw
+#     request bodies, or secrets.
+#   - CI failures stay failures; nothing converts a failure into a success.
+#
+# Remote runs remain `not authorized / not run` until a user authorizes the
+# first push; this file only defines the contract.
+
+name: ci
+
+on:
+  push:
+    branches:
+      - "codex/phase3-*"
+  pull_request:
+    branches:
+      - "codex/phase3-*"
+  workflow_dispatch:
+    inputs:
+      run_full:
+        description: "Run the Full CI job (complete tests + PostgreSQL 16)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.9.13"
+  # Pinned dev/CI tools kept OUT of backend/requirements.txt by design (they
+  # are not runtime dependencies). Both are reproducible, immutable versions.
+  RUFF_VERSION: "0.15.22"
+  HYPOTHESIS_VERSION: "6.141.1"
+
+jobs:
+  fast:
+    name: Fast (lint + SQLite tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend deps + pinned dev tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install ruff==${{ env.RUFF_VERSION }}
+      - name: Fast verify (lint + SQLite tests + git diff --check)
+        env:
+          VERIFY_SUMMARY_FILE: fast-summary.txt
+        run: python scripts/verify.py fast
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: ci-fast-summary
+          path: fast-summary.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  full:
+    name: Full (complete tests + PostgreSQL 16)
+    # Manual only: triggered at integration / phase-exit nodes. Keeps Full CI
+    # cost for when it is the authoritative gate.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_full }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        # postgres:16 tag is the same image the repo's own conftest_pg.py uses
+        # for local Docker-backed PG tests; pinned tag (not floating latest).
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: posture_pg_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Guarded external DSN contract enforced by tests/conftest_pg.py: the
+      # database name MUST be posture_pg_test[_*] and PG_TEST_ALLOW_DESTRUCTIVE
+      # MUST be set, or the suite fails closed (never silently skips).
+      PG_TEST_DSN: postgresql+asyncpg://postgres:testpass@localhost:5432/posture_pg_test
+      PG_TEST_ALLOW_DESTRUCTIVE: "1"
+      # Full CI contract: ANY skipped test is a hard failure, proving the
+      # PostgreSQL-backed tests actually ran (zero PG skips).
+      VERIFY_REQUIRE_PG: "1"
+      VERIFY_SUMMARY_FILE: full-summary.txt
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend deps + pinned dev tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install ruff==${{ env.RUFF_VERSION }} hypothesis==${{ env.HYPOTHESIS_VERSION }}
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+              echo "PostgreSQL is ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "PostgreSQL did not become ready" >&2
+          exit 1
+      - name: Full verify (lint + complete tests + PostgreSQL 16 + git diff)
+        run: python scripts/verify.py full
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: ci-full-summary
+          path: full-summary.txt
+          if-no-files-found: warn
+          retention-days: 30
