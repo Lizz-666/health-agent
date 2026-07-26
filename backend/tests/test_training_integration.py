@@ -20,13 +20,22 @@ import pytest
 from app.auth.models import User
 from app.health.models import DailyCheckIn, HealthProfile
 from app.posture.models import PostureUserGoal
+from app.training.candidates import select_candidates
 from app.training.context import build_context
+from app.training.knowledge import build_index, load_catalog
+from app.training.policy import load_training_policy
 from app.training.safety import classify_safety, load_safety_policy
-from app.training.schemas import GateStatus, RequestSnapshot
+from app.training.schemas import (
+    GateStatus, PlanPrescription, PlanSession, RequestSnapshot,
+    TrainingPlanDraft)
+from app.training.tools import validate_training_plan
 from tests.conftest import TestSession
 from tests.conftest_pg import requires_pg
 
 POLICY = load_safety_policy("app/training/data/training_safety_policy.v1.json")
+TPOLICY = load_training_policy("app/training/data/training_policy.v1.json")
+CATALOG = load_catalog("app/training/data/exercises.v1.json")
+CATALOG_INDEX = build_index(CATALOG)
 EVAL_AT = datetime(2026, 7, 26, 1, 30, tzinfo=timezone.utc)
 TODAY = date(2026, 7, 26)
 PRIOR = date(2026, 7, 20)
@@ -230,3 +239,94 @@ async def test_adapter_source_correction_clears_retained_red_flag():
         assert ctx.retained_pain == []
         assert (classify_safety(ctx, POLICY).gate_status
                 is GateStatus.eligible)
+
+
+# ---------------------------------------------------------------------------
+# Task 6 additive: validate_training_plan Tool end-to-end (SQLite + PostgreSQL)
+# ---------------------------------------------------------------------------
+
+
+def _valid_tool_draft(decision, candidate_id):
+    ex = CATALOG_INDEX[candidate_id]
+    rx = ex.prescription
+    presc = PlanPrescription(
+        exercise_id=candidate_id, sets=rx.sets_min,
+        reps=rx.reps_min if rx.mode.value == "reps" else None,
+        duration_seconds=(rx.duration_seconds_min
+                          if rx.mode.value == "duration" else None),
+        rest_seconds=rx.rest_seconds_min)
+    sessions = []
+    for week in (1, 2, 3, 4):
+        for order, day in enumerate((1, 3, 5), start=1):
+            sessions.append(PlanSession(
+                week_index=week, day_of_week=day, session_order=order,
+                prescriptions=[presc]))
+    return TrainingPlanDraft.model_validate({
+        "draft_id": "d1", "requested_goal": "basic_strength",
+        "source_context_fingerprint": decision.fingerprint,
+        "profile_version": 1, "catalog_version": CATALOG.content_version,
+        "policy_version": "v1", "source_manifest_version": "v1",
+        "sessions": sessions})
+
+
+def _tool_request():
+    return RequestSnapshot(fitness_goal="basic_strength",
+                           equipment_bodyweight=True,
+                           equipment_resistance_band=False,
+                           iana_timezone="Asia/Shanghai")
+
+
+async def _assert_tool_validates(db):
+    uid = await _create_user(db, "13900000020")
+    await _add_profile(db, uid)
+    await _add_checkin(db, uid, TODAY)
+    await _add_goal(db, uid)
+    probe = await build_context(
+        db, str(uid), request=_tool_request(), policy=POLICY,
+        catalog_version=CATALOG.content_version,
+        source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
+    decision = classify_safety(probe, POLICY)
+    cand = select_candidates(probe, decision, CATALOG, TPOLICY, POLICY)
+    draft = _valid_tool_draft(decision, cand.candidates[0].exercise_id)
+    result = await validate_training_plan(
+        db, str(uid), draft, request=_tool_request(), catalog=CATALOG,
+        safety_policy=POLICY, training_policy=TPOLICY,
+        source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
+    assert result.valid is True, [v.code for v in result.violations]
+    assert result.gate_status is GateStatus.eligible
+
+
+@pytest.mark.asyncio
+async def test_tool_validates_valid_draft_sqlite():
+    async with TestSession() as db:
+        await _assert_tool_validates(db)
+
+
+@requires_pg
+@pytest.mark.asyncio
+async def test_tool_validates_valid_draft_postgresql(pg_session):
+    await _assert_tool_validates(pg_session)
+
+
+@pytest.mark.asyncio
+async def test_tool_blocked_context_on_retained_red_flag_sqlite():
+    async with TestSession() as db:
+        uid = await _create_user(db, "13900000021")
+        await _add_profile(db, uid)
+        await _add_checkin(db, uid, TODAY)
+        await _add_goal(db, uid)
+        await _add_checkin(db, uid, PRIOR, abnormal=True,
+                           followup=_red_flag_followup(),
+                           risk_summary="red_flag")
+        probe = await build_context(
+            db, str(uid), request=_tool_request(), policy=POLICY,
+            catalog_version=CATALOG.content_version,
+            source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
+        decision = classify_safety(probe, POLICY)
+        draft = _valid_tool_draft(decision, CATALOG.exercises[0].exercise_id)
+        result = await validate_training_plan(
+            db, str(uid), draft, request=_tool_request(), catalog=CATALOG,
+            safety_policy=POLICY, training_policy=TPOLICY,
+            source_manifest_version="v1", evaluated_at_utc=EVAL_AT)
+        assert result.valid is False
+        assert "blocked_context" in [v.code for v in result.violations]

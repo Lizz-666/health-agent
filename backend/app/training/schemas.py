@@ -740,3 +740,87 @@ class CandidateResult(BaseModel):
     policy_version: str
     catalog_version: Optional[str] = None
     conservative: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Draft plan + validation result contracts (Task 6)
+# ---------------------------------------------------------------------------
+
+
+class PlanPrescription(BaseModel):
+    """One exercise prescription within a session."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    exercise_id: str = Field(..., min_length=1, max_length=60)
+    sets: int = Field(..., ge=1, le=10)
+    reps: Optional[int] = Field(None, ge=1, le=100)
+    duration_seconds: Optional[int] = Field(None, ge=5, le=3600)
+    rest_seconds: int = Field(..., ge=0, le=600)
+    relation_reason: Optional[str] = Field(None, max_length=30)
+
+
+class PlanSession(BaseModel):
+    """A session in the four-week timeline.
+
+    ``week_index`` 1-4, ``day_of_week`` 1-7, ``session_order`` unique within the
+    week. Together they form the sole ordinal recovery/frequency timeline.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    week_index: int = Field(..., ge=1, le=4)
+    day_of_week: int = Field(..., ge=1, le=7)
+    session_order: int = Field(..., ge=1, le=20)
+    prescriptions: List[PlanPrescription] = Field(..., min_length=1)
+
+    @field_validator("prescriptions")
+    @classmethod
+    def _no_blank_relation(cls, v):
+        for p in v:
+            if p.relation_reason is not None and not p.relation_reason.strip():
+                raise ValueError("relation_reason must be non-blank")
+        return v
+
+
+class TrainingPlanDraft(BaseModel):
+    """A minimal four-week draft plan for validation + Phase 4 handoff.
+
+    Carries NO persistence / activation / completion state. Validation never
+    mutates or repairs it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    draft_id: str = Field(..., min_length=1, max_length=60)
+    requested_goal: str = Field(..., min_length=1, max_length=30)
+    source_context_fingerprint: str = Field(..., min_length=1)
+    profile_version: Optional[int] = None
+    catalog_version: str = Field(..., min_length=1, max_length=40)
+    policy_version: str = Field(..., min_length=1, max_length=20)
+    source_manifest_version: str = Field(..., min_length=1, max_length=20)
+    sessions: List[PlanSession] = Field(..., min_length=1)
+
+
+class PlanViolation(BaseModel):
+    """One structured validation violation (code + scope, no raw health data)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(..., min_length=1, max_length=60)
+    scope: str = Field("plan", min_length=1, max_length=80)
+    detail: str = Field(..., min_length=1, max_length=240)
+
+
+class PlanValidationResult(BaseModel):
+    """Pure, side-effect-free validation result (fail-closed)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    valid: bool
+    gate_status: GateStatus
+    decision_fingerprint: str = Field(..., min_length=1)
+    violations: List[PlanViolation] = Field(default_factory=list)
+    profile_version: Optional[int] = None
+    catalog_version: Optional[str] = None
+    policy_version: str
