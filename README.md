@@ -2,7 +2,7 @@
 
 体态评估为核心的个人健康教练，Flutter + FastAPI 架构。
 
-当前阶段：阶段 2（健康档案、签到与趋势）自动化验证与 PostgreSQL 集成已通过，待 Android 冒烟补齐后收尾；详见 `docs/reports/phase2-exit-audit-2026-07-26.md`
+当前阶段：阶段 2（健康档案、签到与趋势）已完成（自动化验证 + PostgreSQL 16 + Android 启动证据；Android 人工逐屏冒烟由用户决定跳过，作为接受的残余风险）；详见 `docs/reports/phase2-exit-audit-2026-07-26.md`
 
 ## 运行时要求
 
@@ -192,7 +192,7 @@ start ms-settings:developers   # 打开设置并启用开发者模式
 | 后端 ruff（`app tests`） | All checks passed | 2026-07-26 |
 | Flutter analyze | No issues found | 2026-07-26 |
 | Flutter test | 300 passed | 2026-07-26 |
-| Android 完整业务冒烟（阶段 2） | 未执行（`Pixel_6` AVD 可列出，但未跑目标平台流程）→ 阶段 2 暂不标记完成 | 2026-07-26 |
+| Android（阶段 2） | Pixel 6 AVD 构建、安装、启动（MainActivity resumed）+ 一次性 PG16/uvicorn 实时旅程 15/15 + 300 widget；人工逐屏冒烟由用户决定跳过（接受残余风险） | 2026-07-26 |
 
 ### 依赖升级记录
 

@@ -1,6 +1,6 @@
 # Phase 2 Health Profile, Check-Ins, And Trends Implementation Plan
 
-> 状态（2026-07-26）：Tasks 1–7 已合并于 `codex/phase2-spec-plan`（Task 8 base `26f785f`）。Task 8 退出审计完成：新增 `backend/tests/test_phase2_e2e.py`（6 项），后端 798 passed、ruff clean、Flutter 300 passed、真实 PG16 集成 11 passed、一次性 PG16 容器裸 CLI `alembic upgrade head/current` 通过；**Android 冒烟未执行**，阶段 2 不标记完成。详见 `docs/reports/phase2-exit-audit-2026-07-26.md`。
+> 状态（2026-07-26 Final Closure）：Tasks 1–8B 已完成，Phase 2 已完成。证据：后端 798 passed、ruff clean、Phase 2 E2E 6 passed、Flutter 300 passed、真实 PG16 集成 11 passed、一次性 PG16 容器裸 CLI `alembic upgrade head/current` 到 0006、Android Pixel 6 AVD 构建/安装/启动（MainActivity resumed）、一次性 PG16/uvicorn 实时旅程 15/15。**Android 人工逐屏业务回放由用户决定跳过，作为接受的残余风险；不写作“人工逐屏冒烟通过”。** 详见 `docs/reports/phase2-exit-audit-2026-07-26.md`。
 
 **Goal:** Deliver a verified Phase 2 vertical slice where users can maintain structured health profile data, complete daily check-ins, record optional weight, and review trends/grid data without AI inference or training-plan generation.
 
