@@ -22,7 +22,7 @@ Conventions mirror ``app.health.schemas`` / ``app.posture.schemas``.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
 from typing import Dict, List, Optional
 
@@ -519,3 +519,181 @@ class ImportedExerciseDraft(BaseModel):
     review_status: ReviewStatus = ReviewStatus.needs_review
     source_id: str = Field(..., min_length=1, max_length=80)
     source_pinned_version: str = Field(..., min_length=1, max_length=120)
+
+
+# ---------------------------------------------------------------------------
+# Training safety context + decision (Task 4)
+# ---------------------------------------------------------------------------
+
+
+class GateStatus(str, Enum):
+    """Safety gate outcomes in precedence order (highest first).
+
+    red_flag > restricted > clarification_required > eligible_conservative >
+    eligible (spec: Safety decision). Restricted / red_flag expose no
+    candidate IDs (enforced in candidates.py, not here).
+    """
+
+    red_flag = "red_flag"
+    restricted = "restricted"
+    clarification_required = "clarification_required"
+    eligible_conservative = "eligible_conservative"
+    eligible = "eligible"
+
+
+class SafetyRiskTier(str, Enum):
+    """The two-dimensional risk classification. ``None`` on the decision means
+    classification could not run because required data was missing."""
+
+    normal = "normal"
+    caution = "caution"
+    restricted = "restricted"
+    red_flag = "red_flag"
+
+
+class PainLimitationSnapshot(BaseModel):
+    """A user-stated pain limitation with normalization results filled in.
+
+    ``*_canonical`` is None when the reviewed alias map could not normalize the
+    raw value (the caller then fails the context to clarification_required).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    body_area_raw: str = Field(..., min_length=1, max_length=60)
+    status_raw: str = Field(..., min_length=1, max_length=30)
+    body_area_canonical: Optional[str] = None
+    status_canonical: Optional[str] = None
+
+
+class HealthProfileSnapshot(BaseModel):
+    """Structured current health profile (recomputed, never trusting labels)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    configured: bool = False
+    fitness_goal: Optional[str] = None
+    training_experience: Optional[str] = None
+    weekly_frequency: Optional[int] = None
+    session_duration_minutes: Optional[int] = None
+    equipment_bodyweight: Optional[bool] = None
+    equipment_resistance_band: Optional[bool] = None
+    pain_limitations: Optional[List[PainLimitationSnapshot]] = None
+    risk_screen: Optional[Dict[str, Optional[str]]] = None
+    profile_version: Optional[int] = None
+    profile_updated_at: Optional[datetime] = None
+
+
+class CheckInSnapshot(BaseModel):
+    """The current-day check-in with its recomputed risk and freshness token."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    present: bool = False
+    local_date: Optional[date] = None
+    recomputed_risk: Optional[str] = None
+    token: Optional[str] = None
+
+
+class RetainedPainRecord(BaseModel):
+    """A retained abnormal-pain check-in record (recomputed, token-bearing)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(..., min_length=1)
+    recomputed_risk: str = Field(..., min_length=1)
+    local_date: Optional[date] = None
+
+
+class PostureGoalSnapshot(BaseModel):
+    """A confirmed posture goal: active (not superseded) and blocked flags."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    issue_id: str = Field(..., min_length=1, max_length=30)
+    active: bool = True
+    blocked: bool = False
+
+
+class PostureSnapshot(BaseModel):
+    """Active posture safety-signal digest, global risk and confirmed goals."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    active_signals_digest: Optional[str] = None
+    global_risk_tier: Optional[str] = None
+    risk_version: Optional[str] = None
+    goals: List[PostureGoalSnapshot] = Field(default_factory=list)
+
+
+class RequestSnapshot(BaseModel):
+    """The recommendation/validation request parameters."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fitness_goal: Optional[str] = None
+    equipment_bodyweight: Optional[bool] = None
+    equipment_resistance_band: Optional[bool] = None
+    weekly_frequency: Optional[int] = None
+    session_duration_minutes: Optional[int] = None
+    iana_timezone: Optional[str] = None
+    client_local_date: Optional[date] = None
+
+
+class VersionMeta(BaseModel):
+    """Version pins included in the decision fingerprint."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    policy_version: str = Field(..., min_length=1)
+    catalog_version: Optional[str] = None
+    source_manifest_version: Optional[str] = None
+    schema_version: str = Field("v1", min_length=1)
+
+
+class EvalMeta(BaseModel):
+    """Evaluation clock / timezone metadata (server-derived, never client)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    evaluated_at_utc: datetime
+    iana_timezone: Optional[str] = None
+    current_local_date: Optional[date] = None
+    timezone_trusted: bool = False
+
+
+class TrainingSafetyContext(BaseModel):
+    """Immutable request snapshot assembled from current structured sources.
+
+    Pure-engine fixtures omit ``user_id``; the application adapter sets it for
+    authorization only and never lets it reach the decision fingerprint or logs.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: Optional[str] = None
+    health: HealthProfileSnapshot = Field(default_factory=HealthProfileSnapshot)
+    checkin: CheckInSnapshot = Field(default_factory=CheckInSnapshot)
+    retained_pain: List[RetainedPainRecord] = Field(default_factory=list)
+    posture: PostureSnapshot = Field(default_factory=PostureSnapshot)
+    request: RequestSnapshot = Field(default_factory=RequestSnapshot)
+    versions: VersionMeta
+    eval: EvalMeta
+
+
+class TrainingSafetyDecision(BaseModel):
+    """Deterministic safety decision (pure output, no raw sensitive values)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    gate_status: GateStatus
+    risk_tier: Optional[SafetyRiskTier] = None
+    reason_codes: List[str] = Field(default_factory=list)
+    missing_fields: List[str] = Field(default_factory=list)
+    blocking_source_refs: List[str] = Field(default_factory=list)
+    profile_version: Optional[int] = None
+    checkin_token: Optional[str] = None
+    posture_risk_version: Optional[str] = None
+    training_policy_version: str
+    catalog_version: Optional[str] = None
+    fingerprint: str = Field(..., min_length=1)

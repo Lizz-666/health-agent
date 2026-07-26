@@ -1,0 +1,91 @@
+{
+  "policy_version": "v1",
+  "review_scope": "personal_development",
+  "source": "Approved safety-boundaries (2026-06-12) risk grading and the Phase 3 spec risk/eligibility rules. These are versioned product-policy constraints within the healthy-adult source envelope, not medical prescriptions.",
+  "body_region_aliases": {
+    "knee": ["knee", "knees", "patella", "膝盖", "髌骨", "膝关节"],
+    "hip": ["hip", "hips", "hip joint", "髋", "髋部", "髋关节", "臀部关节"],
+    "lower_back": ["lower back", "lower_back", "lumbar", "lower spine", "下腰", "腰部", "腰", "下背部"],
+    "spine": ["spine", "spinal", "back", "upper back", "脊柱", "脊椎", "背部", "背"],
+    "shoulder": ["shoulder", "shoulders", "shoulder joint", "肩", "肩膀", "肩部", "肩关节"],
+    "neck": ["neck", "cervical", "cervical spine", "颈", "颈部", "颈椎"],
+    "elbow": ["elbow", "elbows", "肘", "肘部"],
+    "wrist": ["wrist", "wrists", "腕", "手腕"],
+    "ankle": ["ankle", "ankles", "踝", "脚踝"],
+    "foot": ["foot", "feet", "脚", "足", "足部"],
+    "chest": ["chest", "胸", "胸部"],
+    "head": ["head", "headache", "头", "头部", "头痛"]
+  },
+  "status_aliases": {
+    "aching": ["aching", "ache", "dull pain", "dull", "隐痛", "钝痛"],
+    "sharp": ["sharp", "sharp pain", "shooting", "刺痛", "剧痛", "放射痛"],
+    "throbbing": ["throbbing", "throbbing pain", "pulsing", "跳痛", "搏动痛"],
+    "stiffness": ["stiff", "stiffness", "僵硬", "发僵"],
+    "numbness": ["numb", "numbness", "tingling", "pins and needles", "麻木", "发麻", "刺麻"],
+    "weakness": ["weak", "weakness", "无力", "乏力"],
+    "burning": ["burning", "burn", "灼痛", "烧灼感"],
+    "general_soreness": ["sore", "soreness", "muscle soreness", "muscle ache", "酸", "酸痛", "酸痛感"]
+  },
+  "all_risk_screen_qualifiers": [
+    "underage",
+    "pregnancy_or_postpartum",
+    "recent_surgery_or_major_injury",
+    "major_chronic_condition",
+    "eating_disorder_concern",
+    "professional_instruction_limitations"
+  ],
+  "restricted_risk_screen_qualifiers": [
+    "underage",
+    "pregnancy_or_postpartum",
+    "recent_surgery_or_major_injury",
+    "major_chronic_condition",
+    "eating_disorder_concern",
+    "professional_instruction_limitations"
+  ],
+  "red_flag_followup_signals": [
+    "has_neurological_symptom",
+    "has_dizziness_or_chest_symptom",
+    "has_acute_trauma"
+  ],
+  "required_profile_fields": [
+    "fitness_goal",
+    "training_experience",
+    "weekly_frequency",
+    "session_duration_minutes",
+    "equipment"
+  ],
+  "risk_precedence": [
+    "red_flag",
+    "restricted",
+    "clarification_required",
+    "eligible_conservative",
+    "eligible"
+  ],
+  "caution_sources": {
+    "training_experience_beginner": true,
+    "non_empty_pain_limitations": true,
+    "checkin_caution": true,
+    "retained_pain_caution": true,
+    "posture_cautious": true
+  },
+  "recovery": {
+    "requires_source_correction_or_deletion": true,
+    "no_manual_override": true,
+    "time_elapsed_does_not_clear": true,
+    "acknowledgement_does_not_clear": true,
+    "newer_normal_checkin_alone_does_not_clear": true
+  },
+  "fingerprint_components": [
+    "profile_version",
+    "profile_updated_at",
+    "current_checkin_token",
+    "retained_pain_token_aggregate",
+    "posture_signals_digest",
+    "posture_goal_fingerprint",
+    "policy_version",
+    "catalog_version",
+    "source_manifest_version",
+    "current_local_date",
+    "iana_timezone"
+  ]
+}
