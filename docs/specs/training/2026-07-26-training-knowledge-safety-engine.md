@@ -1,11 +1,11 @@
 # Phase 3 Training Knowledge And Safety Engine
 
-> Status: approved Task 0 baseline, 2026-07-26. OpenCode delivered the Tasks 1-7
-> runtime implementation, static data, tests and CI configuration on the single
-> implementation branch `codex/phase3-opencode-implementation`
-> (exit report: `docs/reports/phase3-exit-audit-2026-07-26.md`). Verified/complete
-> status is recorded by Codex only after independent final acceptance; this note
-> is delivery evidence, not a verified/complete/public-release claim.
+> Status: verified and committed locally, 2026-07-26. OpenCode delivered Tasks
+> 1-7; Codex independently reviewed the full diff, repaired acceptance findings,
+> and verified `423bf55` with `989 passed`, 0 failed, 0 skipped, including exact
+> PostgreSQL evidence `13/13`. See
+> `docs/reports/phase3-exit-audit-2026-07-26.md`. This is personal-development
+> validation, not clinical or public-release approval. Remote CI was not run.
 
 ## Outcome
 

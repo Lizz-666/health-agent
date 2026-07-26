@@ -232,12 +232,11 @@ flowchart TB
 
 ## 7. 阶段 3：训练知识与安全引擎
 
-> 状态（2026-07-26）：**已启动，Task 0 规格与计划基线已验证。**
-> OpenCode 已在单一实现分支交付 Tasks 1-7 的全部运行时代码、静态数据、测试和 CI 配置（本地全量 `949 passed`、0 skipped、ruff clean、PostgreSQL 16.14 适配器回归 0 skip、Phase 3 专项 `151 passed`、源/许可/媒体审计无缺口）；退出报告见 `docs/reports/phase3-exit-audit-2026-07-26.md`。
-> **本状态不等于 verified/complete/merged**：阶段 3 完成状态仍以本节退出标准和 Codex 独立终验（真实 diff 审查 + 重新验证）为准，由 Codex 在验收后记录最终状态。
+> 状态（2026-07-26）：**已验证并本地提交，等待本地集成。**
+> OpenCode 完成 Tasks 1-7 后，Codex 对完整 diff 做独立终验，首次交付未通过；阻断项在 `423bf55` 关闭。新鲜本地证据为 `989 passed`、0 failed、0 skipped、PostgreSQL expected/actual `13/13`、ruff 与 diff 检查通过。远程 GitHub CI 未授权、未运行；退出与协作实验评价见 `docs/reports/phase3-exit-audit-2026-07-26.md`。
 > 当前规格：`docs/specs/training/2026-07-26-training-knowledge-safety-engine.md`。
 > 当前计划：`docs/plans/training/2026-07-26-training-knowledge-safety-engine.md`。
-> Phase 3 采用 OpenCode + Claude 在单一分支完成整阶段实现、Codex 仅在全部完成后执行终验的受控实验；完成状态仍以本节退出标准和新鲜证据为准。
+> Phase 3 的整阶段单次委派实验表明编码速度高但终验返工集中；后续采用每 2-3 个相关 Task 一个实现批次，并在安全契约边界安排 Codex 验收。
 
 ### 目标
 

@@ -1,13 +1,11 @@
 # Phase 3 Training Knowledge And Safety Engine Implementation Plan
 
-> Status: OpenCode delivered Tasks 1-7 implementation, static data, tests and CI
-> configuration on `codex/phase3-opencode-implementation` (local full `949 passed`,
-> 0 skipped; Phase 3 suite `151 passed`; PostgreSQL 16.14 adapter regression,
-> 0 skip; ruff clean; source/license/media audit clean). See
-> `docs/reports/phase3-exit-audit-2026-07-26.md`. Codex records the final
-> verified/complete status only after independent acceptance; this line is
-> delivery evidence, not a verified/complete/merged claim. Task 0 baseline remains
-> the approved specification.
+> Status: verified and committed locally, 2026-07-26. OpenCode delivered Tasks
+> 1-7; Codex rejected the first pass, closed the acceptance findings in
+> `423bf55`, and reran the local Full gate: `989 passed`, 0 failed, 0 skipped,
+> PostgreSQL expected/actual `13/13`, ruff and diff checks clean. See
+> `docs/reports/phase3-exit-audit-2026-07-26.md`. Remote CI was not authorized or
+> run. Task 0 remains the approved specification baseline.
 
 **Goal:** Deliver a deterministic, source-traceable home-exercise catalog, training safety gate, candidate engine, and `validate_training_plan` Tool without plan generation, AI, or Flutter training UI.
 

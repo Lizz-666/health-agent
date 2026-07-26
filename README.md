@@ -115,11 +115,11 @@ Actions 分层 CI（`.github/workflows/ci.yml`）。三层定义见
 
 | 层级 | 命令 | 内容 |
 | --- | --- | --- |
-| Local focused | `python scripts/verify.py fast` | ruff（`app tests scripts`）+ 后端 SQLite 测试 + `git diff --check` |
+| Local focused | `python scripts/verify.py fast` | ruff（`app tests scripts`）+ Phase 3 定向 SQLite 测试 + `git diff --check` |
 | Local full | `python scripts/verify.py full` | ruff + 后端全量测试；Docker/`PG_TEST_DSN` 可用时跑真实 PostgreSQL 16 |
 
-`fast` 在没有 Docker / `PG_TEST_DSN` 时 PostgreSQL 相关测试按设计跳过；`full`
-设置 `VERIFY_REQUIRE_PG=1` 时任何跳过都算硬失败（保证 PostgreSQL 路径零跳过）。
+`fast` 明确禁用 PostgreSQL 用例；`full` 设置 `VERIFY_REQUIRE_PG=1` 时会核对
+预期/实际 PostgreSQL 用例数，且任何跳过都算硬失败。
 
 `ruff` 与 `hypothesis` 是开发/CI 工具，刻意不放入 `backend/requirements.txt`
 （非运行时依赖）。本地需自行安装：
@@ -131,7 +131,7 @@ pip install hypothesis==6.141.1      # 仅 Task 5 起的 property 测试需要
 
 GitHub Actions：
 
-- `fast` 在 push/PR 到 `codex/phase3-*` 分支时运行；`full` 仅在
+- `fast` 在 push/PR 到 `codex/phase3-*` 分支时运行；`full` 在每个 PR 或
   `workflow_dispatch`（勾选 `run_full`）时运行，用于集成/阶段退出节点。
 - 第三方 Action 固定到审查过的 immutable commit SHA（不用浮动 tag）；
   默认权限 `contents: read`；不部署、不发布、不使用生产密钥或真实健康数据；
