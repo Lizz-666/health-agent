@@ -146,11 +146,11 @@ rg -n "2026-07-26-training-knowledge-safety-engine" docs/product/roadmap.md docs
 
 **Dependencies:** Task 0 committed. Before selecting action SHAs, verify current official action repositories/documentation; do not use floating tags.
 
-**Contract:** `python scripts/verify.py fast` runs deterministic targeted lint/backend checks; `full` runs complete backend, synthetic safety/source checks when present, and PostgreSQL-backed tests when CI supplies `TEST_DATABASE_URL`. The workflow uses least permissions, concurrency cancellation, timeouts, safe caches, PostgreSQL 16 for Full CI, and a short machine-readable/text summary artifact.
+**Contract:** `python scripts/verify.py fast` runs deterministic targeted lint/backend checks; `full` runs complete backend, synthetic safety/source checks when present, and PostgreSQL-backed tests. Full CI supplies the existing fixture contract `PG_TEST_DSN=postgresql+asyncpg://.../<throwaway_test_database>` plus `PG_TEST_ALLOW_DESTRUCTIVE=1`; the database name must pass `tests/conftest_pg.py` safety guards, and no generic development `DATABASE_URL`/`TEST_DATABASE_URL` substitute is permitted. The workflow uses least permissions, concurrency cancellation, timeouts, safe caches, PostgreSQL 16 for Full CI, and a short machine-readable/text summary artifact.
 
 **Safety rules:** Synthetic data only. CI output must not dump environment values, health payloads, raw request bodies, or secrets. CI failures remain failures and are never converted to success summaries.
 
-**Acceptance criteria:** Local runner works on Windows and CI Linux semantics; workflow syntax is valid; actions are SHA-pinned; Fast and Full jobs select the documented commands; no deployment permission exists. Remote run remains `not authorized/not run` until user authorizes push.
+**Acceptance criteria:** Local runner works on Windows and CI Linux semantics; workflow syntax is valid; actions are SHA-pinned; Fast and Full jobs select the documented commands; the Full job proves PostgreSQL tests ran with zero PostgreSQL skips under the guarded `PG_TEST_DSN` contract; no deployment permission exists. Remote run remains `not authorized/not run` until user authorizes push.
 
 **Verification:** Runner self/help checks, Fast local run, workflow static inspection, `git diff --check`, ruff for any Python runner test.
 
