@@ -1,0 +1,5 @@
+# Phase 3 illustrations are content-hashed: each SVG's sha256 is stored in the
+# catalog (backend/app/training/data/exercises.v1.json) and audited by tests.
+# They must stay byte-identical on every platform, so treat them as binary and
+# never let git perform LF<->CRLF translation that would invalidate the hash.
+*.svg binary
