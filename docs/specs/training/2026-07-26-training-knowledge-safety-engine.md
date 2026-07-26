@@ -1,6 +1,11 @@
 # Phase 3 Training Knowledge And Safety Engine
 
-> Status: approved Task 0 baseline, 2026-07-26. Runtime implementation is not yet complete.
+> Status: approved Task 0 baseline, 2026-07-26. OpenCode delivered the Tasks 1-7
+> runtime implementation, static data, tests and CI configuration on the single
+> implementation branch `codex/phase3-opencode-implementation`
+> (exit report: `docs/reports/phase3-exit-audit-2026-07-26.md`). Verified/complete
+> status is recorded by Codex only after independent final acceptance; this note
+> is delivery evidence, not a verified/complete/public-release claim.
 
 ## Outcome
 

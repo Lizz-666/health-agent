@@ -232,7 +232,9 @@ flowchart TB
 
 ## 7. 阶段 3：训练知识与安全引擎
 
-> 状态（2026-07-26）：**已启动，Task 0 规格与计划基线已验证，运行时代码尚未完成。**
+> 状态（2026-07-26）：**已启动，Task 0 规格与计划基线已验证。**
+> OpenCode 已在单一实现分支交付 Tasks 1-7 的全部运行时代码、静态数据、测试和 CI 配置（本地全量 `949 passed`、0 skipped、ruff clean、PostgreSQL 16.14 适配器回归 0 skip、Phase 3 专项 `151 passed`、源/许可/媒体审计无缺口）；退出报告见 `docs/reports/phase3-exit-audit-2026-07-26.md`。
+> **本状态不等于 verified/complete/merged**：阶段 3 完成状态仍以本节退出标准和 Codex 独立终验（真实 diff 审查 + 重新验证）为准，由 Codex 在验收后记录最终状态。
 > 当前规格：`docs/specs/training/2026-07-26-training-knowledge-safety-engine.md`。
 > 当前计划：`docs/plans/training/2026-07-26-training-knowledge-safety-engine.md`。
 > Phase 3 采用 OpenCode + Claude 在单一分支完成整阶段实现、Codex 仅在全部完成后执行终验的受控实验；完成状态仍以本节退出标准和新鲜证据为准。

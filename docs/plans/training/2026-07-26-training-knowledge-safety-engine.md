@@ -1,6 +1,13 @@
 # Phase 3 Training Knowledge And Safety Engine Implementation Plan
 
-> Status: Task 0 verified. Phase 2 is complete at `1818e74`; no Phase 3 runtime behavior is complete yet.
+> Status: OpenCode delivered Tasks 1-7 implementation, static data, tests and CI
+> configuration on `codex/phase3-opencode-implementation` (local full `949 passed`,
+> 0 skipped; Phase 3 suite `151 passed`; PostgreSQL 16.14 adapter regression,
+> 0 skip; ruff clean; source/license/media audit clean). See
+> `docs/reports/phase3-exit-audit-2026-07-26.md`. Codex records the final
+> verified/complete status only after independent acceptance; this line is
+> delivery evidence, not a verified/complete/merged claim. Task 0 baseline remains
+> the approved specification.
 
 **Goal:** Deliver a deterministic, source-traceable home-exercise catalog, training safety gate, candidate engine, and `validate_training_plan` Tool without plan generation, AI, or Flutter training UI.
 

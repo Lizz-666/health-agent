@@ -24,7 +24,7 @@
 | Task | Executor | Branch / worktree | Base SHA | Status | Scope and coordination note |
 | --- | --- | --- | --- | --- | --- |
 | Phase 3 Task 0 | Codex coordinator | `codex/phase3-spec-plan` / root worktree | `1818e74` | `committed` | 规格、来源/许可 pin、workout.cool 对照矩阵、Tasks 0-7 charters、CI 分层和实验评价口径；独立复核的 4 P1、5 P2、2 P3 已全部关闭；commit `2ed211a`。 |
-| Phase 3 Tasks 1-7 | OpenCode + Claude full-phase implementation; Codex final acceptance only | `codex/phase3-opencode-implementation` / `health-worktrees/phase3-opencode-implementation` | `c49eb618759ff85d7235f515b57c9d3fad38d6cb` | `in_progress` | 单一会话按 Task 1 CI、Task 2 contracts/source、Task 3 catalog/assets、Task 4 safety、Task 5 candidates/policy、Task 6 validator、Task 7 E2E/exit evidence 顺序完成；允许本地 milestone commits，禁止 merge/rebase/push/PR；Codex 仅在整阶段交付后终验。 |
+| Phase 3 Tasks 1-7 | OpenCode + Claude full-phase implementation; Codex final acceptance only | `codex/phase3-opencode-implementation` / `health-worktrees/phase3-opencode-implementation` | `c49eb618759ff85d7235f515b57c9d3fad38d6cb` | `review` | OpenCode reported the whole phase delivered on the single branch (Tasks 1-7: CI foundation, schemas/loaders/importer, 24-exercise catalog + original SVGs, safety context/gate, versioned policy + candidate engine, validate_training_plan Tool, E2E + source audit + exit report). Local full `949 passed`/0 skipped, Phase 3 suite `151 passed`, PostgreSQL 16.14 adapter regression 0 skip, ruff clean, source/license/media audit clean; remote CI `not authorized/not run` pending user-authorized push. Status is `review` (delivered, pending Codex independent final acceptance), NOT verified/complete/merged. |
 
 ## Integration Order
 
