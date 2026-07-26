@@ -16,11 +16,12 @@
 
 Phase 3 is the agreed OpenCode/Codex collaboration experiment:
 
-- OpenCode with the user's selected Claude model writes all runtime and CI implementation for Tasks 1-7, but does not choose safety policy.
-- Codex owns Task 0 specification, task prompts, scope control, safety-policy tables, state precedence, normalization behavior, executable safety cases, actual diff review, verification, commits, local integration, and final phase assessment.
-- One OpenCode task writes one branch/worktree at a time. No second writer modifies the same task files.
-- Before Tasks 4-6, Codex locks the exact relevant policy table and test matrix. OpenCode mechanically implements that contract and must stop on an unspecified safety choice. Codex directly takes over any affected change that cannot be reduced to a bounded implementation contract.
-- Codex still performs the governance-required review before committing each task. To reduce coordination overhead, routine tasks receive a concise scope/diff/test review; Task 4 has both a pre-implementation contract lock and post-implementation independent checkpoint, and the full two-pass acceptance occurs in Task 7.
+- OpenCode with the user's selected Claude model owns all Phase 3 implementation for Tasks 1-7 in one dedicated branch and worktree. Tasks 1-7 remain the required sequential implementation and verification milestones, not separate delegation, review, branch, or integration units.
+- Codex owns the already-approved Task 0 specification, scope and safety contract, plus one final full-phase diff review, independent verification, acceptance fixes or return findings, local integration, and collaboration assessment.
+- OpenCode may create cohesive local commits on the implementation branch, preferably one per internal task, so final review can inspect intent and dependencies. It must not merge, rebase, push, open a PR, or modify another worktree.
+- There is no routine Codex review, commit, integration, or mandatory checkpoint between Tasks 1-7. OpenCode self-reviews each milestone and runs focused verification before continuing.
+- OpenCode does not choose, add, or relax health/safety/privacy policy. An unspecified case defaults to a non-authorizing fail-closed outcome and is documented. Only an ambiguity whose alternatives materially change product or safety behavior is a blocker requiring Codex clarification; independent work should continue where possible.
+- After OpenCode reports the entire phase complete, Codex reviews the complete baseline-to-head diff and commit series, performs specification and engineering/security/privacy review, reruns focused/full/PostgreSQL verification as applicable, and only then decides whether Phase 3 is verified and eligible for local integration.
 - The experiment records implementation time, Codex/OpenCode interaction count, first-pass acceptance, P0-P3 findings, rework, test quality, scope compliance, integration conflicts, and residual risk. The Phase 3 exit report compares this mode with the Phase 2 collaboration pattern.
 
 ## Layered Local And CI Verification
@@ -33,10 +34,10 @@ This plan follows `docs/product/roadmap.md` section 13.1. No GitHub workflow exi
 | Task 1 CI foundation | workflow syntax, shared runner dry-run, focused backend checks | required after user-authorized push | manual dispatch must prove full job; no deployment |
 | Task 2 contracts/source intake | schema, malformed content, manifest/license/media exclusion, ruff | required | required at integration with Task 3 |
 | Task 3 reviewed catalog/assets | complete catalog validation, relation graph, hashes, coverage, no external media | required | required; artifact includes catalog/source summary |
-| Task 4 safety gate | safety matrix, stale/missing data, health/posture adapter tests, auth isolation | required | required; formal Codex contract checkpoint and PostgreSQL adapter regression |
-| Task 5 candidates/policy | filter, de-duplication, conflicts, volume/recovery/progression invariants | required | required on the Task 5 candidate SHA and again with Task 4-6 integration |
+| Task 4 safety gate | safety matrix, stale/missing data, health/posture adapter tests, auth isolation | required | required; PostgreSQL adapter regression, no intermediate Codex checkpoint |
+| Task 5 candidates/policy | filter, de-duplication, conflicts, volume/recovery/progression invariants | required | required on the implementation head after Task 5 and again at Phase 3 completion |
 | Task 6 validator Tool | typed contract, stale versions, blocked gates, no mutation/side effect | required | required; full backend and PostgreSQL regression |
-| Task 7 exit audit | Phase 3 E2E, source/license audit, full backend/ruff, doc consistency | required | required on integrated SHA; no Android gate because Phase 3 has no UI |
+| Task 7 exit audit | Phase 3 E2E, source/license audit, full backend/ruff, doc consistency | required | required on final implementation SHA; no Android gate because Phase 3 has no UI |
 
 CI constraints:
 
@@ -47,11 +48,11 @@ CI constraints:
 - Every CI summary names workflow, job, tested SHA, result, failing tests, first useful error, and artifact link/name.
 - Rebase, integration conflict resolution, or substantive code/content change invalidates old evidence.
 
-## Task Standard And Report Format
+## Milestone Standard And Final Report Format
 
-Every task prompt includes goal, non-goals, allowed files, forbidden scope, dependencies, contract, safety rules, acceptance criteria, commands, and report format.
+The single full-phase prompt incorporates each milestone's goal, non-goals, allowed files, forbidden scope, dependencies, contract, safety rules, acceptance criteria, commands, and report format from this plan.
 
-Every OpenCode report includes:
+The final OpenCode report includes milestone-by-milestone evidence for:
 
 1. Base SHA and current head SHA.
 2. Created/modified files grouped by allowed area.
@@ -63,7 +64,7 @@ Every OpenCode report includes:
 8. Scope-compliance statement.
 9. Local/Fast CI/Full CI evidence with tested SHA, or explicit `not configured`, `not authorized`, or `not required`.
 
-OpenCode does not commit, merge, rebase, push, or modify another worktree unless the task prompt explicitly changes that rule.
+For this explicitly approved experiment, OpenCode may commit cohesive milestones on the single Phase 3 implementation branch. It does not merge, rebase, push, open a PR, or modify another worktree.
 
 ## File And Module Map
 
@@ -174,7 +175,7 @@ rg -n "2026-07-26-training-knowledge-safety-engine" docs/product/roadmap.md docs
 
 **Forbidden scope:** Existing health/posture code, migrations, main/router, app/Flutter, external media, full upstream dataset, or network-dependent tests.
 
-**Dependencies:** Task 1 integrated. Pin `hasaneyldrm/exercises-dataset` commit `7455efae41b330c265e7cd4b78dfa848e7ce5ebd` and workout.cool commit `77f25a922b51be7d96bd051c5d2096959f0d61a8` in the manifest.
+**Dependencies:** Task 1 implementation and focused verification complete in the same branch. Pin `hasaneyldrm/exercises-dataset` commit `7455efae41b330c265e7cd4b78dfa848e7ce5ebd` and workout.cool commit `77f25a922b51be7d96bd051c5d2096959f0d61a8` in the manifest.
 
 **Contract:** Implement the spec catalog/exercise/provenance/illustration/prescription schemas with `extra="forbid"`. Loader rejects duplicate IDs, invalid versions, missing fields, relation errors, invalid hashes, external media/URLs, and unsupported equipment. Import adapter maps only whitelisted non-media names/taxonomy/equipment/muscle metadata, excludes upstream instructions/translations, and marks outputs `needs_review`; it cannot emit `approved`. The pinned upstream copyright and complete license/media-exception notice are retained in `THIRD_PARTY_NOTICES.md` and integrity-checked by tests.
 
@@ -200,7 +201,7 @@ rg -n "2026-07-26-training-knowledge-safety-engine" docs/product/roadmap.md docs
 
 **Forbidden scope:** Existing health/posture code/data, copying posture `corrections`, third-party media, unpinned external content, app/Flutter, migrations, or generated binary assets.
 
-**Dependencies:** Task 2 integrated. Exercise safety/applicability claims require current primary or peer-reviewed source review; external dataset metadata alone is insufficient.
+**Dependencies:** Task 2 implementation and focused verification complete in the same branch. Exercise safety/applicability claims require current primary or peer-reviewed source review; external dataset metadata alone is insufficient.
 
 **Contract:** Catalog covers both equipment modes and all five roles: warm-up, strength, corrective, mobility, recovery. Every entry meets the recommendation-ready invariant, has stable relations, local illustration hash/ownership, bounded instructions, and item-level source/review metadata. `approved` is machine-readable as `review_scope=personal_development` and must not be described as clinical/professional/public-release approval. Unsupported or uncertain entries remain absent rather than `approved`.
 
@@ -228,7 +229,7 @@ rg -n "2026-07-26-training-knowledge-safety-engine" docs/product/roadmap.md docs
 
 **Forbidden scope:** Modifying `backend/app/health/**`, `backend/app/posture/**`, migrations, routers, Flutter, catalog entries/assets, or AI.
 
-**Dependencies:** Task 3 integrated. Before OpenCode starts, Codex must lock the Task 4 safety-policy table and executable matrix covering required/unknown fields, normalization aliases/failures, risk precedence, retained red flags, recovery, time-zone/date derivation, fingerprint composition, and posture-goal requirement. Read existing health/posture services/models and adapt without changing their contracts.
+**Dependencies:** Task 3 implementation and focused verification complete in the same branch. Implement the Task 0 safety contract and executable matrix covering required/unknown fields, normalization aliases/failures, risk precedence, retained red flags, recovery, time-zone/date derivation, fingerprint composition, and posture-goal requirement. Read existing health/posture services/models and adapt without changing their contracts.
 
 **Contract:** Recompute from typed current health profile, current-day check-in, all retained structured abnormal-pain check-ins needed to detect an uncleared historical red flag, active posture safety lifecycle, profile entries, and active confirmed goals. Require non-null pain limitations (empty means answered none), a complete risk screen with no missing/`unknown` qualifier, and at least one current confirmed non-blocked posture goal for every user-specific request. Normalize free-form pain area/status only through the versioned reviewed alias map; any active unknown value returns `clarification_required`. Validate an IANA time zone and derive current local date from an injected/server UTC clock. Build each check-in token from `id + local_date + UTC updated_at + risk_version + canonical structured safety hash`, excluding free text, and include the sorted retained-signal aggregate plus profile/posture/goal/policy/catalog versions in the decision fingerprint. Use existing domain-owned public read services where available; any necessary direct read query is narrow, ownership-filtered, and confined to `training.context`, with no writes or duplicated classifiers. Do not trust stored risk labels without recomputation. Emit deterministic fingerprint/version metadata. Enforce precedence `red_flag > restricted > clarification_required > eligible_conservative > eligible`. Stale or missing sources cannot authorize selection.
 
@@ -236,7 +237,7 @@ rg -n "2026-07-26-training-knowledge-safety-engine" docs/product/roadmap.md docs
 
 **Acceptance criteria:** Synthetic matrix covers every tier/source combination, missing/unknown risk-screen values, null/empty pain limitations, known/unknown pain aliases and statuses, trusted/untrusted time zone and client-date mismatch, missing/stale confirmed posture goal for all fitness goals, a prior-day retained red flag followed by a normal current-day check-in, source correction/deletion recovery behavior, stale hashes/versions, cross-account isolation, deleted/missing context, posture conflict, and red-flag global blocking. Decision reasons contain codes/refs, not raw sensitive values.
 
-**Verification:** Focused tests, ruff, backend integration against SQLite and disposable PostgreSQL 16, Fast/Full CI. This is the formal mid-phase Codex contract checkpoint.
+**Verification:** Focused tests, ruff, backend integration against SQLite and disposable PostgreSQL 16, Fast/Full CI when authorized. Record evidence and continue without an intermediate Codex checkpoint when local verification passes.
 
 ### Task 5: Versioned training policy and deterministic candidate engine
 
@@ -256,7 +257,7 @@ rg -n "2026-07-26-training-knowledge-safety-engine" docs/product/roadmap.md docs
 
 **Forbidden scope:** Existing health/posture code, catalog content/assets except a narrowly reported relation defect, migration, router, Flutter, or AI.
 
-**Dependencies:** Task 4 passed the contract checkpoint. Before OpenCode starts, Codex locks exact versioned candidate precedence, de-duplication tags, conflict outcomes, normal/caution volume bounds, recovery rules, and executable expected sets. OpenCode stops instead of selecting a new health/safety threshold.
+**Dependencies:** Task 4 implementation and focused verification complete in the same branch. Implement the specification's versioned candidate precedence, de-duplication tags, conflict outcomes, normal/caution volume bounds, recovery rules, and executable expected sets. Do not select a new health/safety threshold; use fail-closed behavior and report any materially blocking ambiguity.
 
 **Contract:** Execute the exact filter order in the spec; return stable IDs/order and structured include/exclude reason codes. Conservative policy only narrows choices/bounds. Conflicts resolve by explicit versioned priorities, never random order or prose interpretation.
 
@@ -264,7 +265,7 @@ rg -n "2026-07-26-training-knowledge-safety-engine" docs/product/roadmap.md docs
 
 **Acceptance criteria:** Deterministic allowed sets for all synthetic profiles; no forbidden/duplicate item; multi-posture conflicts stable; caution never exceeds normal bounds; property tests cover invariants; policy/source/version trace included.
 
-**Verification:** Focused policy/candidate/property tests, ruff, Fast CI, Full CI on the Task 5 candidate SHA, then Full CI again after Tasks 4-6 integrate.
+**Verification:** Focused policy/candidate/property tests, ruff, Fast CI when authorized, Full CI on the implementation head after Task 5, then Full CI again at Phase 3 completion.
 
 ### Task 6: `validate_training_plan` Tool and integration contract
 
@@ -284,7 +285,7 @@ rg -n "2026-07-26-training-knowledge-safety-engine" docs/product/roadmap.md docs
 
 **Forbidden scope:** Existing routers/services outside training, DB models/migrations, Flutter, catalog changes, policy loosening, or AI.
 
-**Dependencies:** Task 5 integrated. Codex locks validator violation precedence and the four-week timeline matrix before implementation.
+**Dependencies:** Task 5 implementation and focused verification complete in the same branch. Implement the specification's validator violation precedence and four-week timeline contract without adding plan repair or policy relaxation.
 
 **Contract:** Validate current safety/candidate eligibility, context fingerprint, versions, exercise IDs, prescription bounds, session/weekly limits, recovery, duplication/conflicts, and relation use. Drafts have exactly four weeks; every session carries `week_index` 1-4, `day_of_week` 1-7, and unique in-week `session_order`, which produces the sole recovery/frequency timeline. Return all structured violations. Input remains unchanged and nothing is persisted.
 
@@ -296,7 +297,7 @@ rg -n "2026-07-26-training-knowledge-safety-engine" docs/product/roadmap.md docs
 
 ### Task 7: Phase 3 E2E, source audit, exit report, and experiment evaluation
 
-**Goal:** Verify every Phase 3 exit criterion on the integrated SHA, document actual behavior and residual risk, and evaluate the OpenCode/Codex experiment.
+**Goal:** Verify every Phase 3 exit criterion on the final implementation SHA, document actual behavior and residual risk, and provide evidence for Codex's final OpenCode/Codex experiment evaluation.
 
 **Non-goals:** No new feature, plan/UI implementation, source-policy relaxation, or roadmap completion without fresh evidence.
 
@@ -312,30 +313,31 @@ rg -n "2026-07-26-training-knowledge-safety-engine" docs/product/roadmap.md docs
 
 **Forbidden scope:** New product behavior, Flutter, plan generation, external writes without user authorization, real health data, or retroactively changing source pins to make tests pass.
 
-**Dependencies:** Tasks 1-6 verified and integrated.
+**Dependencies:** Tasks 1-6 implemented, self-reviewed, locally verified, and committed as cohesive milestones in the same implementation branch.
 
 **Contract:** E2E covers catalog load, normal/caution/missing/restricted/red-flag gates, deterministic candidates, multi-posture conflict, valid/invalid drafts, stale versions, and red-flag non-bypass. Audit verifies licenses/SHAs/import fields/media exclusion/hashes and workout.cool matrix.
 
 **Safety rules:** Only synthetic data. Completion requires no unresolved P0/P1/P2. Residual P3/manual limitations are explicit. No Android smoke is claimed or required because Phase 3 has no UI.
 
-**Acceptance criteria:** Full local and authorized CI evidence is SHA-bound; all roadmap exits pass; source audit has no gap; docs match actual code; experiment metrics and recommendation for Phase 4 collaboration are recorded.
+**Acceptance criteria:** Full local and authorized CI evidence is SHA-bound; all roadmap exits pass; source audit has no gap; docs match actual code; implementation metrics are recorded. OpenCode must not mark Phase 3 verified/complete in the roadmap or task ledger; Codex records the final collaboration recommendation and completion status only after independent acceptance.
 
-**Verification:** Full backend tests, ruff, PostgreSQL 16 adapter regression, Phase 3 E2E/safety/property suites, CI Fast/Full on integrated SHA, `git diff --check`, and source-link/hash audit.
+**Verification:** Full backend tests, ruff, PostgreSQL 16 adapter regression, Phase 3 E2E/safety/property suites, CI Fast/Full on the final implementation SHA when authorized, `git diff --check`, and source-link/hash audit.
 
 ## Integration Order
 
 ```text
-Task 0 -> Task 1 -> Task 2 -> Task 3
-                              -> Codex locks Task 4 policy/tests
-                              -> Task 4 -> formal contract checkpoint
-Task 4 -> Task 5 -> Task 6 -> Task 7 final acceptance
+Task 0 approved baseline
+  -> one OpenCode branch/worktree
+  -> Task 1 -> Task 2 -> Task 3 -> Task 4 -> Task 5 -> Task 6 -> Task 7
+  -> OpenCode full-phase report
+  -> Codex final diff review, verification, fixes/return findings, and acceptance
 ```
 
-Tasks are serial by default. A second implementation session is not justified in the initial Phase 3 experiment because schema, catalog, policy, safety context, candidates, and validator share contracts even when their primary files differ.
+Tasks are sequential milestones inside one OpenCode implementation session. A second implementation session is not justified because schema, catalog, policy, safety context, candidates, and validator share contracts even when their primary files differ. Codex does not write the implementation worktree until OpenCode has delivered the full phase.
 
 ## Rollback
 
 - Tasks 2-6 add an internal package and static data only; no migration or user-facing activation occurs.
-- Revert the latest integrated task commit or remove the training package from future callers. Do not silently select an older catalog/policy version.
+- Revert the affected cohesive implementation commit(s) or remove the training package from future callers. Do not silently select an older catalog/policy version.
 - CI foundation can be disabled by reverting its workflow commit; it never deploys.
 - Source/license uncertainty disables affected catalog entries or the entire catalog version instead of falling back to unreviewed content.
