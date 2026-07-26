@@ -232,6 +232,11 @@ flowchart TB
 
 ## 7. 阶段 3：训练知识与安全引擎
 
+> 状态（2026-07-26）：**已启动，Task 0 规格与计划基线已验证，运行时代码尚未完成。**
+> 当前规格：`docs/specs/training/2026-07-26-training-knowledge-safety-engine.md`。
+> 当前计划：`docs/plans/training/2026-07-26-training-knowledge-safety-engine.md`。
+> Phase 3 采用 OpenCode + Claude 全量实现、Codex 中期契约检查点与最终验收的受控实验；完成状态仍以本节退出标准和新鲜证据为准。
+
 ### 目标
 
 先构建可验证的训练领域能力，再让 Agent 生成计划。
