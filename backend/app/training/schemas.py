@@ -697,3 +697,46 @@ class TrainingSafetyDecision(BaseModel):
     training_policy_version: str
     catalog_version: Optional[str] = None
     fingerprint: str = Field(..., min_length=1)
+
+
+# ---------------------------------------------------------------------------
+# Candidate engine contracts (Task 5)
+# ---------------------------------------------------------------------------
+
+
+class Candidate(BaseModel):
+    """A selected, recommendation-ready exercise with its deterministic sort key."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    exercise_id: str = Field(..., min_length=1, max_length=60)
+    training_roles: List[str] = Field(..., min_length=1)
+    movement_purposes: List[str] = Field(..., min_length=1)
+    sort_key: str = Field(..., min_length=1)
+
+
+class ExcludedExercise(BaseModel):
+    """An exercise excluded from selection with structured reason codes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    exercise_id: str = Field(..., min_length=1, max_length=60)
+    reason_codes: List[str] = Field(..., min_length=1)
+
+
+class CandidateResult(BaseModel):
+    """Deterministic candidate selection output (pure, no raw health values).
+
+    Non-eligible gates (red_flag / restricted / clarification_required) always
+    return an empty candidate list; restricted/red_flag expose NO candidate IDs.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    gate_status: GateStatus
+    decision_fingerprint: str = Field(..., min_length=1)
+    candidates: List[Candidate] = Field(default_factory=list)
+    excluded: List[ExcludedExercise] = Field(default_factory=list)
+    policy_version: str
+    catalog_version: Optional[str] = None
+    conservative: bool = False
