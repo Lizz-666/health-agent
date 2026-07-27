@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-"""Phase 3 layered verification runner (Task 1 CI foundation).
+"""Shared layered verification runner (Phase 3 foundation, extended for Phase 4).
 
 Usage (from the repository root, on Windows or Linux):
 
-    python scripts/verify.py fast   # ruff + targeted Phase 3 SQLite tests + diff
+    python scripts/verify.py fast   # ruff + targeted backend SQLite tests + diff
     python scripts/verify.py full   # ruff + complete backend tests (+ PostgreSQL 16
                                     #   when available) + git diff --check
 
-Design contract (docs/product/roadmap.md section 13.1 and the Phase 3 plan):
+``FAST_TEST_TARGETS`` started as the Phase 3 backend suite. Phase 4 backend
+targets are appended here by the same task that creates each test file (Tasks
+2-4) so Fast CI exercises the new code as it lands, instead of referencing files
+that do not yet exist. ``full`` always runs the COMPLETE backend suite, so every
+Phase 4 test is covered regardless of the fast list.
+
+Design contract (docs/product/roadmap.md section 13.1 and the Phase 3/4 plans):
 
 - ``fast`` is the fast feedback layer: deterministic lint + targeted Phase 3
   tests on SQLite. PostgreSQL-backed cases are explicitly disabled in this
@@ -63,6 +69,13 @@ FAST_TEST_TARGETS = [
     "tests/test_training_integration.py",
     "tests/test_phase3_e2e.py",
     "tests/test_verify_runner.py",
+    "tests/test_ci_action_pins.py",
+    "tests/test_training_plan_state.py",
+    "tests/test_training_plan_persistence.py",
+    "tests/test_training_plan_migrations.py",
+    "tests/test_training_generator.py",
+    "tests/test_training_api.py",
+    "tests/test_phase4_e2e.py",
 ]
 
 
