@@ -7,13 +7,13 @@
 
 ## Decision
 
-Status: **review - remote CI pending**.
+Status: **verified**.
 
 The OpenCode handoff was not acceptable as delivered. Codex found blocking
 cross-layer correctness and safety gaps, added failing regression tests, fixed
 them on an independent worktree, and reran the risk-matched local matrix. No
-P0/P1/P2 finding remains in the reviewed content. Final `verified` status still
-requires Fast, Flutter, and Full GitHub CI to pass on the exact final report SHA.
+P0/P1/P2 finding remains in the reviewed content. Fast, Flutter, and Full
+GitHub CI passed on exact reviewed SHA `dd31d21`.
 
 ## Findings Closed
 
@@ -59,6 +59,11 @@ requires Fast, Flutter, and Full GitHub CI to pass on the exact final report SHA
 | `flutter test` | `app` | **322 passed** |
 | SVG hash comparison | repo root | all **24/24** packaged files equal the existing project assets |
 | `git diff --cached --check` before `c308189` | repo root | no whitespace errors; Windows LF/CRLF notices only |
+
+Remote evidence: GitHub Actions run
+`30272372618` on exact SHA `dd31d210859e2990ddeede0069fd56cf58cba405`
+completed successfully: Fast, Flutter, and Full (PostgreSQL 16) all passed.
+Draft PR #2 remains unmerged.
 
 The first no-token local full attempt after the final safety change had no test
 failure but skipped nine GitHub API action-pin checks; `VERIFY_REQUIRE_PG=1`
