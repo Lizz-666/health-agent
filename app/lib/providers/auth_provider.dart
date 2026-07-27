@@ -9,6 +9,7 @@ import 'activity_grid_provider.dart';
 import 'assessment_provider.dart';
 import 'daily_checkin_provider.dart';
 import 'health_profile_provider.dart';
+import 'plan_provider.dart';
 import 'posture_profile_provider.dart';
 import 'posture_state_provider.dart';
 import 'user_provider.dart';
@@ -204,6 +205,9 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
       ref.invalidate(dailyCheckinProvider);
       ref.invalidate(weightTrendProvider);
       ref.invalidate(activityGridProvider);
+      // Phase 4 plan state: clear so no previous user's plan/today data leaks
+      // across accounts.
+      ref.invalidate(planProvider);
     },
   );
 });

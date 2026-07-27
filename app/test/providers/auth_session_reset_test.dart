@@ -9,6 +9,7 @@ import 'package:posture_app/providers/assessment_provider.dart';
 import 'package:posture_app/providers/auth_provider.dart';
 import 'package:posture_app/providers/daily_checkin_provider.dart';
 import 'package:posture_app/providers/health_profile_provider.dart';
+import 'package:posture_app/providers/plan_provider.dart';
 import 'package:posture_app/providers/posture_profile_provider.dart';
 import 'package:posture_app/providers/posture_state_provider.dart';
 import 'package:posture_app/providers/user_provider.dart';
@@ -243,5 +244,74 @@ void main() {
     ));
     await staleFetch;
     expect(container.read(healthProfileProvider).result, isNull);
+  });
+
+  test('auth failure clears Phase 4 plan state (no cross-account leak)', () async {
+    final plan = <String, dynamic>{
+      'has_active': true,
+      'plan': {
+        'plan_version_id': 'plan-user-a',
+        'requested_goal': 'basic_strength',
+        'weekly_frequency': 3,
+        'session_duration_minutes': 30,
+        'status': 'active',
+        'change_reason': 'initial_confirmation',
+        'decision_gate': 'eligible',
+        'generated_at': '2026-07-27T08:00:00Z',
+        'confirmed_at': '2026-07-27T08:05:00Z',
+        'catalog_version': 'v1',
+        'policy_version': 'v1',
+        'sessions': [
+          {
+            'session_id': 's-a',
+            'week_index': 1,
+            'day_of_week': 1,
+            'session_order': 1,
+            'target_minutes': null,
+            'prescriptions': [
+              {
+                'prescription_id': 'p-a',
+                'exercise_id': 'ex-1',
+                'sets': 3,
+                'reps': 10,
+                'duration_seconds': null,
+                'rest_seconds': 60,
+                'relation_reason': null,
+                'exercise': {
+                  'exercise_id': 'ex-1',
+                  'name_en': 'Squat',
+                  'name_zh': '深蹲',
+                  'training_roles': ['strength'],
+                  'difficulty': 'beginner',
+                  'illustration_asset_key':
+                      'assets/training/illustrations/ex-1.svg',
+                  'illustration_alt_zh': '深蹲',
+                  'instruction_steps': ['stand'],
+                  'form_cues': ['straight'],
+                  'substitution_ids': [],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/training/plans/active', (_) => plan);
+    final api = _apiWith(adapter);
+    final container = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(api)],
+    );
+    addTearDown(container.dispose);
+
+    container.read(authProvider);
+    await container.read(planProvider.notifier).fetchActive();
+    expect(container.read(planProvider).activePlan?.planVersionId, 'plan-user-a');
+
+    // Trigger the auth-failure reset (logout / token failure / account switch).
+    api.onAuthFailed?.call();
+
+    // Plan state is cleared so the next user never sees user A's plan.
+    expect(container.read(planProvider).activePlan, isNull);
   });
 }
