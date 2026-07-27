@@ -15,6 +15,7 @@ import 'screens/test/self_test_screen.dart';
 import 'screens/test/photo_test_screen.dart';
 import 'screens/result/result_screen.dart';
 import 'screens/history/history_screen.dart';
+import 'screens/plan/plan_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/profile/posture_profile_screen.dart';
 import 'screens/profile/health_profile_screen.dart';
@@ -110,8 +111,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/history',
-                builder: (_, _) => const HistoryScreen(),
+                path: '/plan',
+                builder: (_, _) => const PlanScreen(),
               ),
             ],
           ),
@@ -142,6 +143,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      // History remains reachable (moved out of the bottom nav to make room
+      // for the Phase 4 计划 tab).
+      GoRoute(
+        path: '/history',
+        builder: (_, _) => const HistoryScreen(),
       ),
       GoRoute(
         path: '/issues/:category',
@@ -226,9 +233,9 @@ class AppShell extends StatelessWidget {
             label: '首页',
           ),
           NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: '历史',
+            icon: Icon(Icons.fitness_center_outlined),
+            selectedIcon: Icon(Icons.fitness_center),
+            label: '计划',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outlined),
