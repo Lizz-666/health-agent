@@ -69,6 +69,7 @@ FAST_TEST_TARGETS = [
     "tests/test_training_integration.py",
     "tests/test_phase3_e2e.py",
     "tests/test_verify_runner.py",
+    "tests/test_ci_action_pins.py",
 ]
 
 

@@ -84,6 +84,9 @@ jobs:
           pip install ruff==${{ env.RUFF_VERSION }} hypothesis==${{ env.HYPOTHESIS_VERSION }}
       - name: Fast verify (lint + SQLite tests + git diff --check)
         env:
+          # The default GITHUB_TOKEN lets test_ci_action_pins authoritatively
+          # verify each pinned action SHA resolves to its declared tag.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERIFY_SUMMARY_FILE: fast-summary.txt
           VERIFY_ARTIFACT_NAME: ci-fast-summary
           VERIFY_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -91,7 +94,7 @@ jobs:
       - name: Upload summary artifact
         if: always()
         # actions/upload-artifact v7.0.1 (Node 24). Verified 2026-07-27.
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e3c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-fast-summary
           path: fast-summary.txt
@@ -139,7 +142,7 @@ jobs:
           } > ../flutter-summary.txt
       - name: Upload summary artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e3c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-flutter-summary
           path: flutter-summary.txt
@@ -210,7 +213,7 @@ jobs:
         run: python scripts/verify.py full
       - name: Upload summary artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e3c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-full-summary
           path: full-summary.txt
