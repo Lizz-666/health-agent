@@ -57,7 +57,7 @@ def _offline_downgrade_sql() -> str:
 
 
 # 全部表名（重命名后的 events 表 + 6 个新表 + 平台表 + Phase 2 health_profiles
-# + Phase 2 health_checkins + Phase 2 weight_records）。
+# + Phase 2 health_checkins + Phase 2 weight_records + Phase 4 training tables）。
 ALL_TABLES = {
     "users",
     "verification_codes",
@@ -71,6 +71,12 @@ ALL_TABLES = {
     "health_profiles",
     "health_checkins",
     "weight_records",
+    # Phase 4 four-week training plan MVP (migration 0007).
+    "training_plan_versions",
+    "training_sessions",
+    "training_prescriptions",
+    "training_session_feedback",
+    "training_session_substitutions",
 }
 
 # Phase 1 expand 阶段新增的 6 张表。
@@ -90,12 +96,12 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0006_health_weight_tracking。"""
+    """Alembic 只有一个 head，且为 0007_training_plans。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0006_health_weight_tracking", head_lines[0]
+    assert head_lines[0].split()[0] == "0007_training_plans", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
@@ -225,6 +231,7 @@ def test_migration_tables_match_base_metadata():
     import app.auth.models  # noqa: F401
     import app.posture.models  # noqa: F401
     import app.health.models  # noqa: F401
+    import app.training.models  # noqa: F401
 
     metadata_tables = set(Base.metadata.tables.keys())
     assert metadata_tables == ALL_TABLES
@@ -493,6 +500,7 @@ def test_metadata_indexes_match_offline_sql():
     import app.auth.models  # noqa: F401
     import app.posture.models  # noqa: F401
     import app.health.models  # noqa: F401
+    import app.training.models  # noqa: F401
 
     domain_tables = {
         "posture_assessment_events",
@@ -505,7 +513,23 @@ def test_metadata_indexes_match_offline_sql():
         "health_profiles",
         "health_checkins",
         "weight_records",
+        # Phase 4 training tables (migration 0007).
+        "training_plan_versions",
+        "training_sessions",
+        "training_prescriptions",
+        "training_session_feedback",
+        "training_session_substitutions",
     }
+
+    # Indexes that exist ONLY in the migration SQL, by design (ADR-0002): the
+    # "at most one active plan per user" partial UNIQUE index is materialized in
+    # migration 0007 on PostgreSQL. It is intentionally NOT declared on the
+    # model, because SQLAlchemy's ``postgresql_where`` is silently dropped by
+    # ``create_all`` on SQLite while keeping ``unique=True`` (which would wrongly
+    # enforce UNIQUE(user_id) for ALL rows on the SQLite test DB). persistence.py
+    # enforces the invariant at the application level; a ``requires_pg`` test
+    # proves the DB-level guarantee where the migration actually runs.
+    SQL_ONLY_INDEXES = {"uq_training_plan_versions_one_active"}
 
     # 1. Base.metadata 中的索引名 + 命名 UNIQUE 约束名。
     metadata_names = set()
@@ -529,10 +553,17 @@ def test_metadata_indexes_match_offline_sql():
     for m in re.finditer(r"CONSTRAINT (\w+) UNIQUE \(", sql):
         sql_names.add(m.group(1))
 
-    assert metadata_names == sql_names, (
+    metadata_only = metadata_names - sql_names
+    sql_only = sql_names - metadata_names
+    assert metadata_only == set(), (
+        "index/unique-constraint drift: names in metadata but not in SQL: "
+        f"{sorted(metadata_only)}"
+    )
+    assert sql_only == SQL_ONLY_INDEXES, (
         "index/unique-constraint drift between Base.metadata and migration SQL:\n"
-        f"  only in metadata: {sorted(metadata_names - sql_names)}\n"
-        f"  only in migration SQL: {sorted(sql_names - metadata_names)}"
+        f"  only in metadata: {sorted(metadata_only)}\n"
+        f"  only in migration SQL (expected only {sorted(SQL_ONLY_INDEXES)}): "
+        f"{sorted(sql_only)}"
     )
 
 

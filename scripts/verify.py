@@ -70,6 +70,9 @@ FAST_TEST_TARGETS = [
     "tests/test_phase3_e2e.py",
     "tests/test_verify_runner.py",
     "tests/test_ci_action_pins.py",
+    "tests/test_training_plan_state.py",
+    "tests/test_training_plan_persistence.py",
+    "tests/test_training_plan_migrations.py",
 ]
 
 
