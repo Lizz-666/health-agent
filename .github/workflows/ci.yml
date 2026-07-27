@@ -1,26 +1,31 @@
-# Phase 3 CI foundation (Task 1).
+# Shared CI for the health-agent (Phase 3 foundation, extended for Phase 4).
 #
-# Layered verification per docs/product/roadmap.md section 13.1 and the Phase 3
-# implementation plan:
-#   - fast : ruff + targeted Phase 3 SQLite tests + git diff --check. Runs on
-#            push / PR to the implementation branches and manual dispatch.
-#   - full : ruff + COMPLETE backend tests on a real PostgreSQL 16 service,
-#            enforcing exact PG execution and zero skips. Runs on every PR or
-#            by workflow_dispatch with run_full=true.
+# Layered verification per docs/product/roadmap.md section 13.1 and the
+# Phase 3/Phase 4 implementation plans:
+#   - fast    : ruff + targeted backend SQLite tests + git diff --check.
+#   - flutter : Flutter analyze + complete Flutter tests (Phase 4 Plan/UI).
+#   - full    : ruff + COMPLETE backend tests on a real PostgreSQL 16 service,
+#               enforcing exact PG execution and zero skips.
+#
+# Triggers: push to main and codex/phase3-* branches, any pull_request (this is
+# the CI surface for the Phase 4 draft PR's head branch), and manual dispatch.
 #
 # Constraints:
 #   - Least permissions: contents: read only. No deployment, release, package
 #     write, production secret, real photo, or real health data.
 #   - Third-party actions are pinned to reviewed immutable commit SHAs (no
-#     floating tags). SHAs verified 2026-07-26 against each action repository.
+#     floating tags). SHAs verified 2026-07-27 against each action repository's
+#     latest release at that date; all run on the current Node 24 runtime (the
+#     previous pins targeted the deprecated Node 20 runtime).
 #   - Same-branch runs cancel stale runs; every job has an explicit timeout;
-#     caches hold no secrets (pip download cache only).
+#     caches hold no secrets (pip / pub caches only).
 #   - Synthetic data only. CI never dumps env values, health payloads, raw
 #     request bodies, or secrets.
 #   - CI failures stay failures; nothing converts a failure into a success.
 #
-# Remote runs remain `not authorized / not run` until a user authorizes the
-# first push; this file only defines the contract.
+# Phase 4 backend targets are appended to scripts/verify.py FAST_TEST_TARGETS by
+# the same task that creates each test file (Tasks 2-4), so Fast CI grows with
+# the suite rather than referencing files that do not yet exist.
 
 name: ci
 
@@ -47,6 +52,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.9.13"
+  FLUTTER_VERSION: "3.44.0"
   VERIFY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
   # Pinned dev/CI tools kept OUT of backend/requirements.txt by design (they
   # are not runtime dependencies). Both are reproducible, immutable versions.
@@ -60,11 +66,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        # actions/checkout v7.0.1 (Node 24). Verified 2026-07-27.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        # actions/setup-python v7.0.0 (Node 24). Verified 2026-07-27.
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -82,10 +90,59 @@ jobs:
         run: python scripts/verify.py fast
       - name: Upload summary artifact
         if: always()
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        # actions/upload-artifact v7.0.1 (Node 24). Verified 2026-07-27.
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e3c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-fast-summary
           path: fast-summary.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  flutter:
+    name: Flutter (analyze + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Set up Flutter
+        # subosito/flutter-action v2.23.0. Verified 2026-07-27.
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+      - name: Flutter analyze
+        id: flutter_analyze
+        working-directory: app
+        run: flutter analyze
+      - name: Flutter test
+        id: flutter_test
+        working-directory: app
+        run: flutter test 2>&1 | tee ../flutter-test.log
+      - name: Build concise summary
+        if: always()
+        working-directory: app
+        run: |
+          {
+            echo "flutter CI summary (GitHub Actions evidence)"
+            echo "workflow=${GITHUB_WORKFLOW} sha=${GITHUB_SHA} job=${GITHUB_JOB}"
+            echo "flutter_version=${FLUTTER_VERSION}"
+            echo "analyze_status=${{ steps.flutter_analyze.conclusion }}"
+            echo "test_status=${{ steps.flutter_test.conclusion }}"
+            echo "--- last 20 test log lines ---"
+            tail -n 20 ../flutter-test.log 2>/dev/null || echo "(no test log produced)"
+          } > ../flutter-summary.txt
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e3c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-flutter-summary
+          path: flutter-summary.txt
           if-no-files-found: warn
           retention-days: 14
 
@@ -125,11 +182,11 @@ jobs:
       VERIFY_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -153,7 +210,7 @@ jobs:
         run: python scripts/verify.py full
       - name: Upload summary artifact
         if: always()
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e3c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-full-summary
           path: full-summary.txt
