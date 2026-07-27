@@ -169,6 +169,41 @@ async def _record_idempotency(
     )
 
 
+async def peek_idempotency(
+    db: AsyncSession,
+    user_id: str,
+    operation: str,
+    idempotency_key: str,
+    request_hash: str,
+    now: Optional[datetime] = None,
+) -> Optional[str]:
+    """Return the recorded ``result_ref`` for a replay, or None to proceed.
+
+    Used by callers that must resolve a replay BEFORE another precondition (e.g.
+    confirm must replay even after the pending draft has become active). A
+    same-key-different-hash record raises ``idempotency_key_conflict``. An
+    expired record is treated as absent (caller proceeds and may re-record).
+    """
+    now = now or _now()
+    res = await db.execute(
+        select(IdempotencyRecord).where(
+            IdempotencyRecord.user_id == uuid.UUID(user_id),
+            IdempotencyRecord.operation == operation,
+            IdempotencyRecord.idempotency_key == idempotency_key,
+        )
+    )
+    record = res.scalar_one_or_none()
+    if record is None:
+        return None
+    if record.expires_at.replace(tzinfo=timezone.utc) <= now:
+        return None
+    if record.request_hash != request_hash:
+        raise AppException(
+            400, "idempotency_key 已用于不同的请求", "idempotency_key_conflict"
+        )
+    return record.result_ref
+
+
 async def _require_owned_version(
     db: AsyncSession, user_id: str, plan_version_id: uuid.UUID
 ) -> TrainingPlanVersion:
@@ -597,6 +632,7 @@ __all__ = [
     "OP_SESSION_FEEDBACK",
     "IDEMPOTENCY_TTL",
     "hash_request",
+    "peek_idempotency",
     "DraftResult",
     "ConfirmResult",
     "CancelResult",
