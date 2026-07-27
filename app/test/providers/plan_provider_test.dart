@@ -204,7 +204,9 @@ void main() {
           's-1',
           FeedbackInput(
               outcomeState: OutcomeState.completed, idempotencyKey: 'f1'),
+          'Asia/Shanghai',
         );
     expect(ok, isTrue);
+    expect(adapter.calls.last.queryParameters['iana_timezone'], 'Asia/Shanghai');
   });
 }

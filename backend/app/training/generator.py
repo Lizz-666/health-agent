@@ -76,6 +76,7 @@ _FREQ_RECOVERY_CEILING_HOURS: dict[int, int] = {2: 72, 3: 48, 4: 24, 5: 24}
 # Target session composition (role preference order) capped by policy.
 _ROLE_PREFERENCE = ("warmup", "strength", "corrective", "mobility", "recovery")
 _TARGET_PER_ROLE = {"warmup": 1, "strength": 2, "corrective": 2, "mobility": 1, "recovery": 1}
+_DURATION_EXERCISE_CAP = {15: 3, 30: 5, 45: 7, 60: 8}
 
 
 @dataclass(frozen=True)
@@ -250,8 +251,17 @@ def generate_plan_draft(
             decision_fingerprint=current.fingerprint,
         )
 
+    duration = ctx.request.session_duration_minutes
+    duration_cap = _DURATION_EXERCISE_CAP.get(duration)
+    if duration_cap is None:
+        return GenerationResult(
+            ok=False, gate_status=gate, requested_goal=goal, draft=None,
+            reason_codes=["invalid_session_duration"],
+            decision_fingerprint=current.fingerprint,
+        )
     exercises = _select_session_exercises(
-        candidate_result, catalog, freq, policy.max_exercises_per_session
+        candidate_result, catalog, freq,
+        min(duration_cap, policy.max_exercises_per_session),
     )
     if not exercises:
         return GenerationResult(
@@ -269,6 +279,7 @@ def generate_plan_draft(
                     week_index=week,
                     day_of_week=day,
                     session_order=order,
+                    target_minutes=duration,
                     prescriptions=[_prescription_for(ex) for ex in exercises],
                 )
             )

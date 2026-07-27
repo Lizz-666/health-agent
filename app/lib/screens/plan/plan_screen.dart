@@ -8,9 +8,11 @@
 // feedback; no recommendation or safety logic lives here.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/idempotency_key.dart';
 import '../../models/plan.dart';
 import '../../providers/assessment_provider.dart' show LoadStatus;
+import '../../providers/health_profile_provider.dart';
 import '../../providers/plan_provider.dart';
 
 const String _kDefaultTimezone = 'Asia/Shanghai';
@@ -36,6 +38,24 @@ String _outcomeLabel(OutcomeState s) {
   }
 }
 
+Widget _exerciseIllustration(PlanExercise exercise, {double size = 72}) {
+  return Semantics(
+    label: exercise.illustrationAltZh,
+    image: true,
+    child: SvgPicture.asset(
+      exercise.illustrationAssetKey,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (_, _, _) => SizedBox(
+        width: size,
+        height: size,
+        child: const Icon(Icons.image_not_supported_outlined),
+      ),
+    ),
+  );
+}
+
 class PlanScreen extends ConsumerStatefulWidget {
   const PlanScreen({super.key});
   @override
@@ -47,14 +67,42 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   int _frequency = 3;
   int _duration = 30;
   bool _bodyweight = true;
+  bool _resistanceBand = false;
+  bool _profileReady = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(planProvider.notifier).fetchActive();
-      ref.read(planProvider.notifier).fetchDraft();
+      _loadInitialState();
     });
+  }
+
+  Future<void> _loadInitialState() async {
+    await Future.wait([
+      ref.read(healthProfileProvider.notifier).fetchProfile(),
+      ref.read(planProvider.notifier).fetchActive(),
+      ref.read(planProvider.notifier).fetchDraft(),
+    ]);
+    if (!mounted) return;
+    final profile = ref.read(healthProfileProvider).result?.profile;
+    final supportedGoal = profile?.fitnessGoal?.wire;
+    if (profile != null &&
+        supportedGoal != null &&
+        _kGoalLabels.containsKey(supportedGoal) &&
+        profile.weeklyFrequency != null &&
+        profile.sessionDurationMinutes != null &&
+        profile.equipment?.bodyweight != null &&
+        profile.equipment?.resistanceBand != null) {
+      setState(() {
+        _goal = supportedGoal;
+        _frequency = profile.weeklyFrequency!;
+        _duration = profile.sessionDurationMinutes!.value;
+        _bodyweight = profile.equipment!.bodyweight!;
+        _resistanceBand = profile.equipment!.resistanceBand!;
+        _profileReady = _bodyweight || _resistanceBand;
+      });
+    }
   }
 
   @override
@@ -71,6 +119,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       return _ActiveView(plan: plan);
     }
     if (plan.draftStatus == LoadStatus.data && plan.draft != null) {
+      if (!_profileReady) return _profileRequired();
       return _DraftReview(
         draft: plan.draft!,
         goal: _goal,
@@ -82,9 +131,11 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       );
     }
     if (plan.draftStatus == LoadStatus.loading ||
-        plan.activeStatus == LoadStatus.loading) {
+        plan.activeStatus == LoadStatus.loading ||
+        ref.watch(healthProfileProvider).status == LoadStatus.loading) {
       return const Center(child: CircularProgressIndicator());
     }
+    if (!_profileReady) return _profileRequired();
     if (plan.draftStatus == LoadStatus.networkError ||
         plan.activeStatus == LoadStatus.networkError) {
       return _StatusCard(
@@ -111,13 +162,16 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       frequency: _frequency,
       duration: _duration,
       bodyweight: _bodyweight,
-      onChangedGoal: (v) => setState(() => _goal = v),
-      onChangedFrequency: (v) => setState(() => _frequency = v),
-      onChangedDuration: (v) => setState(() => _duration = v),
-      onChangedBodyweight: (v) => setState(() => _bodyweight = v),
+      resistanceBand: _resistanceBand,
       onGenerate: _generate,
     );
   }
+
+  Widget _profileRequired() => const _StatusCard(
+        icon: Icons.assignment_ind_outlined,
+        title: '请先完善健康档案',
+        detail: '训练目标、频率、时长和器材必须来自当前健康档案，不能使用页面默认值代替。',
+      );
 
   Future<void> _generate() async {
     await ref.read(planProvider.notifier).generateDraft(DraftInput(
@@ -125,7 +179,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           weeklyFrequency: _frequency,
           sessionDurationMinutes: _duration,
           equipmentBodyweight: _bodyweight,
-          equipmentResistanceBand: false,
+          equipmentResistanceBand: _resistanceBand,
           ianaTimezone: _kDefaultTimezone,
           idempotencyKey: newIdempotencyKey(),
         ));
@@ -137,7 +191,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           weeklyFrequency: _frequency,
           sessionDurationMinutes: _duration,
           equipmentBodyweight: _bodyweight,
-          equipmentResistanceBand: false,
+          equipmentResistanceBand: _resistanceBand,
           ianaTimezone: _kDefaultTimezone,
           idempotencyKey: newIdempotencyKey(),
         ));
@@ -152,10 +206,7 @@ class _GenerationForm extends StatelessWidget {
   final int frequency;
   final int duration;
   final bool bodyweight;
-  final ValueChanged<String> onChangedGoal;
-  final ValueChanged<int> onChangedFrequency;
-  final ValueChanged<int> onChangedDuration;
-  final ValueChanged<bool> onChangedBodyweight;
+  final bool resistanceBand;
   final VoidCallback onGenerate;
 
   const _GenerationForm({
@@ -163,10 +214,7 @@ class _GenerationForm extends StatelessWidget {
     required this.frequency,
     required this.duration,
     required this.bodyweight,
-    required this.onChangedGoal,
-    required this.onChangedFrequency,
-    required this.onChangedDuration,
-    required this.onChangedBodyweight,
+    required this.resistanceBand,
     required this.onGenerate,
   });
 
@@ -183,9 +231,7 @@ class _GenerationForm extends StatelessWidget {
           items: _kGoalLabels.entries
               .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
               .toList(),
-          onChanged: (v) {
-            if (v != null) onChangedGoal(v);
-          },
+          onChanged: null,
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<int>(
@@ -194,9 +240,7 @@ class _GenerationForm extends StatelessWidget {
           items: [2, 3, 4, 5]
               .map((e) => DropdownMenuItem(value: e, child: Text('$e 次/周')))
               .toList(),
-          onChanged: (v) {
-            if (v != null) onChangedFrequency(v);
-          },
+          onChanged: null,
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<int>(
@@ -205,15 +249,18 @@ class _GenerationForm extends StatelessWidget {
           items: [15, 30, 45, 60]
               .map((e) => DropdownMenuItem(value: e, child: Text('$e 分钟')))
               .toList(),
-          onChanged: (v) {
-            if (v != null) onChangedDuration(v);
-          },
+          onChanged: null,
         ),
         const SizedBox(height: 8),
         SwitchListTile(
           title: const Text('徒手训练'),
           value: bodyweight,
-          onChanged: onChangedBodyweight,
+          onChanged: null,
+        ),
+        SwitchListTile(
+          title: const Text('弹力带'),
+          value: resistanceBand,
+          onChanged: null,
         ),
         const SizedBox(height: 16),
         FilledButton(
@@ -223,7 +270,7 @@ class _GenerationForm extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const Text(
-          '计划基于当前健康档案与体态评估，由确定性引擎生成；受限或风险状态不会生成计划。',
+          '以上选项来自当前健康档案。如需修改，请先更新健康档案；受限或风险状态不会生成计划。',
           style: TextStyle(fontSize: 12),
         ),
       ],
@@ -269,12 +316,22 @@ class _DraftReview extends StatelessWidget {
                   for (final p in session.prescriptions)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        '${p.exercise?.nameZh ?? p.exerciseId} · '
-                        '${p.sets}组'
-                        '${p.reps != null ? " × ${p.reps}次" : ""}'
-                        '${p.durationSeconds != null ? " · ${p.durationSeconds}秒" : ""}'
-                        ' · 休息${p.restSeconds}秒',
+                      child: Row(
+                        children: [
+                          if (p.exercise != null) ...[
+                            _exerciseIllustration(p.exercise!, size: 52),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: Text(
+                              '${p.exercise?.nameZh ?? p.exerciseId} · '
+                              '${p.sets}组'
+                              '${p.reps != null ? " × ${p.reps}次" : ""}'
+                              '${p.durationSeconds != null ? " · ${p.durationSeconds}秒" : ""}'
+                              ' · 休息${p.restSeconds}秒',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                 ],
@@ -371,14 +428,37 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
           title: '今天是休息日',
           detail: '按计划今日无训练任务。',
         );
+      case TodayState.planComplete:
+        return const _StatusCard(
+          icon: Icons.flag_outlined,
+          title: '四周计划已完成',
+          detail: '本周期已结束，不会重复显示第一周课程。',
+        );
       case TodayState.session:
         return _SessionSection(
           session: today.session!,
+          feedback: today.feedbackOutcomeState,
+          substitutionApplied: today.substitutionApplied,
           onFeedback: (OutcomeState outcome) async {
             await ref.read(planProvider.notifier).recordFeedback(
                   today.session!.sessionId,
                   FeedbackInput(
                       outcomeState: outcome, idempotencyKey: newIdempotencyKey()),
+                  _kDefaultTimezone,
+                );
+            if (mounted) {
+              ref.read(planProvider.notifier).fetchToday(_kDefaultTimezone);
+            }
+          },
+          onSubstitute: (original, replacement) async {
+            await ref.read(planProvider.notifier).recordSubstitution(
+                  today.session!.sessionId,
+                  SubstitutionInput(
+                    originalExerciseId: original,
+                    replacementExerciseId: replacement,
+                    idempotencyKey: newIdempotencyKey(),
+                  ),
+                  _kDefaultTimezone,
                 );
             if (mounted) {
               ref.read(planProvider.notifier).fetchToday(_kDefaultTimezone);
@@ -391,8 +471,17 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
 
 class _SessionSection extends StatelessWidget {
   final PlanSession session;
+  final OutcomeState? feedback;
+  final bool substitutionApplied;
   final Future<void> Function(OutcomeState outcome) onFeedback;
-  const _SessionSection({required this.session, required this.onFeedback});
+  final Future<void> Function(String original, String replacement) onSubstitute;
+  const _SessionSection({
+    required this.session,
+    required this.feedback,
+    required this.substitutionApplied,
+    required this.onFeedback,
+    required this.onSubstitute,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -409,6 +498,10 @@ class _SessionSection extends StatelessWidget {
                 children: [
                   Text(p.exercise?.nameZh ?? p.exerciseId,
                       style: const TextStyle(fontWeight: FontWeight.bold)),
+                  if (p.exercise != null) ...[
+                    const SizedBox(height: 8),
+                    Center(child: _exerciseIllustration(p.exercise!, size: 140)),
+                  ],
                   Text('${p.sets}组'
                       '${p.reps != null ? " × ${p.reps}次" : ""}'
                       '${p.durationSeconds != null ? " · ${p.durationSeconds}秒" : ""}'
@@ -417,13 +510,28 @@ class _SessionSection extends StatelessWidget {
                     const SizedBox(height: 4),
                     for (final step in p.exercise!.instructionSteps.take(4))
                       Text('· $step', style: const TextStyle(fontSize: 12)),
+                    if (p.exercise!.substitutionIds.isNotEmpty &&
+                        !substitutionApplied &&
+                        feedback == null) ...[
+                      const SizedBox(height: 8),
+                      const Text('可选替代动作',
+                          style: TextStyle(fontSize: 12)),
+                      for (final replacement in p.exercise!.substitutionIds)
+                        TextButton(
+                          key: Key('substitute-${p.exerciseId}-$replacement'),
+                          onPressed: () => onSubstitute(p.exerciseId, replacement),
+                          child: Text('替换为 $replacement'),
+                        ),
+                    ],
                   ],
                 ],
               ),
             ),
           ),
         const SizedBox(height: 12),
-        const Text('今日完成情况'),
+        Text(feedback == null
+            ? '今日完成情况'
+            : '已记录：${_outcomeLabel(feedback!)}'),
         Wrap(
           spacing: 8,
           children: [
@@ -431,7 +539,7 @@ class _SessionSection extends StatelessWidget {
               ActionChip(
                 key: Key('feedback-${o.name}'),
                 label: Text(_outcomeLabel(o)),
-                onPressed: () => onFeedback(o),
+                onPressed: feedback == null ? () => onFeedback(o) : null,
               ),
           ],
         ),

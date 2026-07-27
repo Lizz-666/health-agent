@@ -96,6 +96,7 @@ async def get_today(
 async def post_substitute(
     session_id: UUID,
     request: SubstitutionRequest,
+    iana_timezone: str = Query(..., description="User IANA timezone; local date is server-derived."),
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -105,13 +106,15 @@ async def post_substitute(
     most one substitution per (session, local_date); replay returns the recorded
     result.
     """
-    return await service.record_substitution(db, user_id, str(session_id), request)
+    return await service.record_substitution(
+        db, user_id, str(session_id), request, iana_timezone)
 
 
 @router.post("/plans/sessions/{session_id}:feedback", response_model=FeedbackResponse)
 async def post_feedback(
     session_id: UUID,
     request: FeedbackRequest,
+    iana_timezone: str = Query(..., description="User IANA timezone; local date is server-derived."),
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -120,4 +123,5 @@ async def post_feedback(
     No free-text note is accepted. At most one feedback per (session,
     local_date); replay returns the recorded result.
     """
-    return await service.record_feedback(db, user_id, str(session_id), request)
+    return await service.record_feedback(
+        db, user_id, str(session_id), request, iana_timezone)

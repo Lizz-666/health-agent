@@ -5,6 +5,7 @@
 // covers the user-facing wiring (entry button, draft rendering, confirm action).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posture_app/core/api_client.dart';
 import 'package:posture_app/screens/plan/plan_screen.dart';
@@ -52,7 +53,7 @@ Map<String, dynamic> _draftPlanJson() => {
                 'training_roles': ['strength'],
                 'difficulty': 'beginner',
                 'illustration_asset_key':
-                    'assets/training/illustrations/ex-1.svg',
+                    'assets/training/illustrations/ex_strength_bodyweight_squat.svg',
                 'illustration_alt_zh': '深蹲',
                 'instruction_steps': ['stand'],
                 'form_cues': ['straight'],
@@ -62,6 +63,32 @@ Map<String, dynamic> _draftPlanJson() => {
           ],
         },
       ],
+    };
+
+Map<String, dynamic> _healthProfileJson() => {
+      'configured': true,
+      'profile': {
+        'id': 'synthetic-user',
+        'fitness_goal': 'posture_improvement',
+        'training_experience': 'experienced',
+        'weekly_frequency': 3,
+        'session_duration_minutes': 30,
+        'equipment': {'bodyweight': true, 'resistance_band': false},
+        'pain_injury_limitations': [],
+        'risk_screen': {},
+        'allergies': [],
+        'diet_exclusions': [],
+        'version': 1,
+        'updated_at': '2026-07-27T08:00:00Z',
+        'created_at': '2026-07-27T08:00:00Z',
+      },
+      'readiness': {
+        'readiness': 'ready',
+        'risk_version': 'v1',
+        'reason': 'synthetic',
+        'missing_fields': [],
+        'restricted_reason': null,
+      },
     };
 
 Widget _wrap(ApiClient api) {
@@ -74,6 +101,7 @@ Widget _wrap(ApiClient api) {
 void main() {
   testWidgets('generation form -> draft review on generate', (tester) async {
     final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
       ..registerJson('GET', '/training/plans/active', (_) => {'has_active': false})
       ..registerJson('GET', '/training/plans/draft', (_) => {'has_draft': false})
       ..registerJson('POST', '/training/plans:draft',
@@ -89,12 +117,14 @@ void main() {
 
     // Draft review renders the session and the confirm button.
     expect(find.textContaining('深蹲'), findsWidgets);
+    expect(find.byType(SvgPicture), findsWidgets);
     expect(find.byKey(const Key('plan-confirm-button')), findsOneWidget);
     expect(find.byKey(const Key('plan-regenerate-button')), findsOneWidget);
   });
 
   testWidgets('draft review confirm posts to plans:confirm', (tester) async {
     final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
       ..registerJson('GET', '/training/plans/active', (_) => {'has_active': false})
       ..registerJson('GET', '/training/plans/draft', (_) => {'has_draft': false})
       ..registerJson('POST', '/training/plans:draft',
@@ -116,5 +146,60 @@ void main() {
     );
     // Active view shows a rest day honestly (no fake session).
     expect(find.text('今天是休息日'), findsOneWidget);
+  });
+
+  testWidgets('missing health profile blocks generation defaults', (tester) async {
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => {
+            'configured': false,
+            'profile': null,
+            'readiness': {
+              'readiness': 'missing_required_data',
+              'risk_version': 'v1',
+              'reason': 'synthetic',
+              'missing_fields': ['fitness_goal'],
+              'restricted_reason': null,
+            },
+          })
+      ..registerJson('GET', '/training/plans/active', (_) => {'has_active': false})
+      ..registerJson('GET', '/training/plans/draft', (_) => {'has_draft': false});
+
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('请先完善健康档案'), findsOneWidget);
+    expect(find.byKey(const Key('plan-generate-button')), findsNothing);
+  });
+
+  testWidgets('active session renders local SVG and substitution action',
+      (tester) async {
+    final active = _draftPlanJson()
+      ..['status'] = 'active'
+      ..['confirmed_at'] = '2026-07-27T08:00:00Z';
+    final session = (active['sessions'] as List).first as Map<String, dynamic>;
+    final prescription =
+        (session['prescriptions'] as List).first as Map<String, dynamic>;
+    (prescription['exercise'] as Map<String, dynamic>)['substitution_ids'] =
+        ['ex-alt'];
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson('GET', '/training/plans/active',
+          (_) => {'has_active': true, 'plan': active})
+      ..registerJson('GET', '/training/plans/draft', (_) => {'has_draft': false})
+      ..registerJson('GET', '/training/plans/today', (_) => {
+            'state': 'session',
+            'local_date': '2026-07-27',
+            'decision_gate': 'eligible',
+            'session': session,
+            'feedback_outcome_state': null,
+            'substitution_applied': false,
+          });
+
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SvgPicture), findsWidgets);
+    expect(find.byKey(const Key('substitute-ex-1-ex-alt')), findsOneWidget);
+    expect(find.byKey(const Key('feedback-completed')), findsOneWidget);
   });
 }

@@ -133,6 +133,15 @@ def test_generation_is_deterministic_for_equal_inputs():
         assert d1 == d2
 
 
+def test_short_session_has_a_smaller_exercise_cap_than_long_session():
+    short, _, _ = _gen(_ctx(goal="basic_strength", freq=3, duration=15))
+    long, _, _ = _gen(_ctx(goal="basic_strength", freq=3, duration=60))
+    assert short.ok is True and long.ok is True
+    assert max(len(s.prescriptions) for s in short.draft.sessions) <= 3
+    assert {s.target_minutes for s in short.draft.sessions} == {15}
+    assert {s.target_minutes for s in long.draft.sessions} == {60}
+
+
 # --- safety matrix ---------------------------------------------------------
 
 

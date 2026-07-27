@@ -105,6 +105,16 @@ void main() {
       expect(() => TodayResult.fromJson({'state': 'almost_ready'}),
           throwsFormatException);
     });
+
+    test('parses the four-week completion state', () {
+      final r = TodayResult.fromJson({
+        'state': 'plan_complete',
+        'local_date': '2026-08-24',
+        'substitution_applied': false,
+      });
+      expect(r.state, TodayState.planComplete);
+      expect(r.session, isNull);
+    });
   });
 
   group('FeedbackResult parsing', () {

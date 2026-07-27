@@ -298,14 +298,15 @@ another user's data. Stable error codes are returned as `{detail, code}`.
 | `GET /plans/draft` | Retrieve the current pending draft or an explicit `no_draft` state | n/a | Ownership-scoped; returns draft + validation status. |
 | `POST /plans:confirm` | Explicitly confirm+activate the pending draft | key required | Re-runs safety + validator on the stored draft; rejects stale fingerprint/version; atomically supersedes the previous active plan. Returns the new active version. |
 | `GET /plans/active` | Retrieve the single active plan or `no_active_plan` | n/a | Includes immutable version + change reason. |
-| `GET /plans/today` | Today's prescriptions for the active plan | n/a | Server-derived local date; returns `no_active_plan` / `rest_day` / `session` with prescriptions + catalog-derived illustration/steps/reps/rest/alternatives. Blocked context surfaces as a structured state, never as success. |
-| `POST /plans/sessions/{session_id}:substitute` | One user-initiated substitution within today's session | key required | Body: `{original_exercise_id, replacement_exercise_id, idempotency_key}`. Re-runs safety; red-flag/restricted/stale -> reject. At most one per `(session_id, local_date)`. |
-| `POST /plans/sessions/{session_id}:feedback` | Record today's outcome state | key required | Body: `{outcome_state, idempotency_key}`. No free-text note accepted. At most one per `(session_id, local_date)`; replay returns the recorded row. |
+| `GET /plans/today?iana_timezone={tz}` | Today's prescriptions for the active plan | n/a | Derives the local date and current plan week from the injected UTC clock, confirmation time, and validated IANA timezone. Returns `no_active_plan` / `blocked` / `rest_day` / `session` / `plan_complete`; a session includes the effective substitution and recorded feedback state. |
+| `POST /plans/sessions/{session_id}:substitute?iana_timezone={tz}` | One user-initiated substitution within today's session | key required | Body: `{original_exercise_id, replacement_exercise_id, idempotency_key}`. The validated timezone is required for the server-derived date. The original must be prescribed today; the replacement must be an original catalog substitution, survive current candidate selection, and pass whole-plan validation. |
+| `POST /plans/sessions/{session_id}:feedback?iana_timezone={tz}` | Record today's outcome state | key required | Body: `{outcome_state, idempotency_key}`. The validated timezone is required for the server-derived date. No free-text note accepted. At most one per `(session_id, local_date)`; replay returns the recorded row. |
 
 Stable error codes (non-exhaustive): `clarification_required`,
 `restricted_no_plan`, `red_flag_stop`, `goal_not_supported_yet`,
 `stale_context`, `no_pending_draft`, `no_active_plan`, `already_confirmed`,
 `substitution_limit_reached`, `feedback_already_recorded`, `not_owner`,
+`session_not_today`, `substitution_not_safe`, `stored_draft_invalid`,
 `invalid_idempotency_key`. HTTP status follows the existing convention
 (`AppException` -> `{detail, code}`; 400 for contract violations, 409 for
 conflicting state, 410 for gone idempotency anchors, 503 for service failure).
@@ -333,7 +334,7 @@ conflicting state, 410 for gone idempotency anchors, 503 for service failure).
   codes, versions, and counts — never raw health profile fields, pain notes,
   photos, or another user's identifiers. This matches the Phase 3 observability
   contract.
-- `today`/`feedback` use the server-derived local date (from the injected UTC
+- `today`/`feedback`/`substitution` use the server-derived local date (from the injected UTC
   clock + trusted IANA timezone), never a client-supplied date as the authority.
 - Tests, fixtures, screenshots, and reports use synthetic data only.
 
@@ -357,16 +358,21 @@ conflicting state, 410 for gone idempotency anchors, 503 for service failure).
 - Entry: the existing disabled "生成改善计划" button in
   `posture_profile_screen.dart` is enabled iff
   `confirmedGoals?.canGeneratePlan == true`; it routes to the new plan flow.
-- Flow: goal (one of three) + frequency + duration selection -> draft review
+- Flow: current health-profile goal (one of three) + frequency + duration and
+  equipment review -> draft review
   (exercises, prescriptions, illustrations, alternatives) -> explicit confirm ->
   active plan view (four weeks, sessions, version/change reason) -> today's
   prescriptions (steps, reps/duration, rest, alternatives, illustration) ->
   feedback state selection + optional one substitution.
+- The plan page does not fabricate request defaults. It loads the current
+  structured health profile and blocks generation when required values are
+  missing, unsupported, or contain no selected equipment. Changes are made in
+  the health-profile flow so Phase 3 request/profile equality remains authoritative.
 - A new bottom-nav **计划** tab is added; the shell is reshaped to 今日 / 计划 /
   Agent(disabled placeholder) / 我的 per vision.md. Agent tab is a disabled
   placeholder (Phase 5).
 - UI must surface `blocked` / `restricted` / `red_flag` / `no_active_plan` /
-  `rest_day` / `stale` / `parse_error` states honestly and never pretend success
+  `rest_day` / `plan_complete` / `stale` / `parse_error` states honestly and never pretend success
   or coerce a blocked result to a normal plan (matches existing
   parse-error-never-downgrades convention).
 - Typed models under `app/lib/models/plan*.dart` (hand-written strict `fromJson`,

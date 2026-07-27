@@ -14,7 +14,7 @@ Two layers:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -160,7 +160,7 @@ async def test_feedback_substitute_without_active_plan_is_409(client):
     sid = str(uuid.uuid4())
     h = _auth(uid)
     fb = await client.post(
-        f"/api/v1/training/plans/sessions/{sid}:feedback",
+        f"/api/v1/training/plans/sessions/{sid}:feedback?iana_timezone=Asia/Shanghai",
         json={"outcome_state": "completed", "idempotency_key": "f1"}, headers=h)
     assert fb.status_code == 409
     # Use a real catalog substitution pair so the request reaches the
@@ -174,7 +174,7 @@ async def test_feedback_substitute_without_active_plan_is_409(client):
     assert pair is not None, "catalog has no substitution pair"
     orig, repl = pair
     sub = await client.post(
-        f"/api/v1/training/plans/sessions/{sid}:substitute",
+        f"/api/v1/training/plans/sessions/{sid}:substitute?iana_timezone=Asia/Shanghai",
         json={"original_exercise_id": orig, "replacement_exercise_id": repl,
               "idempotency_key": "s1"}, headers=h)
     assert sub.status_code == 409
@@ -233,12 +233,15 @@ async def eligible_user(monkeypatch):
     return uid, ctx, decision
 
 
-async def test_service_generate_confirm_active_today_feedback_substitute(eligible_user):
+async def test_service_generate_confirm_active_today_feedback_substitute(
+        eligible_user, monkeypatch):
     from app.training import service as svc
     from app.training.schemas_api import (
         ConfirmRequest, DraftRequest, FeedbackRequest, SubstitutionRequest)
 
     uid, ctx, _decision = eligible_user
+    fixed_now = datetime(2026, 7, 27, 1, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(svc, "_utc_now", lambda: fixed_now)
 
     async with TestSession() as db:
         draft = await svc.generate_draft(db, uid, DraftRequest(
@@ -276,14 +279,6 @@ async def test_service_generate_confirm_active_today_feedback_substitute(eligibl
             for p in today.session.prescriptions:
                 assert p.exercise is not None
 
-            # Feedback (idempotent; one per session/day).
-            fb1 = await svc.record_feedback(db, uid, session_id, FeedbackRequest(
-                outcome_state="completed", idempotency_key="fb1"))
-            assert fb1.status == "recorded"
-            fb2 = await svc.record_feedback(db, uid, session_id, FeedbackRequest(
-                outcome_state="completed", idempotency_key="fb1"))
-            assert fb2.status == "replayed"
-
             # One substitution per session/day; the replacement must be an
             # allowed substitution of the original.
             orig = today.session.prescriptions[0].exercise_id
@@ -293,20 +288,49 @@ async def test_service_generate_confirm_active_today_feedback_substitute(eligibl
                 sub1 = await svc.record_substitution(
                     db, uid, session_id, SubstitutionRequest(
                         original_exercise_id=orig, replacement_exercise_id=repl,
-                        idempotency_key="sub1"))
+                        idempotency_key="sub1"), "Asia/Shanghai")
                 assert sub1.status == "recorded"
+                effective_today = await svc.get_today(db, uid, "Asia/Shanghai")
+                assert effective_today.substitution_applied is True
+                assert effective_today.session.prescriptions[0].exercise_id == repl
                 # Same (session, day) with a different key -> conflict (one per
                 # session/day). Replay with the same key returns "replayed".
                 replay_sub = await svc.record_substitution(
                     db, uid, session_id, SubstitutionRequest(
                         original_exercise_id=orig, replacement_exercise_id=repl,
-                        idempotency_key="sub1"))
+                        idempotency_key="sub1"), "Asia/Shanghai")
                 assert replay_sub.status == "replayed"
                 with pytest.raises(Exception):
                     await svc.record_substitution(
                         db, uid, session_id, SubstitutionRequest(
                             original_exercise_id=orig, replacement_exercise_id=repl,
-                            idempotency_key="sub2"))
+                            idempotency_key="sub2"), "Asia/Shanghai")
+
+            # Feedback closes the day's execution state and is idempotent.
+            fb1 = await svc.record_feedback(db, uid, session_id, FeedbackRequest(
+                outcome_state="completed", idempotency_key="fb1"),
+                "Asia/Shanghai")
+            assert fb1.status == "recorded"
+            execution_context = svc._execution_context
+
+            async def must_not_recheck(*_args, **_kwargs):
+                raise AssertionError("idempotent replay re-ran execution checks")
+
+            monkeypatch.setattr(svc, "_execution_context", must_not_recheck)
+            fb2 = await svc.record_feedback(db, uid, session_id, FeedbackRequest(
+                outcome_state="completed", idempotency_key="fb1"),
+                "Asia/Shanghai")
+            assert fb2.status == "replayed"
+            monkeypatch.setattr(svc, "_execution_context", execution_context)
+            completed_today = await svc.get_today(db, uid, "Asia/Shanghai")
+            assert completed_today.feedback_outcome_state == "completed"
+            if allowed:
+                replay_after_feedback = await svc.record_substitution(
+                    db, uid, session_id, SubstitutionRequest(
+                        original_exercise_id=orig,
+                        replacement_exercise_id=repl,
+                        idempotency_key="sub1"), "Asia/Shanghai")
+                assert replay_after_feedback.status == "replayed"
 
 
 async def test_service_confirm_rejects_stale_context(monkeypatch):
@@ -334,3 +358,155 @@ async def test_service_confirm_rejects_stale_context(monkeypatch):
         with pytest.raises(AppException) as exc:
             await svc.confirm(db, uid, ConfirmRequest(**{**_draft_body(key="c")}))
         assert exc.value.code == "stale_context"
+
+
+async def test_today_advances_by_confirmation_week_and_then_completes(
+        eligible_user, monkeypatch):
+    from app.training.schemas_api import ConfirmRequest, DraftRequest
+
+    uid, _ctx, _decision = eligible_user
+    confirmed_at = datetime(2026, 7, 27, 0, 30, tzinfo=timezone.utc)
+    monkeypatch.setattr(service, "_utc_now", lambda: confirmed_at)
+    async with TestSession() as db:
+        await service.generate_draft(db, uid, DraftRequest(**_draft_body(key="g-weeks")))
+        await service.confirm(db, uid, ConfirmRequest(**_draft_body(key="c-weeks")))
+
+        for expected_week in (1, 2, 3, 4):
+            current = confirmed_at + timedelta(days=7 * (expected_week - 1))
+            monkeypatch.setattr(service, "_utc_now", lambda current=current: current)
+            today = await service.get_today(db, uid, "Asia/Shanghai")
+            assert today.state == "session"
+            assert today.session.week_index == expected_week
+
+        monkeypatch.setattr(
+            service, "_utc_now", lambda: confirmed_at + timedelta(days=28))
+        complete = await service.get_today(db, uid, "Asia/Shanghai")
+        assert complete.state == "plan_complete"
+        assert complete.session is None
+
+
+async def test_execution_writes_only_target_the_actual_local_day(
+        eligible_user, monkeypatch):
+    from app.core.exceptions import AppException
+    from app.training import persistence as persistence
+    from app.training.schemas_api import ConfirmRequest, DraftRequest, FeedbackRequest
+
+    uid, _ctx, _decision = eligible_user
+    now = datetime(2026, 7, 27, 0, 30, tzinfo=timezone.utc)
+    monkeypatch.setattr(service, "_utc_now", lambda: now)
+    async with TestSession() as db:
+        await service.generate_draft(db, uid, DraftRequest(**_draft_body(key="g-day")))
+        confirmed = await service.confirm(
+            db, uid, ConfirmRequest(**_draft_body(key="c-day")))
+        sessions = await persistence.load_sessions(
+            db, uuid.UUID(confirmed.plan.plan_version_id))
+        future_session = next(
+            session for session in sessions
+            if session.week_index == 2 and session.day_of_week == 1)
+
+        with pytest.raises(AppException) as exc:
+            await service.record_feedback(
+                db, uid, str(future_session.session_id), FeedbackRequest(
+                    outcome_state="completed", idempotency_key="wrong-day"),
+                "Asia/Shanghai")
+        assert exc.value.code == "session_not_today"
+
+
+async def test_draft_replay_returns_the_recorded_version(
+        eligible_user, monkeypatch):
+    from app.training.schemas_api import DraftRequest
+
+    uid, _ctx, _decision = eligible_user
+    async with TestSession() as db:
+        first = await service.generate_draft(
+            db, uid, DraftRequest(**_draft_body(key="draft-first")))
+        second = await service.generate_draft(
+            db, uid, DraftRequest(**_draft_body(key="draft-second")))
+
+        async def must_not_reclassify(*_args, **_kwargs):
+            raise AssertionError("idempotent replay re-ran safety classification")
+
+        monkeypatch.setattr(service, "_classify", must_not_reclassify)
+        replay = await service.generate_draft(
+            db, uid, DraftRequest(**_draft_body(key="draft-first")))
+        assert first.draft.plan_version_id != second.draft.plan_version_id
+        assert replay.draft.plan_version_id == first.draft.plan_version_id
+
+
+async def test_confirm_idempotency_covers_the_complete_request(eligible_user):
+    from app.core.exceptions import AppException
+    from app.training.schemas_api import ConfirmRequest, DraftRequest
+
+    uid, _ctx, _decision = eligible_user
+    async with TestSession() as db:
+        await service.generate_draft(db, uid, DraftRequest(**_draft_body(key="g-hash")))
+        await service.confirm(db, uid, ConfirmRequest(**_draft_body(key="same-confirm")))
+        changed = _draft_body(key="same-confirm")
+        changed["session_duration_minutes"] = 45
+        with pytest.raises(AppException) as exc:
+            await service.confirm(db, uid, ConfirmRequest(**changed))
+        assert exc.value.code == "idempotency_key_conflict"
+
+
+async def test_confirm_revalidates_the_stored_draft(eligible_user, monkeypatch):
+    from app.core.exceptions import AppException
+    from app.training.schemas import PlanValidationResult, PlanViolation
+    from app.training.schemas_api import ConfirmRequest, DraftRequest
+
+    uid, _ctx, _decision = eligible_user
+    async with TestSession() as db:
+        await service.generate_draft(db, uid, DraftRequest(**_draft_body(key="g-validate")))
+
+        def reject(*_args, **_kwargs):
+            return PlanValidationResult(
+                valid=False,
+                gate_status=_decision.gate_status,
+                decision_fingerprint=_decision.fingerprint,
+                violations=[PlanViolation(
+                    code="test_rejection", scope="plan", detail="synthetic")],
+                profile_version=1,
+                catalog_version=service.catalog().content_version,
+                policy_version=service.TRAINING_POLICY.policy_version,
+            )
+
+        monkeypatch.setattr(service, "validate_plan", reject)
+        with pytest.raises(AppException) as exc:
+            await service.confirm(
+                db, uid, ConfirmRequest(**_draft_body(key="c-validate")))
+        assert exc.value.code == "stored_draft_invalid"
+
+
+async def test_today_blocks_when_current_plan_validation_fails(
+        eligible_user, monkeypatch):
+    from app.training.schemas import PlanValidationResult, PlanViolation
+    from app.training.schemas_api import ConfirmRequest, DraftRequest
+
+    uid, _ctx, decision = eligible_user
+    now = datetime(2026, 7, 27, 1, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(service, "_utc_now", lambda: now)
+    async with TestSession() as db:
+        await service.generate_draft(
+            db, uid, DraftRequest(**_draft_body(key="g-today-validate")))
+        await service.confirm(
+            db, uid, ConfirmRequest(**_draft_body(key="c-today-validate")))
+
+        def reject(*_args, **_kwargs):
+            return PlanValidationResult(
+                valid=False,
+                gate_status=decision.gate_status,
+                decision_fingerprint=decision.fingerprint,
+                violations=[PlanViolation(
+                    code="exercise_not_candidate",
+                    scope="week1.d1.o1",
+                    detail="synthetic current-context exclusion",
+                )],
+                profile_version=1,
+                catalog_version=service.catalog().content_version,
+                policy_version=service.TRAINING_POLICY.policy_version,
+            )
+
+        monkeypatch.setattr(service, "validate_plan", reject)
+        today = await service.get_today(db, uid, "Asia/Shanghai")
+        assert today.state == "blocked"
+        assert today.session is None
+        assert today.change_reason == "safety_revalidation_failed"

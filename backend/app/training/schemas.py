@@ -819,6 +819,7 @@ class PlanSession(BaseModel):
     week_index: int = Field(..., ge=1, le=4)
     day_of_week: int = Field(..., ge=1, le=7)
     session_order: int = Field(..., ge=1, le=20)
+    target_minutes: Optional[int] = Field(None, ge=15, le=60)
     prescriptions: List[PlanPrescription] = Field(..., min_length=1)
 
     @field_validator("prescriptions")

@@ -292,7 +292,7 @@ async def create_draft(
             week_index=session.week_index,
             day_of_week=session.day_of_week,
             session_order=session.session_order,
-            target_minutes=None,
+            target_minutes=session.target_minutes or session_duration_minutes,
         )
         db.add(ses)
         await db.flush()
@@ -587,6 +587,18 @@ async def get_feedback(
     return res.scalar_one_or_none()
 
 
+async def get_feedback_owned(
+    db: AsyncSession, user_id: str, feedback_id: uuid.UUID
+) -> Optional[TrainingSessionFeedback]:
+    res = await db.execute(
+        select(TrainingSessionFeedback).where(
+            TrainingSessionFeedback.user_id == uuid.UUID(user_id),
+            TrainingSessionFeedback.feedback_id == feedback_id,
+        )
+    )
+    return res.scalar_one_or_none()
+
+
 async def get_substitution(
     db: AsyncSession, user_id: str, session_id: uuid.UUID, local_date: date
 ) -> Optional[TrainingSessionSubstitution]:
@@ -595,6 +607,18 @@ async def get_substitution(
             TrainingSessionSubstitution.user_id == uuid.UUID(user_id),
             TrainingSessionSubstitution.session_id == session_id,
             TrainingSessionSubstitution.local_date == local_date,
+        )
+    )
+    return res.scalar_one_or_none()
+
+
+async def get_substitution_owned(
+    db: AsyncSession, user_id: str, substitution_id: uuid.UUID
+) -> Optional[TrainingSessionSubstitution]:
+    res = await db.execute(
+        select(TrainingSessionSubstitution).where(
+            TrainingSessionSubstitution.user_id == uuid.UUID(user_id),
+            TrainingSessionSubstitution.substitution_id == substitution_id,
         )
     )
     return res.scalar_one_or_none()
@@ -647,7 +671,9 @@ __all__ = [
     "get_active_version",
     "get_version_owned",
     "get_feedback",
+    "get_feedback_owned",
     "get_substitution",
+    "get_substitution_owned",
     "load_sessions",
     "load_prescriptions",
 ]

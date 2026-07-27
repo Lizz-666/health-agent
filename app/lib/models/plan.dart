@@ -40,6 +40,7 @@ enum TodayState {
   noActivePlan,
   blocked,
   restDay,
+  planComplete,
   session;
 
   static TodayState tryParse(Object? raw) {
@@ -51,6 +52,8 @@ enum TodayState {
           return TodayState.blocked;
         case 'rest_day':
           return TodayState.restDay;
+        case 'plan_complete':
+          return TodayState.planComplete;
         case 'session':
           return TodayState.session;
       }
@@ -369,6 +372,8 @@ class TodayResult {
   final String? changeReason;
   final String? decisionGate;
   final PlanSession? session;
+  final OutcomeState? feedbackOutcomeState;
+  final bool substitutionApplied;
 
   const TodayResult({
     required this.state,
@@ -376,6 +381,8 @@ class TodayResult {
     required this.changeReason,
     required this.decisionGate,
     required this.session,
+    required this.feedbackOutcomeState,
+    required this.substitutionApplied,
   });
 
   factory TodayResult.fromJson(Map<String, dynamic> json) {
@@ -389,6 +396,12 @@ class TodayResult {
       session: s is Map<String, dynamic>
           ? PlanSession.fromJson(s)
           : (s == null ? null : throw FormatException('invalid session')),
+      feedbackOutcomeState: json['feedback_outcome_state'] == null
+          ? null
+          : OutcomeState.tryParse(json['feedback_outcome_state']),
+      substitutionApplied: json['substitution_applied'] == null
+          ? false
+          : _readBool(json, 'substitution_applied'),
     );
   }
 }

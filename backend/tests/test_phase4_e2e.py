@@ -135,18 +135,21 @@ async def test_phase4_e2e_generate_confirm_today_substitute_feedback(eligible_us
                 sub = await service.record_substitution(
                     db, uid, session_id, SubstitutionRequest(
                         original_exercise_id=first.exercise_id,
-                        replacement_exercise_id=repl, idempotency_key="sub"))
+                        replacement_exercise_id=repl,
+                        idempotency_key="sub"), "Asia/Shanghai")
                 assert sub.status in ("recorded", "replayed")
 
             # 5. Daily feedback (one of the five outcome states).
             fb = await service.record_feedback(
                 db, uid, session_id, FeedbackRequest(
-                    outcome_state="completed", idempotency_key="fb"))
+                    outcome_state="completed", idempotency_key="fb"),
+                "Asia/Shanghai")
             assert fb.status in ("recorded", "replayed")
             # Replay is idempotent (no second feedback row / same id).
             fb2 = await service.record_feedback(
                 db, uid, session_id, FeedbackRequest(
-                    outcome_state="completed", idempotency_key="fb"))
+                    outcome_state="completed", idempotency_key="fb"),
+                "Asia/Shanghai")
             assert fb2.status == "replayed"
 
 

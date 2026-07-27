@@ -214,10 +214,12 @@ class PlanNotifier extends StateNotifier<PlanState> {
   }
 
   // POST /training/plans/sessions/{id}:feedback
-  Future<bool> recordFeedback(String sessionId, FeedbackInput input) async {
+  Future<bool> recordFeedback(
+      String sessionId, FeedbackInput input, String ianaTimezone) async {
     try {
       final resp = await _api.dio.post(
         '/training/plans/sessions/$sessionId:feedback',
+        queryParameters: {'iana_timezone': ianaTimezone},
         data: input.toJson(),
       );
       if (!mounted) return false;
@@ -235,10 +237,12 @@ class PlanNotifier extends StateNotifier<PlanState> {
   }
 
   // POST /training/plans/sessions/{id}:substitute
-  Future<bool> recordSubstitution(String sessionId, SubstitutionInput input) async {
+  Future<bool> recordSubstitution(
+      String sessionId, SubstitutionInput input, String ianaTimezone) async {
     try {
       final resp = await _api.dio.post(
         '/training/plans/sessions/$sessionId:substitute',
+        queryParameters: {'iana_timezone': ianaTimezone},
         data: input.toJson(),
       );
       if (!mounted) return false;

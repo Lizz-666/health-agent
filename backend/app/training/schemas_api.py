@@ -7,7 +7,7 @@ at the router; no model carries a ``user_id``.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,7 +25,7 @@ class _Idempotent(BaseModel):
 class DraftRequest(_Idempotent):
     fitness_goal: str = Field(..., min_length=1, max_length=30)
     weekly_frequency: int = Field(..., ge=2, le=5)
-    session_duration_minutes: int = Field(..., ge=15, le=60)
+    session_duration_minutes: Literal[15, 30, 45, 60]
     equipment_bodyweight: bool
     equipment_resistance_band: bool
     iana_timezone: str = Field(..., min_length=1, max_length=60)
@@ -37,7 +37,7 @@ class ConfirmRequest(_Idempotent):
     # profile / check-in / posture signal / version yields ``stale_context``.
     fitness_goal: str = Field(..., min_length=1, max_length=30)
     weekly_frequency: int = Field(..., ge=2, le=5)
-    session_duration_minutes: int = Field(..., ge=15, le=60)
+    session_duration_minutes: Literal[15, 30, 45, 60]
     equipment_bodyweight: bool
     equipment_resistance_band: bool
     iana_timezone: str = Field(..., min_length=1, max_length=60)
@@ -147,6 +147,8 @@ class TodayResponse(BaseModel):
     change_reason: Optional[str] = None
     decision_gate: Optional[str] = None
     session: Optional[SessionView] = None
+    feedback_outcome_state: Optional[str] = None
+    substitution_applied: bool = False
 
 
 class FeedbackResponse(BaseModel):
