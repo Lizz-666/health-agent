@@ -1,6 +1,6 @@
 # Phase 5 Agent MVP Collaboration Charter
 
-> Date: 2026-07-28. Status: planning. Base:
+> Date: 2026-07-28. Status: Task 0 Gate 0 review. Base:
 > `e560552e0b0dcd3fb5d892f177be1bd80c17c6dd` (verified Phase 4 candidate).
 
 ## 1. Decision
@@ -77,6 +77,10 @@ the reviewed SHA is fixed and reverified.
   `user_id`, or authority to choose its own Tool set.
 - Tool inputs and outputs are typed. Server code enforces a fixed allowlist,
   ownership, current safety policy, idempotency, and explicit side effects.
+- Risk classification and plan validation are mandatory server wrappers, not
+  provider-visible Tools that the model can choose or omit.
+- Every Agent-initiated write produces a short-lived typed proposal and requires
+  a separate authenticated user confirmation; the model never executes a write.
 - Long-term structural changes remain `proposal -> deterministic validation ->
   diff -> user confirmation -> execution`. The model cannot confirm for the
   user.
@@ -85,8 +89,13 @@ the reviewed SHA is fixed and reverified.
   through an alternative path.
 - Complete chat transcripts are not long-term memory. Persist only approved
   structured state and privacy-minimized audit metadata defined by Task 0.
+- A live cloud provider call additionally requires current server-side consent,
+  provider/disclosure configuration, withdrawal/deletion paths, and a satisfied
+  privacy gate. A feature switch alone is never authorization.
 - Prompt text is not a safety policy. Prompt injection cannot change actor,
   permissions, safety gates, confirmation requirements, or tool schemas.
+- Provider output contains typed intent/Tool/message codes only. All displayed
+  prose is rendered from reviewed server templates; free model text is not shown.
 - Provider timeout, malformed output, tool failure, stale context, or validation
   failure returns an explicit failure or safe deterministic baseline where the
   domain contract permits it. It never becomes `normal`, `healthy`, `success`,

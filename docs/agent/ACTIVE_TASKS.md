@@ -5,13 +5,14 @@
 
 ## Current Initiative
 
-- 阶段：Phase 5 Agent MVP 规划中；协作状态 `planned`，尚未批准运行时代码。
+- 阶段：Phase 5 Agent MVP Task 0 已形成规格候选，状态 `review`；尚未批准运行时代码。
 - Phase 4 已通过 Codex 最终独立验收，状态 `verified`；PR #2 保持 draft、尚未合并，因此不记为 `merged`。
 - Phase 5 协作章程：`docs/agent/PHASE5_COLLABORATION_CHARTER.md`。
-- Phase 5 OpenCode 第一项工作仅为只读预审：`docs/agent/PHASE5_OPENCODE_PREFLIGHT_PROMPT.md`。预审报告不是规格，也不授权实现。
+- Phase 5 OpenCode 只读预审已完成并由 Codex 收敛：`docs/reports/phase5-opencode-preflight-2026-07-28.md`。下一步仅执行 `docs/agent/PHASE5_OPENCODE_GATE0_REVIEW_PROMPT.md` 的独立规格审查。
 - Phase 5 采用有门禁的混合模式：Codex 负责规格、架构、安全/隐私契约和四个风险门；OpenCode 在单一实现分支按批次主实现并操作 CI，每个风险门停止等待独立验收。
 - Phase 5 精确规划基线为已验证 Phase 4 SHA `e560552e0b0dcd3fb5d892f177be1bd80c17c6dd`。Task 0 规格批准前，不得从路线图直接开始运行时代码。
-- 路线图“当日小调整”与 Phase 4 将自动缩短、顺延和恢复性调整推迟至 Phase 7 存在范围冲突；由 Codex 在 Task 0 明确收敛，OpenCode 不自行扩展。
+- “当日小调整”范围已收敛为复用 Phase 4 用户主动替换和结构化反馈；自动缩短、顺延和恢复性调整仍属于 Phase 7。
+- 新 P0 隐私边界：当前 `ActorContext.consent_record` 仍无持久化来源；Phase 5 规格要求独立云模型处理告知/同意、撤回、删除和证据隐私门，任何单一配置开关都不能启用 live provider。
 - Phase 2 最终证据：`docs/reports/phase2-exit-audit-2026-07-26.md`；Final Closure commit `1818e74`。用户接受的残余风险仍是 Android 人工逐屏业务回放未执行，不改写为已通过。
 - Phase 3 基线：Task 0 主体提交 `2ed211a`（base `1818e74`）；整阶段 OpenCode 实现实验的精确 base 为 `c49eb618759ff85d7235f515b57c9d3fad38d6cb`。
 - Phase 3 远程证据：PR `#1` 在精确 SHA `8459384dbbcb339e8d78fa243b4e8690c76b7bba` 上 Fast 和 Full GitHub CI 均成功；PR 仍为 draft，尚未合并到 `main`。
@@ -31,8 +32,8 @@
 | Phase 3 Task 0 | Codex coordinator | `codex/phase3-spec-plan` / root worktree | `1818e74` | `committed` | 规格、来源/许可 pin、workout.cool 对照矩阵、Tasks 0-7 charters、CI 分层和实验评价口径；独立复核的 4 P1、5 P2、2 P3 已全部关闭；commit `2ed211a`。 |
 | Phase 3 Tasks 1-7 | OpenCode + Claude implementation; Codex final acceptance and fixes | `codex/phase3-opencode-implementation` / `health-worktrees/phase3-opencode-implementation` | `c49eb618759ff85d7235f515b57c9d3fad38d6cb` | `merged` | OpenCode handoff `9ccaa35` failed first-pass acceptance. Codex closed findings in `423bf55`; local Full `989 passed`, PostgreSQL `13/13`; integration closure `e7fd6d9` and CI dependency test fix `8459384`. PR #1 remote Fast/Full both pass at `8459384`; draft remains unmerged. |
 | Phase 4 Tasks 0-7 | OpenCode + selected Claude model; Codex final acceptance and fixes | `codex/phase4-opencode-implementation` plus review worktree `health-worktrees/phase4-codex-review` | `b7f8391e17a2adbb4ae52d012b360d17ff4550fd` | `verified` | OpenCode handoff `2a409e8` failed first-pass acceptance. Codex closed week progression, current-plan validation, substitution safety, full idempotency, duration, profile-equality, SVG, and execution-state findings in `c308189`; audit commit `dd31d21`; status commit `e560552`. Local Full: 1074 passed/0 failed/0 skipped, PostgreSQL 18/18; Flutter analyze clean + 322 tests. Exact-SHA CI run `30272758915` on `e560552`: Fast/Flutter/Full all success. Audit: `docs/reports/phase4-codex-exit-audit-2026-07-27.md`. PR #2 remains draft and unmerged. |
-| Phase 5 Task 0 | Codex coordinator; OpenCode read-only preflight | `codex/phase5-spec-plan` / `health-worktrees/phase5-spec-plan` | `e560552` | `in_progress` | 先完成只读能力盘点，再由 Codex 编写规格、威胁模型、ADR、实施计划、Tool 权限/确认矩阵和评测计划；在 Gate 0 通过前不实现运行时代码。 |
-| Phase 5 Batches A-D | OpenCode primary implementation and CI; Codex gate review/fixes | implementation branch/worktree to be created from accepted Task 0 SHA | pending | `planned` | A：context/read tools；B：audit/migration/write adapters；C：orchestrator/provider/API；D：Flutter/E2E。每个 Gate 停止，P0/P1/P2 清零后继续。 |
+| Phase 5 Task 0 | Codex author; OpenCode independent Gate 0 reviewer | `codex/phase5-spec-plan` / `health-worktrees/phase5-spec-plan` | `e560552` | `review` | 规格、ADR-0003/0004、实施计划、Tool 权限/确认矩阵、云模型同意门和评测计划已形成候选；OpenCode 按 Gate 0 提示词只读审查，P0/P1/P2 清零前不实现。 |
+| Phase 5 Tasks 1-6 | OpenCode primary implementation and CI; Codex gate review/fixes | implementation branch/worktree to be created from accepted Task 0 SHA | pending | `planned` | Batch A：Task 1 context/read tools；Batch B：Tasks 2-3 consent/audit/migration/write confirmation；Batch C：Task 4 provider/orchestrator/API；Batch D：Tasks 5-6 Flutter/E2E。每个 Gate 停止。 |
 
 ## Integration Order
 
