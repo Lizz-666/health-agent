@@ -39,13 +39,17 @@ side-effect references rather than raw payloads.
 
 Phase 5 retains run/Tool metadata for 30 days and deletes expired rows at app
 startup and Agent API boundaries through an independently testable cleanup
-service. Consent events remain until Agent-data or account deletion. The fake
+service. This is best-effort retention without a scheduler; a quiet instance can
+retain expired rows past day 30. Consent events remain until Agent-data or account deletion. The fake
 provider exists only as test dependency injection and has no runtime selection
 path.
 
 Context, request, and argument fingerprints use HMAC-SHA256 with a dedicated
 server-only Agent audit key. Plain hashes of low-entropy values such as weight or
-enum combinations are forbidden.
+enum combinations are forbidden. Phase 5 does not retain prior HMAC keys after
+rotation: pending proposals are scrubbed, while retained old audit fingerprints
+remain deletable opaque metadata but cannot be re-verified. This bounded audit
+trade-off is accepted for the MVP's maximum 30-day metadata window.
 
 Provide explicit consent withdrawal and Agent-data deletion. Withdrawal blocks
 new calls and scrubs pending proposals. Agent-only deletion removes consent and
@@ -75,6 +79,9 @@ previously confirmed operations.
 - Exact natural-language replay is not supported; idempotency applies to writes,
   while duplicate turn IDs prevent duplicate proposals.
 - Four new tables and purge/retention tests are required.
+- The current account-deletion orchestration is hard-coded in `posture.purge`;
+  Phase 5 must explicitly add Agent rows there. Repairing its pre-existing lack
+  of health/training domain deletion is separate platform work.
 - Audit can explain which Tool/version/result occurred without retaining the
   user's raw health conversation.
 

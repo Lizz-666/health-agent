@@ -1,6 +1,6 @@
 # Active Agent Tasks
 
-> 当前开发协调账本，不是产品规格。最后核对：2026-07-28。
+> 当前开发协调账本，不是产品规格。最后核对：2026-07-29。
 > 所有会话先遵守根目录 `AGENTS.md` 的“开发总纲”，再读取本文件中与当前 Task 对应的行和链接。
 
 ## Current Initiative
@@ -8,7 +8,7 @@
 - 阶段：Phase 5 Agent MVP Task 0 已形成规格候选，状态 `review`；尚未批准运行时代码。
 - Phase 4 已通过 Codex 最终独立验收，状态 `verified`；PR #2 保持 draft、尚未合并，因此不记为 `merged`。
 - Phase 5 协作章程：`docs/agent/PHASE5_COLLABORATION_CHARTER.md`。
-- Phase 5 OpenCode 只读预审已完成并由 Codex 收敛：`docs/reports/phase5-opencode-preflight-2026-07-28.md`。下一步仅执行 `docs/agent/PHASE5_OPENCODE_GATE0_REVIEW_PROMPT.md` 的独立规格审查。
+- Phase 5 首轮 Gate 0 只读审查在 `8ac8858` 报告 2 P2/4 P3 并判定 FAIL；Codex 已按 `docs/reports/phase5-gate0-review-2026-07-29.md` 收敛全部 finding。下一步仅执行 `docs/agent/PHASE5_OPENCODE_GATE0_REREVIEW_PROMPT.md` 的独立复审。
 - Phase 5 采用有门禁的混合模式：Codex 负责规格、架构、安全/隐私契约和四个风险门；OpenCode 在单一实现分支按批次主实现并操作 CI，每个风险门停止等待独立验收。
 - Phase 5 精确规划基线为已验证 Phase 4 SHA `e560552e0b0dcd3fb5d892f177be1bd80c17c6dd`。Task 0 规格批准前，不得从路线图直接开始运行时代码。
 - “当日小调整”范围已收敛为复用 Phase 4 用户主动替换和结构化反馈；自动缩短、顺延和恢复性调整仍属于 Phase 7。
@@ -32,13 +32,13 @@
 | Phase 3 Task 0 | Codex coordinator | `codex/phase3-spec-plan` / root worktree | `1818e74` | `committed` | 规格、来源/许可 pin、workout.cool 对照矩阵、Tasks 0-7 charters、CI 分层和实验评价口径；独立复核的 4 P1、5 P2、2 P3 已全部关闭；commit `2ed211a`。 |
 | Phase 3 Tasks 1-7 | OpenCode + Claude implementation; Codex final acceptance and fixes | `codex/phase3-opencode-implementation` / `health-worktrees/phase3-opencode-implementation` | `c49eb618759ff85d7235f515b57c9d3fad38d6cb` | `merged` | OpenCode handoff `9ccaa35` failed first-pass acceptance. Codex closed findings in `423bf55`; local Full `989 passed`, PostgreSQL `13/13`; integration closure `e7fd6d9` and CI dependency test fix `8459384`. PR #1 remote Fast/Full both pass at `8459384`; draft remains unmerged. |
 | Phase 4 Tasks 0-7 | OpenCode + selected Claude model; Codex final acceptance and fixes | `codex/phase4-opencode-implementation` plus review worktree `health-worktrees/phase4-codex-review` | `b7f8391e17a2adbb4ae52d012b360d17ff4550fd` | `verified` | OpenCode handoff `2a409e8` failed first-pass acceptance. Codex closed week progression, current-plan validation, substitution safety, full idempotency, duration, profile-equality, SVG, and execution-state findings in `c308189`; audit commit `dd31d21`; status commit `e560552`. Local Full: 1074 passed/0 failed/0 skipped, PostgreSQL 18/18; Flutter analyze clean + 322 tests. Exact-SHA CI run `30272758915` on `e560552`: Fast/Flutter/Full all success. Audit: `docs/reports/phase4-codex-exit-audit-2026-07-27.md`. PR #2 remains draft and unmerged. |
-| Phase 5 Task 0 | Codex author; OpenCode independent Gate 0 reviewer | `codex/phase5-spec-plan` / `health-worktrees/phase5-spec-plan` | `e560552` | `review` | 规格、ADR-0003/0004、实施计划、Tool 权限/确认矩阵、云模型同意门和评测计划已形成候选；OpenCode 按 Gate 0 提示词只读审查，P0/P1/P2 清零前不实现。 |
+| Phase 5 Task 0 | Codex author; OpenCode independent Gate 0 reviewer | `codex/phase5-spec-plan` / `health-worktrees/phase5-spec-plan` | `e560552` | `review` | 首轮独立审查为 0 P0/0 P1/2 P2/4 P3；Codex 已修复时区和删除契约并收敛 P3，等待只读复审。P0/P1/P2 清零前不实现。 |
 | Phase 5 Tasks 1-6 | OpenCode primary implementation and CI; Codex gate review/fixes | implementation branch/worktree to be created from accepted Task 0 SHA | pending | `planned` | Batch A：Task 1 context/read tools；Batch B：Tasks 2-3 consent/audit/migration/write confirmation；Batch C：Task 4 provider/orchestrator/API；Batch D：Tasks 5-6 Flutter/E2E。每个 Gate 停止。 |
 
 ## Integration Order
 
-1. OpenCode 在 Phase 5 规划 worktree 执行只读预审并停止；Codex 用报告作为输入，而不是完成证明。
-2. Codex 编写并独立复核 Task 0 规格、威胁模型、ADR、计划和任务契约；Gate 0 通过后创建唯一实现分支/worktree。
+1. OpenCode 在 Phase 5 规划 worktree 执行只读预审和 Gate 0 审查并停止；Codex 用报告作为输入，修复后再交独立复审，而不是把报告当作完成证明。
+2. Codex 编写并收敛 Task 0 规格、威胁模型、ADR、计划和任务契约；Gate 0 复审通过后创建唯一实现分支/worktree。
 3. OpenCode 顺序执行 Batches A-D。每个 Gate 的候选 SHA 先完成 focused local 和适用 CI，再停止等待 Codex 审查。
 4. Codex 在 Gate 1-4 检查真实 diff、修复或退回 findings，并在接受后的精确 SHA 上重新验证；下游批次只能从接受 SHA 继续。
 5. Phase 3、Phase 4、Phase 5 按顺序进入主线。rebase、冲突修复、迁移/schema/policy 变化或实质修改后，相关证据失效并重跑。
