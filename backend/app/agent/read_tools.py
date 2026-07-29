@@ -15,6 +15,7 @@ from typing import Any, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.messages import AgentError, ResultCode
 from app.agent.schemas import (
     ActivePlanDisplayView,
     ActivePlanProviderView,
@@ -77,10 +78,14 @@ async def adapt_health_profile_summary(
 
     if profile is None:
         provider = HealthProfileProviderView(
-            configured=False, readiness_code=readiness.readiness
+            configured=False,
+            readiness_code=readiness.readiness,
+            risk_version=readiness.risk_version,
         )
         display = HealthProfileDisplayView(
-            configured=False, readiness_code=readiness.readiness
+            configured=False,
+            readiness_code=readiness.readiness,
+            risk_version=readiness.risk_version,
         )
         return ReadToolResult("get_health_profile_summary", provider, display)
 
@@ -91,6 +96,7 @@ async def adapt_health_profile_summary(
         configured=True,
         profile_version=profile.version,
         readiness_code=readiness.readiness,
+        risk_version=readiness.risk_version,
         fitness_goal=_enum_val(profile.fitness_goal),
         training_experience=_enum_val(profile.training_experience),
         weekly_frequency=profile.weekly_frequency,
@@ -130,6 +136,7 @@ async def adapt_today_checkin(
         checked_in=True,
         local_date=checkin.local_date,
         risk_summary_code=checkin.risk_summary,
+        risk_version=checkin.risk_version,
         abnormal_pain=checkin.abnormal_pain,
         has_pain_followup=checkin.pain_followup is not None,
     )
@@ -137,6 +144,7 @@ async def adapt_today_checkin(
         checked_in=True,
         local_date=checkin.local_date,
         risk_summary_code=checkin.risk_summary,
+        risk_version=checkin.risk_version,
         abnormal_pain=checkin.abnormal_pain,
         sleep_quality=_enum_val(checkin.sleep_quality),
         energy=_enum_val(checkin.energy),
@@ -250,6 +258,8 @@ async def adapt_get_posture_profile(
             certainty=e.certainty,
             has_conflict=e.has_conflict,
             risk_tier=e.risk_tier,
+            risk_version=getattr(e, "risk_version", None),
+            source_codes=[source.source for source in (e.sources or [])],
         )
         for e in evaluated
     ]
@@ -327,6 +337,9 @@ def _plan_summary(plan: Any) -> Optional[TrainingPlanSummaryView]:
         session_duration_minutes=plan.session_duration_minutes,
         decision_gate=plan.decision_gate,
         session_count=len(plan.sessions),
+        change_reason=getattr(plan, "change_reason", None),
+        catalog_version=getattr(plan, "catalog_version", None),
+        policy_version=getattr(plan, "policy_version", None),
     )
 
 
@@ -358,15 +371,24 @@ async def adapt_get_today_training(
     db: AsyncSession, actor: ActorContext, iana_timezone: str
 ) -> ReadToolResult:
     today = await training_service.get_today(db, actor.user_id, iana_timezone)
+    return _project_today_training(today)
+
+
+def _project_today_training(today: Any) -> ReadToolResult:
+    """Project one already-resolved current-day snapshot without re-reading it."""
     session = today.session
     prescriptions = session.prescriptions if session else []
+    prescription_ids = [p.prescription_id for p in prescriptions if p.prescription_id]
     exercise_ids = [p.exercise_id for p in prescriptions]
     provider = TodayTrainingProviderView(
         state=today.state,
         local_date=today.local_date,
         decision_gate=today.decision_gate,
         has_session=session is not None,
+        session_id=session.session_id if session else None,
         prescription_count=len(prescriptions),
+        prescription_ids=prescription_ids,
+        exercise_ids=exercise_ids,
         substitution_applied=today.substitution_applied,
         feedback_outcome_state=today.feedback_outcome_state,
     )
@@ -398,9 +420,12 @@ async def adapt_get_training_exercise(
     ``prescription.exercise`` (already safety-filtered by ``get_today``) and are
     never re-expanded to the full catalog list.
     """
-    from app.agent.messages import AgentError, ResultCode
-
     today = await training_service.get_today(db, actor.user_id, iana_timezone)
+    return _project_training_exercise(today, exercise_id)
+
+
+def _project_training_exercise(today: Any, exercise_id: str) -> ReadToolResult:
+    """Project an exercise from the same owned current-day snapshot."""
     session = today.session
     prescription = None
     if session is not None:
@@ -413,6 +438,8 @@ async def adapt_get_training_exercise(
         raise AgentError(ResultCode.ENTITY_NOT_FOUND)
 
     exercise_view = prescription.exercise  # already safety-filtered by get_today
+    if exercise_view is None or exercise_view.exercise_id != exercise_id:
+        raise AgentError(ResultCode.ENTITY_NOT_FOUND)
 
     provider_catalog = (
         ExerciseCatalogProviderView(
@@ -448,12 +475,13 @@ async def adapt_get_training_exercise(
     stop_codes: List[str] = []
     stop_views: List[StopConditionView] = []
     catalog_exercise = training_service._index().get(exercise_id)
-    if catalog_exercise is not None:
-        for sc in catalog_exercise.stop_conditions:
-            stop_codes.append(sc.code)
-            stop_views.append(
-                StopConditionView(code=sc.code, display_text_zh=sc.display_text_zh)
-            )
+    if catalog_exercise is None or not catalog_exercise.stop_conditions:
+        raise AgentError(ResultCode.ENTITY_NOT_FOUND)
+    for sc in catalog_exercise.stop_conditions:
+        stop_codes.append(sc.code)
+        stop_views.append(
+            StopConditionView(code=sc.code, display_text_zh=sc.display_text_zh)
+        )
 
     provider = TrainingExerciseProviderView(
         exercise_id=exercise_id,

@@ -307,3 +307,17 @@ def test_fingerprint_is_fresh_to_context_version_and_risk_changes():
     )
     assert same.value != changed_version.value
     assert same.value != changed_risk.value
+
+
+def test_fingerprint_invalid_payload_has_distinct_sanitized_code():
+    private_value = object()
+    with pytest.raises(AgentError) as exc:
+        fingerprints.canonical_serialize({"value": private_value})
+    assert exc.value.code == "agent_fingerprint_invalid_value"
+    assert exc.value.detail is None
+
+
+def test_canonical_serialize_rejects_non_string_mapping_keys():
+    with pytest.raises(AgentError) as exc:
+        fingerprints.canonical_serialize({1: "numeric-key"})
+    assert exc.value.code == "agent_fingerprint_invalid_value"

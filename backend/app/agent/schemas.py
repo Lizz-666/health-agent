@@ -138,6 +138,7 @@ class HealthProfileProviderView(ProviderView):
     configured: bool
     profile_version: Optional[int] = None
     readiness_code: Optional[str] = None
+    risk_version: Optional[str] = None
     fitness_goal: Optional[str] = None
     training_experience: Optional[str] = None
     weekly_frequency: Optional[int] = None
@@ -154,6 +155,7 @@ class HealthProfileDisplayView(DisplayView):
     configured: bool
     profile_version: Optional[int] = None
     readiness_code: Optional[str] = None
+    risk_version: Optional[str] = None
     fitness_goal: Optional[str] = None
     training_experience: Optional[str] = None
     weekly_frequency: Optional[int] = None
@@ -175,6 +177,7 @@ class TodayCheckinProviderView(ProviderView):
     checked_in: bool
     local_date: Optional[date] = None
     risk_summary_code: Optional[str] = None
+    risk_version: Optional[str] = None
     abnormal_pain: Optional[bool] = None
     has_pain_followup: bool = False
 
@@ -183,6 +186,7 @@ class TodayCheckinDisplayView(DisplayView):
     checked_in: bool
     local_date: Optional[date] = None
     risk_summary_code: Optional[str] = None
+    risk_version: Optional[str] = None
     abnormal_pain: Optional[bool] = None
     sleep_quality: Optional[str] = None
     energy: Optional[str] = None
@@ -294,6 +298,8 @@ class PostureProfileEntryView(BaseModel):
     certainty: str
     has_conflict: bool
     risk_tier: str
+    risk_version: Optional[str] = None
+    source_codes: List[str] = Field(default_factory=list)
 
 
 class PostureProfileProviderView(ProviderView):
@@ -364,6 +370,9 @@ class TrainingPlanSummaryView(BaseModel):
     session_duration_minutes: int
     decision_gate: str
     session_count: int
+    change_reason: Optional[str] = None
+    catalog_version: Optional[str] = None
+    policy_version: Optional[str] = None
 
 
 class TrainingDraftProviderView(ProviderView):
@@ -398,7 +407,10 @@ class TodayTrainingProviderView(ProviderView):
     local_date: Optional[date] = None
     decision_gate: Optional[str] = None
     has_session: bool = False
+    session_id: Optional[str] = None
     prescription_count: int = 0
+    prescription_ids: List[str] = Field(default_factory=list)
+    exercise_ids: List[str] = Field(default_factory=list)
     substitution_applied: bool = False
     feedback_outcome_state: Optional[str] = None
 
@@ -462,8 +474,8 @@ class StopConditionView(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    code: str
-    display_text_zh: str
+    code: str = Field(..., min_length=1, max_length=60)
+    display_text_zh: str = Field(..., min_length=1, max_length=160)
 
 
 class TrainingExerciseProviderView(ProviderView):
@@ -523,10 +535,20 @@ class ContextProviderView(BaseModel):
     current_local_date: date
     # Health readiness / current safety decision.
     profile_configured: Optional[bool] = None
+    health_profile_version: Optional[int] = None
     readiness_code: Optional[str] = None
     restricted: Optional[bool] = None
+    health_fitness_goal: Optional[str] = None
+    health_training_experience: Optional[str] = None
+    health_weekly_frequency: Optional[int] = None
+    health_session_duration_minutes: Optional[str] = None
     today_checkin_present: Optional[bool] = None
     today_checkin_risk: Optional[str] = None
+    today_checkin_risk_version: Optional[str] = None
+    weight_trend_sufficient: Optional[bool] = None
+    weight_trend_window: Optional[int] = None
+    weight_record_count: Optional[int] = None
+    weight_trend_point_count: Optional[int] = None
     risk_gate_code: Optional[str] = None
     today_decision_gate: Optional[str] = None
     # Plan / today training presence + version/status codes.
@@ -536,6 +558,12 @@ class ContextProviderView(BaseModel):
     plan_status: Optional[str] = None
     plan_decision_gate: Optional[str] = None
     draft_decision_gate: Optional[str] = None
+    plan_change_reason: Optional[str] = None
+    plan_requested_goal: Optional[str] = None
+    plan_weekly_frequency: Optional[int] = None
+    plan_session_duration_minutes: Optional[int] = None
+    plan_session_count: Optional[int] = None
+    plan_policy_version: Optional[str] = None
     today_state: Optional[str] = None
     # Posture issue codes.
     posture_issue_id: Optional[str] = None
@@ -543,10 +571,28 @@ class ContextProviderView(BaseModel):
     posture_severity_levels: List[str] = Field(default_factory=list)
     posture_self_test_count: Optional[int] = None
     posture_has_confirmed_goal: Optional[bool] = None
+    posture_suggestion_id: Optional[str] = None
+    posture_profile_version: Optional[str] = None
+    posture_rule_version: Optional[str] = None
+    posture_assessment_severity: Optional[str] = None
+    posture_assessment_certainty: Optional[str] = None
+    posture_assessment_source_codes: List[str] = Field(default_factory=list)
     # Current owned session / exercise references.
     session_id: Optional[str] = None
     exercise_id: Optional[str] = None
     prescription_exercise_ids: List[str] = Field(default_factory=list)
+    prescription_ids: List[str] = Field(default_factory=list)
+    feedback_outcome_state: Optional[str] = None
+    substitution_applied: Optional[bool] = None
+    exercise_prescription_id: Optional[str] = None
+    exercise_sets: Optional[int] = None
+    exercise_reps: Optional[int] = None
+    exercise_duration_seconds: Optional[int] = None
+    exercise_rest_seconds: Optional[int] = None
+    exercise_name_en: Optional[str] = None
+    exercise_name_zh: Optional[str] = None
+    exercise_difficulty: Optional[str] = None
+    exercise_training_roles: List[str] = Field(default_factory=list)
     exercise_stop_condition_codes: List[str] = Field(default_factory=list)
     # Structured version codes.
     health_risk_version: Optional[str] = None

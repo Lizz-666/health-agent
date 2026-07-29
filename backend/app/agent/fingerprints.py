@@ -18,15 +18,13 @@ from __future__ import annotations
 
 import hmac
 import json
+import math
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any, Mapping, Optional
 
 from app.agent.messages import AgentError, ResultCode
 from app.core.config import settings
-
-_RESULT_CODE_INVALID_VALUE = "agent_fingerprint_invalid_value"
-
 
 @dataclass(frozen=True)
 class AgentFingerprint:
@@ -46,18 +44,33 @@ def canonical_serialize(payload: Mapping[str, Any]) -> bytes:
     ``payload``.
     """
     try:
+        normalized = _normalize_json_value(payload)
         return json.dumps(
-            payload,
+            normalized,
             sort_keys=True,
             ensure_ascii=False,
             separators=(",", ":"),
             allow_nan=False,
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
-        raise AgentError(
-            ResultCode.FINGERPRINT_KEY_MISSING,
-            detail=f"{_RESULT_CODE_INVALID_VALUE}: {exc}",
-        ) from exc
+        raise AgentError(ResultCode.FINGERPRINT_INVALID_VALUE) from exc
+
+
+def _normalize_json_value(value: Any) -> Any:
+    """Return JSON-native data while rejecting ambiguous coercions."""
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("non-finite float")
+        return value
+    if isinstance(value, list):
+        return [_normalize_json_value(item) for item in value]
+    if isinstance(value, Mapping):
+        if any(not isinstance(key, str) for key in value):
+            raise TypeError("mapping keys must be strings")
+        return {key: _normalize_json_value(item) for key, item in value.items()}
+    raise TypeError("value is not JSON-native")
 
 
 def compute_fingerprint(

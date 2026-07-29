@@ -545,3 +545,380 @@ async def test_fingerprint_payload_changes_with_plan_status_and_risk(monkeypatch
     assert a.get("active_plan_present") is not None
     assert a.get("active_plan_present") != b.get("active_plan_present")
     assert a.get("today_state") != b.get("today_state")
+
+
+async def test_confirmed_goal_requires_current_active_unblocked_goal(monkeypatch):
+    from app.training.schemas import PostureGoalSnapshot
+
+    async def _suggestions(db, user_id, now=None):
+        return {
+            "suggestion_id": "s1",
+            "profile_version": "p1",
+            "rule_version": "r1",
+            "risk_version": "risk1",
+            "normal_candidates": [],
+            "retest_required": [],
+            "safety_blocked": [],
+        }
+
+    goals = [
+        PostureGoalSnapshot(
+            issue_id="forward_head",
+            active=False,
+            blocked=False,
+            confirmed_at=_UTC,
+        ),
+        PostureGoalSnapshot(
+            issue_id="forward_head",
+            active=True,
+            blocked=True,
+            confirmed_at=_UTC,
+            suggestion_id="s1",
+            profile_version="p1",
+            rule_version="r1",
+            risk_version="risk1",
+        ),
+    ]
+
+    async def _goals(db, user_id, suggestions):
+        return goals
+
+    monkeypatch.setattr(context_resolver.posture_service, "get_priority_suggestions", _suggestions)
+    monkeypatch.setattr(context_resolver, "_active_goals", _goals)
+    actor = ActorContext(user_id=str(uuid.uuid4()))
+    assert not await context_resolver._has_confirmed_goal(
+        None, actor, "forward_head", _UTC
+    )
+
+    goals[:] = [
+        PostureGoalSnapshot(
+            issue_id="forward_head",
+            active=True,
+            blocked=False,
+            confirmed_at=_UTC,
+            suggestion_id="s1",
+            profile_version="p1",
+            rule_version="r1",
+            risk_version="risk1",
+        )
+    ]
+    assert await context_resolver._has_confirmed_goal(
+        None, actor, "forward_head", _UTC
+    )
+
+
+async def test_training_session_uses_one_today_snapshot(monkeypatch):
+    from app.training.schemas_api import PrescriptionView, SessionView, TodayResponse
+
+    session = SessionView(
+        session_id="session-today",
+        week_index=1,
+        day_of_week=3,
+        session_order=0,
+        target_minutes=30,
+        prescriptions=[
+            PrescriptionView(
+                prescription_id="rx1",
+                exercise_id="ex1",
+                sets=2,
+                reps=8,
+                rest_seconds=30,
+            )
+        ],
+    )
+    responses = [
+        TodayResponse(
+            state="session",
+            local_date=date(2026, 7, 30),
+            decision_gate="normal",
+            session=session,
+        ),
+        TodayResponse(
+            state="blocked",
+            local_date=date(2026, 7, 30),
+            decision_gate="red_flag",
+        ),
+    ]
+    calls = {"count": 0}
+
+    async def _today(db, user_id, tz):
+        result = responses[calls["count"]]
+        calls["count"] += 1
+        return result
+
+    monkeypatch.setattr("app.training.service.get_today", _today)
+    resolved = await context_resolver.resolve_context(
+        None,
+        ActorContext(user_id=str(uuid.uuid4())),
+        entry_type=EntryType.training_session,
+        entity_id="session-today",
+        iana_timezone="Asia/Shanghai",
+        now=_UTC,
+    )
+    assert calls["count"] == 1
+    assert resolved.provider_context.session_id == "session-today"
+    assert resolved.provider_context.today_decision_gate == "normal"
+    assert resolved.provider_context.prescription_ids == ["rx1"]
+
+
+async def test_health_context_includes_version_categories_and_trend(monkeypatch):
+    from app.agent.schemas import (
+        HealthProfileDisplayView,
+        HealthProfileProviderView,
+        ReadToolResult,
+        TodayCheckinDisplayView,
+        TodayCheckinProviderView,
+        WeightTrendDisplayView,
+        WeightTrendProviderView,
+    )
+
+    async def _profile(db, actor):
+        provider = HealthProfileProviderView(
+            configured=True,
+            profile_version=7,
+            readiness_code="ready",
+            risk_version="health-risk-v2",
+            fitness_goal="basic_strength",
+            training_experience="beginner",
+            weekly_frequency=3,
+            session_duration_minutes="30_min",
+        )
+        return ReadToolResult(
+            "get_health_profile_summary",
+            provider,
+            HealthProfileDisplayView(
+                configured=True,
+                profile_version=7,
+                readiness_code="ready",
+                risk_version="health-risk-v2",
+                fitness_goal="basic_strength",
+                training_experience="beginner",
+                weekly_frequency=3,
+                session_duration_minutes="30_min",
+            ),
+        )
+
+    async def _checkin(db, actor, local_date):
+        provider = TodayCheckinProviderView(
+            checked_in=True,
+            local_date=local_date,
+            risk_summary_code="normal",
+            risk_version="checkin-risk-v3",
+        )
+        return ReadToolResult(
+            "get_today_checkin",
+            provider,
+            TodayCheckinDisplayView(
+                checked_in=True,
+                local_date=local_date,
+                risk_summary_code="normal",
+                risk_version="checkin-risk-v3",
+            ),
+        )
+
+    async def _trend(db, actor):
+        provider = WeightTrendProviderView(
+            sufficient=True, window=30, record_count=6, trend_point_count=5
+        )
+        return ReadToolResult(
+            "get_weight_trend_summary",
+            provider,
+            WeightTrendDisplayView(
+                sufficient=True, window=30, record_count=6, trend_point_count=5
+            ),
+        )
+
+    monkeypatch.setattr(context_resolver.read_tools, "adapt_health_profile_summary", _profile)
+    monkeypatch.setattr(context_resolver.read_tools, "adapt_today_checkin", _checkin)
+    monkeypatch.setattr(context_resolver.read_tools, "adapt_weight_trend_summary", _trend)
+    resolved = await context_resolver.resolve_context(
+        None,
+        ActorContext(user_id=str(uuid.uuid4())),
+        entry_type=EntryType.health_profile,
+        entity_id=None,
+        iana_timezone="Asia/Shanghai",
+        now=_UTC,
+    )
+    ctx = resolved.provider_context
+    assert ctx.health_profile_version == 7
+    assert ctx.health_risk_version == "health-risk-v2"
+    assert ctx.health_fitness_goal == "basic_strength"
+    assert ctx.health_training_experience == "beginner"
+    assert ctx.weight_trend_sufficient is True
+    assert ctx.weight_record_count == 6
+    assert resolved.fingerprint_payload["health_profile_version"] == 7
+    assert resolved.fingerprint_payload["health_risk_version"] == "health-risk-v2"
+
+
+async def test_posture_context_includes_owned_assessment_and_current_goal(monkeypatch):
+    from app.agent.schemas import (
+        PostureProfileDisplayView,
+        PostureProfileEntryView,
+        PostureProfileProviderView,
+        ReadToolResult,
+    )
+    from app.training.schemas import PostureGoalSnapshot
+
+    entry = PostureProfileEntryView(
+        issue_id="ST-04",
+        issue_name="synthetic",
+        category="shoulder_thorax",
+        combined_severity="moderate",
+        certainty="confirmed",
+        has_conflict=False,
+        risk_tier="normal",
+        risk_version="posture-risk-v4",
+        source_codes=["self_test"],
+    )
+
+    async def _profile(db, actor):
+        return ReadToolResult(
+            "get_posture_profile",
+            PostureProfileProviderView(present=True, entries=[entry]),
+            PostureProfileDisplayView(present=True, entries=[entry]),
+        )
+
+    suggestions = {
+        "suggestion_id": "s1",
+        "profile_version": "profile-v1",
+        "rule_version": "rule-v1",
+        "risk_version": "posture-risk-v4",
+        "normal_candidates": [],
+        "retest_required": [],
+        "safety_blocked": [],
+    }
+
+    async def _suggestions(db, user_id, now=None):
+        return suggestions
+
+    async def _goals(db, user_id, current_suggestions):
+        return [
+            PostureGoalSnapshot(
+                issue_id="ST-04",
+                active=True,
+                blocked=False,
+                confirmed_at=_UTC,
+                suggestion_id="s1",
+                profile_version="profile-v1",
+                rule_version="rule-v1",
+                risk_version="posture-risk-v4",
+            )
+        ]
+
+    monkeypatch.setattr(context_resolver.read_tools, "adapt_get_posture_profile", _profile)
+    monkeypatch.setattr(context_resolver.posture_service, "get_priority_suggestions", _suggestions)
+    monkeypatch.setattr(context_resolver, "_active_goals", _goals)
+    resolved = await context_resolver.resolve_context(
+        None,
+        ActorContext(user_id=str(uuid.uuid4())),
+        entry_type=EntryType.posture_issue,
+        entity_id="ST-04",
+        iana_timezone="Asia/Shanghai",
+        now=_UTC,
+    )
+    ctx = resolved.provider_context
+    assert ctx.posture_assessment_severity == "moderate"
+    assert ctx.posture_assessment_certainty == "confirmed"
+    assert ctx.posture_assessment_source_codes == ["self_test"]
+    assert ctx.posture_has_confirmed_goal is True
+    assert ctx.posture_risk_version == "posture-risk-v4"
+    assert ctx.posture_suggestion_id == "s1"
+    assert ctx.posture_profile_version == "profile-v1"
+    assert ctx.posture_rule_version == "rule-v1"
+
+
+async def test_training_plan_context_selects_requested_owned_draft(monkeypatch):
+    from app.training.schemas_api import PlanVersionView
+
+    draft_plan = PlanVersionView(
+        plan_version_id="draft-v2",
+        requested_goal="basic_strength",
+        weekly_frequency=3,
+        session_duration_minutes=30,
+        status="draft",
+        change_reason="user_requested",
+        decision_gate="eligible",
+        generated_at=_UTC,
+        catalog_version="catalog-v2",
+        policy_version="policy-v3",
+        sessions=[],
+    )
+
+    async def _active(db, user_id):
+        return ActivePlanResponse(has_active=False, plan=None)
+
+    async def _draft(db, user_id):
+        return DraftResponse(
+            has_draft=True, draft=draft_plan, decision_gate="eligible"
+        )
+
+    monkeypatch.setattr("app.training.service.get_active", _active)
+    monkeypatch.setattr("app.training.service.get_draft", _draft)
+    resolved = await context_resolver.resolve_context(
+        None,
+        ActorContext(user_id=str(uuid.uuid4())),
+        entry_type=EntryType.training_plan,
+        entity_id="draft-v2",
+        iana_timezone="Asia/Shanghai",
+        now=_UTC,
+    )
+    ctx = resolved.provider_context
+    assert ctx.plan_version_id == "draft-v2"
+    assert ctx.plan_status == "draft"
+    assert ctx.plan_change_reason == "user_requested"
+    assert ctx.plan_weekly_frequency == 3
+    assert ctx.plan_policy_version == "policy-v3"
+    assert ctx.catalog_version == "catalog-v2"
+
+
+async def test_training_exercise_context_includes_prescription_and_catalog(monkeypatch):
+    from app.training.schemas_api import PrescriptionView, SessionView, TodayResponse
+
+    exercise_id = next(iter(context_resolver.training_service._index()))
+    exercise_view = context_resolver.training_service._exercise_view(exercise_id)
+    session = SessionView(
+        session_id="session-today",
+        week_index=1,
+        day_of_week=3,
+        session_order=0,
+        target_minutes=30,
+        prescriptions=[
+            PrescriptionView(
+                prescription_id="rx-current",
+                exercise_id=exercise_id,
+                sets=2,
+                reps=8,
+                rest_seconds=30,
+                exercise=exercise_view,
+            )
+        ],
+    )
+
+    async def _today(db, user_id, tz):
+        return TodayResponse(
+            state="session",
+            local_date=date(2026, 7, 30),
+            decision_gate="eligible",
+            session=session,
+        )
+
+    monkeypatch.setattr("app.training.service.get_today", _today)
+    resolved = await context_resolver.resolve_context(
+        None,
+        ActorContext(user_id=str(uuid.uuid4())),
+        entry_type=EntryType.training_exercise,
+        entity_id=exercise_id,
+        iana_timezone="Asia/Shanghai",
+        now=_UTC,
+    )
+    ctx = resolved.provider_context
+    assert ctx.exercise_prescription_id == "rx-current"
+    assert ctx.exercise_sets == 2
+    assert ctx.exercise_reps == 8
+    assert ctx.exercise_name_en == exercise_view.name_en
+    assert ctx.exercise_stop_condition_codes
+    assert ctx.catalog_version
+    assert "exercise_name_en" not in resolved.fingerprint_payload
+    assert "exercise_name_zh" not in resolved.fingerprint_payload
+    assert resolved.fingerprint_payload["exercise_id"] == exercise_id
+    assert resolved.fingerprint_payload["catalog_version"] == ctx.catalog_version

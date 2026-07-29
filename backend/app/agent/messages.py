@@ -35,6 +35,7 @@ class ResultCode:
 
     # Fail-closed audit/fingerprint capability.
     FINGERPRINT_KEY_MISSING = "agent_fingerprint_key_missing"
+    FINGERPRINT_INVALID_VALUE = "agent_fingerprint_invalid_value"
 
     # Successful read boundary.
     READ_OK = "agent_read_ok"
@@ -57,6 +58,7 @@ TEMPLATES: Dict[str, str] = {
     ),
     ResultCode.NO_TEXT_SIGNAL_DETECTED: "未在文本中检测到已配置的安全信号。",
     ResultCode.FINGERPRINT_KEY_MISSING: "服务端审计密钥未配置，相关能力已停用。",
+    ResultCode.FINGERPRINT_INVALID_VALUE: "审计数据无效，相关能力已停用。",
     ResultCode.READ_OK: "已读取当前拥有的信息。",
 }
 
@@ -83,9 +85,7 @@ def render(code: str) -> str:
     try:
         return TEMPLATES[code]
     except KeyError as exc:  # unknown message code -> fail closed
-        raise AgentError(
-            ResultCode.TOOL_NOT_ALLOWED, f"unknown message code: {code!r}"
-        ) from exc
+        raise AgentError(ResultCode.TOOL_NOT_ALLOWED) from exc
 
 
 __all__ = ["ResultCode", "TEMPLATES", "AgentError", "render"]

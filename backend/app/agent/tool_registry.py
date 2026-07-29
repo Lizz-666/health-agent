@@ -75,18 +75,20 @@ class ReadToolSpec:
     ownership_from_context: bool
     requires_confirmation: bool = False
 
-    def validate_input(self, raw: Dict[str, Any]) -> BaseModel:
+    def validate_input(self, raw: Any) -> BaseModel:
         """Pre-validator: reject unknown fields and invalid arguments.
 
         Raises ``AgentError(agent_tool_not_allowed)`` for any malformed input so
         the orchestrator cannot forward attacker-controlled fields to an adapter.
         """
         try:
-            return self.input_model.model_validate(raw or {})
-        except ValidationError as exc:
-            raise AgentError(
-                ResultCode.TOOL_NOT_ALLOWED, f"invalid tool input: {exc}"
-            ) from exc
+            if raw is None:
+                raw = {}
+            if not isinstance(raw, dict):
+                raise TypeError("tool input must be an object")
+            return self.input_model.model_validate(raw)
+        except (TypeError, ValidationError) as exc:
+            raise AgentError(ResultCode.TOOL_NOT_ALLOWED) from exc
 
     def validate_output(self, result: Any) -> ReadToolResult:
         """Post-validator: the adapter must return a spec-bound ``ReadToolResult``.
@@ -95,19 +97,13 @@ class ReadToolSpec:
         is not an instance of the bound typed output models.
         """
         if not isinstance(result, ReadToolResult):
-            raise AgentError(
-                ResultCode.TOOL_NOT_ALLOWED, "adapter returned non-ReadToolResult"
-            )
+            raise AgentError(ResultCode.TOOL_NOT_ALLOWED)
+        if result.tool_name != self.name:
+            raise AgentError(ResultCode.TOOL_NOT_ALLOWED)
         if not isinstance(result.provider_view, self.provider_view_model):
-            raise AgentError(
-                ResultCode.TOOL_NOT_ALLOWED,
-                f"provider_view is not {self.provider_view_model.__name__}",
-            )
+            raise AgentError(ResultCode.TOOL_NOT_ALLOWED)
         if not isinstance(result.display_view, self.display_view_model):
-            raise AgentError(
-                ResultCode.TOOL_NOT_ALLOWED,
-                f"display_view is not {self.display_view_model.__name__}",
-            )
+            raise AgentError(ResultCode.TOOL_NOT_ALLOWED)
         return result
 
 
@@ -270,9 +266,7 @@ def get_read_tool(name: str) -> ReadToolSpec:
     try:
         return READ_TOOLS[name]
     except KeyError as exc:
-        raise AgentError(
-            ResultCode.TOOL_NOT_ALLOWED, f"unknown read tool: {name!r}"
-        ) from exc
+        raise AgentError(ResultCode.TOOL_NOT_ALLOWED) from exc
 
 
 def is_tool_allowed(name: str, entry_type: EntryType) -> bool:
@@ -301,14 +295,11 @@ def resolve_tool_for_entry(name: str, entry_type: EntryType) -> ReadToolSpec:
     """
     spec = READ_TOOLS.get(name)
     if spec is None or entry_type not in spec.allowed_entries:
-        raise AgentError(
-            ResultCode.TOOL_NOT_ALLOWED,
-            f"tool {name!r} not allowed for entry {entry_type.value!r}",
-        )
+        raise AgentError(ResultCode.TOOL_NOT_ALLOWED)
     return spec
 
 
-def validate_tool_input(name: str, raw: Dict[str, Any]) -> BaseModel:
+def validate_tool_input(name: str, raw: Any) -> BaseModel:
     """Resolve a Tool by name and run its deterministic pre-validator."""
     return get_read_tool(name).validate_input(raw)
 

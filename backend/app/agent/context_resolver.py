@@ -39,38 +39,13 @@ _ENTITY_REQUIRED = frozenset(
     {EntryType.posture_issue, EntryType.training_session, EntryType.training_exercise}
 )
 
-# Context fields included in the canonical fingerprint payload: only structured
-# codes, version, presence flags, and owned references (never raw text/values).
-_FINGERPRINT_FIELDS = (
-    "entry_type",
-    "entity_id",
-    "iana_timezone",
-    "current_local_date",
-    "profile_configured",
-    "readiness_code",
-    "restricted",
-    "today_checkin_present",
-    "today_checkin_risk",
-    "risk_gate_code",
-    "today_decision_gate",
-    "active_plan_present",
-    "draft_present",
-    "plan_version_id",
-    "plan_status",
-    "plan_decision_gate",
-    "draft_decision_gate",
-    "today_state",
-    "posture_issue_id",
-    "posture_has_confirmed_goal",
-    "session_id",
-    "exercise_id",
-    "prescription_exercise_ids",
-    "exercise_stop_condition_codes",
-    "health_risk_version",
-    "posture_risk_version",
-    "catalog_version",
-)
-
+_FINGERPRINT_EXCLUDED_FIELDS = {
+    # Reviewed catalog labels help the provider explain an owned entity but are
+    # not proposal-relevant codes or versions and do not belong in audit input.
+    "posture_issue_name_cn",
+    "exercise_name_en",
+    "exercise_name_zh",
+}
 
 async def resolve_context(
     db: AsyncSession,
@@ -133,21 +108,16 @@ async def resolve_context(
     )
 
 
-def _build_fingerprint_payload(ctx: ContextProviderView, extra: dict) -> Dict[str, str]:
-    payload: Dict[str, str] = {}
-    for key in _FINGERPRINT_FIELDS:
-        if key in extra:
-            payload[key] = extra[key]
-            continue
-        value = getattr(ctx, key)
-        if value is None or value == []:
-            continue
-        if isinstance(value, EntryType):
-            payload[key] = value.value
-        elif isinstance(value, (list, tuple)):
-            payload[key] = list(value)
-        else:
-            payload[key] = value if isinstance(value, (str, int, bool)) else str(value)
+def _build_fingerprint_payload(
+    ctx: ContextProviderView, extra: dict
+) -> Dict[str, object]:
+    """Fingerprint every minimized provider-context field, without free text."""
+    payload = ctx.model_dump(
+        mode="json",
+        exclude_none=True,
+        exclude=_FINGERPRINT_EXCLUDED_FIELDS,
+    )
+    payload.update(extra)
     return payload
 
 
@@ -172,10 +142,13 @@ async def _resolve_general(
     return base.model_copy(
         update={
             "profile_configured": pv.configured,
+            "health_profile_version": pv.profile_version,
             "readiness_code": pv.readiness_code,
+            "health_risk_version": pv.risk_version,
             "restricted": pv.restricted,
             "today_checkin_present": cv.checked_in,
             "today_checkin_risk": cv.risk_summary_code,
+            "today_checkin_risk_version": cv.risk_version,
             "active_plan_present": active.provider_view.has_active,
             "today_state": today.provider_view.state,
             "today_decision_gate": today.provider_view.decision_gate,
@@ -192,23 +165,30 @@ async def _resolve_health_profile(
 ) -> ContextProviderView:
     profile = await read_tools.adapt_health_profile_summary(db, actor)
     checkin = await read_tools.adapt_today_checkin(db, actor, local_date)
+    trend = await read_tools.adapt_weight_trend_summary(db, actor)
     pv = profile.provider_view
     cv = checkin.provider_view
+    tv = trend.provider_view
     return base.model_copy(
         update={
             "profile_configured": pv.configured,
+            "health_profile_version": pv.profile_version,
             "readiness_code": pv.readiness_code,
+            "health_risk_version": pv.risk_version,
             "restricted": pv.restricted,
+            "health_fitness_goal": pv.fitness_goal,
+            "health_training_experience": pv.training_experience,
+            "health_weekly_frequency": pv.weekly_frequency,
+            "health_session_duration_minutes": pv.session_duration_minutes,
             "today_checkin_present": cv.checked_in,
             "today_checkin_risk": cv.risk_summary_code,
+            "today_checkin_risk_version": cv.risk_version,
+            "weight_trend_sufficient": tv.sufficient,
+            "weight_trend_window": tv.window,
+            "weight_record_count": tv.record_count,
+            "weight_trend_point_count": tv.trend_point_count,
         }
     )
-
-
-def _health_risk_version(*_args, **_kwargs) -> Optional[str]:  # pragma: no cover
-    # Retained as a documented no-op hook for a later batch that surfaces the
-    # deterministic readiness ``risk_version`` without a new data-access path.
-    return None
 
 
 async def _resolve_posture_issue(
@@ -223,7 +203,16 @@ async def _resolve_posture_issue(
     if get_issue_by_id(issue_id) is None:
         raise AgentError(ResultCode.ENTITY_NOT_FOUND)
     detail = read_tools.adapt_get_posture_issue(issue_id).provider_view
-    has_confirmed_goal = await _has_confirmed_goal(db, actor, issue_id, now)
+    profile = (await read_tools.adapt_get_posture_profile(db, actor)).provider_view
+    assessment = next(
+        (entry for entry in profile.entries if entry.issue_id == issue_id), None
+    )
+    suggestions = await posture_service.get_priority_suggestions(
+        db, actor.user_id, now=now
+    )
+    has_confirmed_goal = await _has_confirmed_goal(
+        db, actor, issue_id, now, suggestions=suggestions
+    )
     return base.model_copy(
         update={
             "posture_issue_id": issue_id,
@@ -231,12 +220,30 @@ async def _resolve_posture_issue(
             "posture_severity_levels": list(detail.severity_levels),
             "posture_self_test_count": detail.self_test_count,
             "posture_has_confirmed_goal": has_confirmed_goal,
+            "posture_suggestion_id": suggestions.get("suggestion_id"),
+            "posture_profile_version": suggestions.get("profile_version"),
+            "posture_rule_version": suggestions.get("rule_version"),
+            "posture_assessment_severity": (
+                assessment.combined_severity if assessment is not None else None
+            ),
+            "posture_assessment_certainty": (
+                assessment.certainty if assessment is not None else None
+            ),
+            "posture_assessment_source_codes": (
+                list(assessment.source_codes) if assessment is not None else []
+            ),
+            "posture_risk_version": suggestions.get("risk_version"),
         }
     )
 
 
 async def _has_confirmed_goal(
-    db: AsyncSession, actor: ActorContext, issue_id: str, now: datetime
+    db: AsyncSession,
+    actor: ActorContext,
+    issue_id: str,
+    now: datetime,
+    *,
+    suggestions: Optional[dict] = None,
 ) -> bool:
     """Whether the user has an active confirmed posture goal for ``issue_id``.
 
@@ -245,11 +252,18 @@ async def _has_confirmed_goal(
     scoped to the caller) combined with ``posture.service.get_priority_suggestions``
     for the suggestions input it requires. No new SQL path is introduced.
     """
-    suggestions = await posture_service.get_priority_suggestions(
-        db, actor.user_id, now=now
-    )
+    if suggestions is None:
+        suggestions = await posture_service.get_priority_suggestions(
+            db, actor.user_id, now=now
+        )
     goals = await _active_goals(db, actor.user_id, suggestions)
-    return any(g.issue_id == issue_id and g.confirmed_at is not None for g in goals)
+    return any(
+        g.issue_id == issue_id
+        and g.confirmed_at is not None
+        and g.active
+        and not g.blocked
+        for g in goals
+    )
 
 
 async def _resolve_training_plan(
@@ -270,18 +284,33 @@ async def _resolve_training_plan(
     # entity_id None means "current"; a supplied id must be a current owned id.
     if entity_id is not None and entity_id not in owned_ids:
         raise AgentError(ResultCode.ENTITY_NOT_FOUND)
+    if entity_id is not None:
+        selected = (
+            active_plan
+            if active_plan and active_plan.plan_version_id == entity_id
+            else draft_plan
+        )
+    else:
+        selected = active_plan or draft_plan
     return base.model_copy(
         update={
             "active_plan_present": active.has_active,
             "draft_present": draft.has_draft,
-            "plan_version_id": (
-                active_plan.plan_version_id if active_plan is not None else None
-            ),
-            "plan_status": active_plan.status if active_plan is not None else None,
-            "plan_decision_gate": (
-                active_plan.decision_gate if active_plan is not None else None
-            ),
+            "plan_version_id": selected.plan_version_id if selected else None,
+            "plan_status": selected.status if selected else None,
+            "plan_decision_gate": selected.decision_gate if selected else None,
             "draft_decision_gate": draft.decision_gate,
+            "plan_change_reason": getattr(selected, "change_reason", None),
+            "plan_requested_goal": getattr(selected, "requested_goal", None),
+            "plan_weekly_frequency": getattr(selected, "weekly_frequency", None),
+            "plan_session_duration_minutes": (
+                getattr(selected, "session_duration_minutes", None)
+            ),
+            "plan_session_count": (
+                len(getattr(selected, "sessions", [])) if selected else None
+            ),
+            "plan_policy_version": getattr(selected, "policy_version", None),
+            "catalog_version": getattr(selected, "catalog_version", None),
         }
     )
 
@@ -296,17 +325,20 @@ async def _resolve_training_session(
     # Fix #4: only the CURRENT local-date session from ``get_today`` is accepted;
     # an active-plan session that is not today shares the same non-enumerating
     # ``agent_entity_not_found`` as a foreign/missing id.
-    today_session_id = await _today_session_id(db, actor, tz)
-    if session_id != today_session_id:
+    today = await training_service.get_today(db, actor.user_id, tz)
+    projected = read_tools._project_today_training(today).provider_view
+    if session_id != projected.session_id:
         raise AgentError(ResultCode.ENTITY_NOT_FOUND)
-    today = await read_tools.adapt_get_today_training(db, actor, tz)
     return base.model_copy(
         update={
             "session_id": session_id,
-            "today_state": today.provider_view.state,
-            "today_decision_gate": today.provider_view.decision_gate,
-            "risk_gate_code": today.provider_view.decision_gate,
-            "prescription_exercise_ids": list(today.display_view.exercise_ids),
+            "today_state": projected.state,
+            "today_decision_gate": projected.decision_gate,
+            "risk_gate_code": projected.decision_gate,
+            "prescription_ids": list(projected.prescription_ids),
+            "prescription_exercise_ids": list(projected.exercise_ids),
+            "feedback_outcome_state": projected.feedback_outcome_state,
+            "substitution_applied": projected.substitution_applied,
         }
     )
 
@@ -319,19 +351,13 @@ async def _resolve_training_exercise(
     tz: str,
 ) -> ContextProviderView:
     today = await training_service.get_today(db, actor.user_id, tz)
+    result = read_tools._project_training_exercise(today, exercise_id)
+    exercise = result.provider_view
     session = today.session
-    prescribed = (
-        session is not None
-        and any(p.exercise_id == exercise_id for p in session.prescriptions)
+    prescription = next(
+        p for p in session.prescriptions if p.exercise_id == exercise_id
     )
-    if not prescribed:
-        raise AgentError(ResultCode.ENTITY_NOT_FOUND)
-    # Stop-condition codes are read only after ownership is confirmed, reusing
-    # the catalog index (same source as ``training.service``).
-    stop_codes: list[str] = []
-    catalog_exercise = training_service._index().get(exercise_id)
-    if catalog_exercise is not None:
-        stop_codes = [sc.code for sc in catalog_exercise.stop_conditions]
+    catalog = exercise.catalog
     return base.model_copy(
         update={
             "exercise_id": exercise_id,
@@ -339,26 +365,19 @@ async def _resolve_training_exercise(
             "today_state": today.state,
             "today_decision_gate": today.decision_gate,
             "risk_gate_code": today.decision_gate,
-            "exercise_stop_condition_codes": stop_codes,
+            "exercise_prescription_id": prescription.prescription_id,
+            "exercise_sets": exercise.sets,
+            "exercise_reps": exercise.reps,
+            "exercise_duration_seconds": exercise.duration_seconds,
+            "exercise_rest_seconds": exercise.rest_seconds,
+            "exercise_name_en": catalog.name_en,
+            "exercise_name_zh": catalog.name_zh,
+            "exercise_difficulty": catalog.difficulty,
+            "exercise_training_roles": list(catalog.training_roles),
+            "exercise_stop_condition_codes": list(exercise.stop_condition_codes),
+            "catalog_version": training_service.catalog().content_version,
         }
     )
-
-
-async def _today_session_id(
-    db: AsyncSession, actor: ActorContext, tz: str
-) -> Optional[str]:
-    """The current local-date session id exposed by ``get_today`` (today only)."""
-    today = await training_service.get_today(db, actor.user_id, tz)
-    return today.session.session_id if today.session is not None else None
-
-
-async def _owned_session_ids(db: AsyncSession, actor: ActorContext, tz: str) -> set:
-    """Current owned session ids: TODAY's session only (fix #4)."""
-    owned = set()
-    today = await training_service.get_today(db, actor.user_id, tz)
-    if today.session is not None:
-        owned.add(today.session.session_id)
-    return owned
 
 
 __all__ = ["resolve_context"]

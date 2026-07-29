@@ -512,3 +512,40 @@ async def test_exercise_exposes_only_safety_filtered_substitutions_and_stop_cond
     assert result.display_view.stop_conditions[0].code == "sharp_pain"
     assert result.display_view.stop_conditions[0].display_text_zh == "剧烈疼痛时停止"
     assert result.display_view.catalog.substitution_ids == ["repl1"]
+
+
+async def test_exercise_fails_closed_when_owned_catalog_projection_is_missing(
+    monkeypatch,
+):
+    session = _session_today(exercise_id="ex1")
+    session.prescriptions[0].exercise = None
+    monkeypatch.setattr(
+        "app.training.service.get_today", _Spy(_today_with_session(session))
+    )
+    monkeypatch.setattr("app.training.service._index", lambda: {})
+
+    from app.agent.messages import AgentError, ResultCode
+
+    with pytest.raises(AgentError) as exc:
+        await read_tools.adapt_get_training_exercise(
+            None, _ACTOR, "Asia/Shanghai", "ex1"
+        )
+    assert exc.value.code == ResultCode.ENTITY_NOT_FOUND
+
+
+async def test_exercise_fails_closed_when_stop_conditions_are_unavailable(
+    monkeypatch,
+):
+    session = _session_today(exercise_id="ex1")
+    monkeypatch.setattr(
+        "app.training.service.get_today", _Spy(_today_with_session(session))
+    )
+    monkeypatch.setattr("app.training.service._index", lambda: {})
+
+    from app.agent.messages import AgentError, ResultCode
+
+    with pytest.raises(AgentError) as exc:
+        await read_tools.adapt_get_training_exercise(
+            None, _ACTOR, "Asia/Shanghai", "ex1"
+        )
+    assert exc.value.code == ResultCode.ENTITY_NOT_FOUND

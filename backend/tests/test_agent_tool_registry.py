@@ -19,6 +19,7 @@ from app.agent.schemas import (
     GetPostureIssueInput,
     GetTrainingExerciseInput,
     HealthProfileDisplayView,
+    HealthProfileProviderView,
     ListPostureIssuesInput,
     ProviderView,
     ReadToolResult,
@@ -239,6 +240,12 @@ def test_invalid_argument_value_fails_closed():
     assert exc.value.code == ResultCode.TOOL_NOT_ALLOWED
 
 
+def test_non_object_tool_input_fails_closed():
+    with pytest.raises(AgentError) as exc:
+        tool_registry.validate_tool_input("get_health_profile_summary", [])
+    assert exc.value.code == ResultCode.TOOL_NOT_ALLOWED
+
+
 def test_post_validator_rejects_wrong_output_type():
     spec = tool_registry.get_read_tool("get_health_profile_summary")
     # A non-ReadToolResult object fails closed.
@@ -268,3 +275,27 @@ def test_valid_input_round_trips_through_pre_validator():
     )
     assert isinstance(parsed, GetTrainingExerciseInput)
     assert parsed.exercise_id == "ex1"
+
+
+def test_invalid_input_error_does_not_retain_raw_values():
+    private_value = "private-health-text"
+    with pytest.raises(AgentError) as exc:
+        tool_registry.validate_tool_input(
+            "get_training_exercise",
+            {"exercise_id": "ex1", "pain_note": private_value},
+        )
+    assert exc.value.code == ResultCode.TOOL_NOT_ALLOWED
+    assert private_value not in str(exc.value)
+    assert private_value not in str(exc.value.detail)
+
+
+def test_post_validator_rejects_mismatched_tool_name():
+    spec = tool_registry.get_read_tool("get_health_profile_summary")
+    result = ReadToolResult(
+        tool_name="get_weight_trend_summary",
+        provider_view=HealthProfileProviderView(configured=False),
+        display_view=HealthProfileDisplayView(configured=False),
+    )
+    with pytest.raises(AgentError) as exc:
+        spec.validate_output(result)
+    assert exc.value.code == ResultCode.TOOL_NOT_ALLOWED
