@@ -87,6 +87,10 @@ FAST_TEST_TARGETS = [
     "tests/test_agent_context.py",
     "tests/test_agent_tool_registry.py",
     "tests/test_agent_read_tools.py",
+    # Phase 5 Batch B / Task 2: consent / audit / proposal persistence + migration.
+    "tests/test_agent_privacy.py",
+    "tests/test_agent_persistence.py",
+    "tests/test_agent_migrations.py",
 ]
 
 

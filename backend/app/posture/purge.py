@@ -54,6 +54,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppException
+from app.agent.models import (
+    AgentActionProposal,
+    AgentCloudConsent,
+    AgentRun,
+    AgentToolEvent,
+)
 from app.posture.models import (
     IdempotencyRecord,
     PostureAssessmentEvent,
@@ -583,6 +589,21 @@ async def _has_purgeable_data(db: AsyncSession, user_id: UUID) -> bool:
         ).first()
         if row is not None:
             return True
+    # Phase 5 Agent tables (PK columns are not named ``id``): an account that
+    # only ever used the Agent still has purgeable data and must be processed.
+    for agent_model, pk_col in (
+        (AgentCloudConsent, AgentCloudConsent.consent_id),
+        (AgentRun, AgentRun.run_id),
+        (AgentToolEvent, AgentToolEvent.event_id),
+        (AgentActionProposal, AgentActionProposal.proposal_id),
+    ):
+        row = (
+            await db.execute(
+                select(pk_col).where(agent_model.user_id == user_id).limit(1)
+            )
+        ).first()
+        if row is not None:
+            return True
     return False
 
 
@@ -688,6 +709,28 @@ async def _delete_db_health_data(db: AsyncSession, user_id: UUID) -> List[str]:
         delete(IdempotencyRecord).where(IdempotencyRecord.user_id == user_id)
     )
     done.append("delete_idempotency_records")
+    # Phase 5 reviewed cross-domain extension (spec Persistence; ADR-0004):
+    # account_deletion also removes the four Agent-owned tables. Delete
+    # proposals + tool_events before runs (FKs reference runs); consents have no
+    # such dependency. This does NOT repair the pre-existing platform gap of
+    # independently owned health/training domain-row deletion, and the
+    # idempotency delete above already covers the three Agent namespaces
+    # (agent_action_confirm / agent_consent_grant / agent_consent_withdraw) by
+    # user_id, alongside all other operations' rows.
+    await db.execute(
+        delete(AgentToolEvent).where(AgentToolEvent.user_id == user_id)
+    )
+    done.append("delete_agent_tool_events")
+    await db.execute(
+        delete(AgentActionProposal).where(AgentActionProposal.user_id == user_id)
+    )
+    done.append("delete_agent_action_proposals")
+    await db.execute(delete(AgentRun).where(AgentRun.user_id == user_id))
+    done.append("delete_agent_runs")
+    await db.execute(
+        delete(AgentCloudConsent).where(AgentCloudConsent.user_id == user_id)
+    )
+    done.append("delete_agent_cloud_consents")
     return done
 
 

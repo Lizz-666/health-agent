@@ -369,6 +369,125 @@ async def test_purge_deletes_health_payload_rows():
 
 
 @pytest.mark.asyncio
+async def test_account_deletion_purges_agent_tables():
+    """Phase 5 reviewed cross-domain extension: account_deletion removes the
+    four Agent-owned tables (and the three Agent idempotency namespaces, already
+    covered by the all-user idempotency delete). Agent-only data is recognized
+    as purgeable, so an Agent-only account is processed (not a no-op)."""
+    from app.agent.models import (
+        AgentActionProposal,
+        AgentCloudConsent,
+        AgentRun,
+        AgentToolEvent,
+    )
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        user_id = await _make_user(db)
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        db.add(
+            AgentCloudConsent(
+                user_id=user_id,
+                purpose="agent_cloud_processing",
+                provider_id="p",
+                disclosure_version="d1",
+                status="granted",
+                sequence_no=1,
+            )
+        )
+        await db.flush()
+        run = AgentRun(
+            user_id=user_id,
+            client_turn_id="t1",
+            entry_type="general",
+            status="completed",
+            started_at=now,
+        )
+        db.add(run)
+        await db.flush()
+        db.add(
+            AgentToolEvent(
+                run_id=run.run_id,
+                user_id=user_id,
+                tool_name="get_today_checkin",
+                side_effect_class="read",
+                status="ok",
+            )
+        )
+        db.add(
+            AgentActionProposal(
+                run_id=run.run_id,
+                user_id=user_id,
+                tool_name="create_weight_record",
+                arguments_json={"weight_kg": 70.0},
+                arguments_hash="h",
+                status="pending",
+                expires_at=now + timedelta(minutes=15),
+            )
+        )
+        await db.commit()
+
+    store = purge.FakeObjectStore()
+
+    async with TestSession() as db:
+        result = await purge.run_purge(db, user_id, store, trigger="user_delete")
+
+    assert result.status == "completed"
+
+    async with TestSession() as db:
+        for model in (
+            AgentCloudConsent,
+            AgentRun,
+            AgentToolEvent,
+            AgentActionProposal,
+        ):
+            rows = (
+                await db.execute(select(model).where(model.user_id == user_id))
+            ).scalars().all()
+            assert rows == [], f"{model.__name__} rows must be deleted"
+
+
+@pytest.mark.asyncio
+async def test_account_deletion_agent_data_does_not_delete_other_user():
+    """Agent table deletion is ownership-scoped: another user's Agent rows
+    survive an account_deletion purge."""
+    from app.agent.models import AgentRun
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        user_a = await _make_user(db)
+        user_b = await _make_user(db)
+        from datetime import datetime, timezone
+
+        db.add(
+            AgentRun(
+                user_id=user_b,
+                client_turn_id="b-turn",
+                entry_type="general",
+                status="completed",
+                started_at=datetime.now(timezone.utc),
+            )
+        )
+        # user_a needs purgeable data to drive a purge.
+        await _seed_photo_event(db, user_a)
+        await db.commit()
+
+    store = purge.FakeObjectStore()
+    store.add_existing(f"posture_photos/{user_a}/secret-photo-key-001.jpg")
+
+    async with TestSession() as db:
+        await purge.run_purge(db, user_a, store, trigger="user_delete")
+
+    async with TestSession() as db:
+        b_runs = (
+            await db.execute(select(AgentRun).where(AgentRun.user_id == user_b))
+        ).scalars().all()
+        assert len(b_runs) == 1  # other user's Agent data preserved
+
+
+@pytest.mark.asyncio
 async def test_oss_success_and_404_both_count_as_verifiable_deletion():
     from tests.conftest import TestSession
 

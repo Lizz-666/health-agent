@@ -142,14 +142,14 @@ def test_e2e_migration_head_is_current():
     """Point 1: Alembic has exactly one head, at the current chain tip.
 
     Tracks the live migration head; advances per migration. Currently
-    ``0007_training_plans`` (Phase 4), advanced from the Phase 2 head
-    ``0006_health_weight_tracking``.
+    ``0008_agent_mvp`` (Phase 5 Agent MVP), advanced from
+    ``0007_training_plans`` (Phase 4).
     """
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(lines) == 1, f"expected exactly one head, got: {lines}"
-    assert lines[0].split()[0] == "0007_training_plans", lines[0]
+    assert lines[0].split()[0] == "0008_agent_mvp", lines[0]
 
 
 def test_e2e_phase2_tables_present():
