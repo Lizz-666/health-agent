@@ -1,7 +1,8 @@
 # Phase 5 Agent MVP Collaboration Charter
 
-> Date: 2026-07-28. Status: Task 0 Gate 0 review. Base:
-> `e560552e0b0dcd3fb5d892f177be1bd80c17c6dd` (verified Phase 4 candidate).
+> Date: 2026-07-29. Status: Gate 0 accepted; Batch A is the only authorized
+> implementation batch. Accepted Task 0 specification:
+> `f6c2eae59c784398fbf1ae38967be3c2ee720940`.
 
 ## 1. Decision
 
@@ -18,7 +19,8 @@ and failure semantics need review before dependent layers accumulate.
 ## 2. Phase State And Base
 
 - Phase 4 is `verified`, not `merged`. Draft PR #2 remains open.
-- Phase 5 planning may proceed from the exact verified Phase 4 SHA above.
+- Phase 5 Task 0 passed independent re-review with P0/P1/P2/P3 all zero at the
+  exact accepted specification SHA above.
 - Runtime implementation must use a Phase 5 implementation branch created from
   the accepted Phase 5 Task 0 specification commit, not from `main` or the old
   root worktree.
@@ -41,8 +43,7 @@ and failure semantics need review before dependent layers accumulate.
 
 ### OpenCode + Selected Model
 
-- Start by performing the read-only preflight in
-  `docs/agent/PHASE5_OPENCODE_PREFLIGHT_PROMPT.md`.
+- The read-only preflight and Gate 0 review are complete.
 - After Task 0 is approved, implement only the currently assigned batch on one
   Phase 5 implementation branch/worktree.
 - Reuse existing domain services and typed Tools. Do not recreate training,

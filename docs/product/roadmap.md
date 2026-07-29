@@ -326,7 +326,8 @@ flowchart TB
 
 ## 9. 阶段 5：Agent MVP
 
-> 状态（2026-07-28）：Task 0 规格候选进入 Gate 0 独立审查，尚未授权运行时代码。
+> 状态（2026-07-29）：Task 0 已在精确 SHA `f6c2eae` 通过 Gate 0 独立复审；
+> 当前仅授权 Batch A / Task 1，后续批次仍受 Gate 1-4 约束。
 > 当前规格：`docs/specs/agent/2026-07-28-agent-mvp.md`。
 > 当前计划：`docs/plans/agent/2026-07-28-agent-mvp.md`。
 

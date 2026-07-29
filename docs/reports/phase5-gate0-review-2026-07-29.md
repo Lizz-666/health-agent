@@ -39,6 +39,13 @@ Agent-owned extension needed for the Agent MVP.
 
 ## Gate State
 
-The two P2 findings are addressed in the candidate documents, but Gate 0 remains
-in `review` until an independent read-only re-review confirms P0/P1/P2 are zero.
-Tasks 1-7 remain unauthorized until that verdict is recorded against an exact SHA.
+Independent read-only re-review at
+`f6c2eae59c784398fbf1ae38967be3c2ee720940` confirmed every prior finding
+closed and found no new issue: P0=0, P1=0, P2=0, P3=0. Preconditions included a
+clean `codex/phase5-spec-plan` worktree, the expected ancestry, and a clean
+`8ac8858..f6c2eae` diff check. The re-review changed no files and used no live
+AI, credentials, runtime implementation, or real health data.
+
+Gate 0 is accepted. `f6c2eae` is the immutable accepted specification SHA.
+Batch A / Task 1 may start only on the named Phase 5 implementation
+branch/worktree; Tasks 2-7 remain gated.
