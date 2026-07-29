@@ -242,6 +242,7 @@ async def test_existing_abnormal_pain_checkin_is_not_overwritten():
     from tests.conftest import TestSession
 
     async with TestSession() as db:
+        fixed_now = datetime(2026, 7, 29, 8, 0, tzinfo=timezone.utc)
         uid = await _make_user(db)
         await _grant_consent(db, uid)
         # Seed a same-day abnormal_pain=true safety signal directly.
@@ -274,7 +275,14 @@ async def test_existing_abnormal_pain_checkin_is_not_overwritten():
             available_time="30_min", daily_status="checked_in",
         )
         afp = at.compute_arguments_fingerprint(args)
-        prepared = await at.prepare(db, S.UPSERT_TODAY_CHECKIN, args, str(uid), iana_timezone=TZ)
+        prepared = await at.prepare(
+            db,
+            S.UPSERT_TODAY_CHECKIN,
+            args,
+            str(uid),
+            iana_timezone=TZ,
+            now=fixed_now,
+        )
         cfp = at.compute_context_fingerprint(prepared.context_fingerprint_payload)
         run_id = await _seed_run(db, uid)
         prop = await ap.create_proposal(
@@ -282,10 +290,18 @@ async def test_existing_abnormal_pain_checkin_is_not_overwritten():
             arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
             context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
             iana_timezone=TZ,
+            now=fixed_now,
         )
         await db.commit()
 
-        res = await ap.confirm_proposal(db, str(uid), prop.proposal_id, idempotency_key="c", iana_timezone=TZ)
+        res = await ap.confirm_proposal(
+            db,
+            str(uid),
+            prop.proposal_id,
+            idempotency_key="c",
+            iana_timezone=TZ,
+            now=fixed_now,
+        )
         # Refused + routed to safety flow; the existing abnormal-pain row is preserved.
         assert res.status == "invalidated"
         assert res.result_code == at.SAFETY_SIGNAL_ROUTE_CODE
