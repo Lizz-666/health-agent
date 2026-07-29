@@ -1069,6 +1069,8 @@ def test_0008_upgrade_creates_four_agent_tables():
     pp = sql.split("CREATE TABLE agent_action_proposals")[1]
     assert "arguments_json JSON" in pp  # JSONB renders as JSON in offline SQL
     assert "arguments_hash" in pp
+    assert "iana_timezone VARCHAR(60) NOT NULL" in pp
+    assert "CONSTRAINT uq_agent_action_proposals_run UNIQUE (run_id)" in pp
     assert (
         "CHECK (status IN ('pending', 'executed', 'invalidated', 'expired', 'cancelled'))"
         in pp
@@ -1121,9 +1123,13 @@ def test_0008_agent_models_metadata_parity():
     proposals = Base.metadata.tables["agent_action_proposals"]
     assert proposals.c["arguments_json"].nullable is True
     assert proposals.c["arguments_hash"].nullable is False
+    assert proposals.c["iana_timezone"].nullable is False
     assert proposals.c["result_ref"].nullable is True
     assert "ix_agent_action_proposals_user_status" in {
         i.name for i in proposals.indexes
+    }
+    assert "uq_agent_action_proposals_run" in {
+        c.name for c in proposals.constraints if c.name
     }
 
     events = Base.metadata.tables["agent_tool_events"]
@@ -1136,3 +1142,4 @@ def test_0008_agent_models_metadata_parity():
     runs = Base.metadata.tables["agent_runs"]
     assert "uq_agent_runs_user_turn" in {c.name for c in runs.constraints if c.name}
     assert "ix_agent_runs_expires_at" in {i.name for i in runs.indexes}
+    assert runs.c["expires_at"].nullable is False

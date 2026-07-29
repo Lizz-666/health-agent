@@ -45,6 +45,7 @@ from app.health.schemas import (
     WeightRecordUpdate,
     WeightTrendResponse,
 )
+from app.posture.user_lock import acquire_user_transaction_lock
 from app.health.trends import compute_weight_trend
 
 # Phase 2 has only manual weight entry.
@@ -326,6 +327,10 @@ async def upsert_today(
     Thin committing wrapper around ``upsert_today_core``; existing button/API
     behaviour and signature are unchanged.
     """
+    # Share the same per-user transaction lock as Agent confirmation so a
+    # concurrent button write cannot insert/replace an abnormal-pain safety
+    # signal between the Agent's latest-data check and flush.
+    await acquire_user_transaction_lock(db, user_id)
     response = await upsert_today_core(db, user_id, data)
     await db.commit()
     return response

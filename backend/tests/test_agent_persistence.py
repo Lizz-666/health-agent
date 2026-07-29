@@ -16,12 +16,15 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import select
 
+from app.agent import action_tools as at
 from app.agent import persistence as ap
+from app.agent import schemas as S
 from app.agent.models import (
     AgentCloudConsent,
     AgentRun,
 )
 from app.auth.models import User
+from app.core.config import settings
 from app.core.exceptions import AppException
 from app.posture.models import IdempotencyRecord
 
@@ -29,6 +32,15 @@ pytestmark = pytest.mark.asyncio
 
 PROVIDER = "cloud-provider-a"
 DISCLOSURE = "disclosure-2026-07"
+HMAC_KEY = "test-agent-audit-key-0123456789abcdef"
+HMAC_VERSION = "v1"
+TZ = "Asia/Shanghai"
+
+
+@pytest.fixture(autouse=True)
+def _hmac_key(monkeypatch):
+    monkeypatch.setattr(settings, "AGENT_AUDIT_HMAC_KEY", HMAC_KEY)
+    monkeypatch.setattr(settings, "AGENT_AUDIT_HMAC_KEY_VERSION", HMAC_VERSION)
 
 
 async def _make_user(db) -> uuid.UUID:
@@ -55,6 +67,40 @@ async def _grant(db, user_id, key="k1", provider=PROVIDER, disclosure=DISCLOSURE
     )
 
 
+async def _ensure_consent(db, user_id):
+    if not (await ap.active_consent(db, str(user_id))).active:
+        await _grant(db, user_id, "grant-" + uuid.uuid4().hex[:8])
+
+
+async def _create_weight_proposal(
+    db,
+    user_id,
+    *,
+    run=None,
+    weight_kg=70.0,
+    now=None,
+    ttl=None,
+):
+    await _ensure_consent(db, user_id)
+    run = run or await _seed_run(db, user_id, "turn-" + uuid.uuid4().hex[:8])
+    args = S.CreateWeightRecordArguments(
+        recorded_at=now or datetime.now(timezone.utc), weight_kg=weight_kg
+    )
+    fp = at.compute_arguments_fingerprint(args)
+    return await ap.create_proposal(
+        db,
+        run_id=run.run_id,
+        user_id=str(user_id),
+        tool_name=S.CREATE_WEIGHT_RECORD,
+        arguments_json=args.model_dump(mode="json"),
+        arguments_hash=fp.value,
+        fingerprint_key_version=fp.key_version,
+        iana_timezone=TZ,
+        now=now,
+        ttl=ttl,
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Consent                                                                      #
 # --------------------------------------------------------------------------- #
@@ -75,6 +121,8 @@ async def test_grant_appends_monotonic_sequence_and_derives_active():
         assert w.sequence_no == 2 and w.status == "withdrawn"
         active = await ap.active_consent(db, str(uid))
         assert not active.active  # highest sequence is a withdrawal
+        assert active.provider_id == PROVIDER
+        assert active.disclosure_version == DISCLOSURE
 
 
 async def test_grant_replay_returns_same_consent_no_new_row():
@@ -147,14 +195,7 @@ async def test_withdraw_scrubs_pending_proposals_atomically():
         uid = await _make_user(db)
         await _grant(db, uid, "g1")
         run = await _seed_run(db, uid)
-        p = await ap.create_proposal(
-            db,
-            run_id=run.run_id,
-            user_id=str(uid),
-            tool_name="upsert_today_checkin",
-            arguments_json={"local_date": "2026-07-29"},
-            arguments_hash="h",
-        )
+        p = await _create_weight_proposal(db, uid, run=run)
         # Withdraw must invalidate + scrub the pending proposal same-transaction.
         await ap.withdraw_consent(db, str(uid), idempotency_key="w1")
         proposal = await ap.load_owned_proposal(db, str(uid), p.proposal_id)
@@ -238,6 +279,25 @@ async def test_tool_event_stores_metadata_only():
         assert not hasattr(ev, "arguments_json") and not hasattr(ev, "result_payload")
 
 
+async def test_tool_event_rejects_foreign_run_binding():
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        uid_a = await _make_user(db)
+        uid_b = await _make_user(db)
+        run = await _seed_run(db, uid_a)
+        with pytest.raises(AppException) as exc:
+            await ap.record_tool_event(
+                db,
+                run_id=run.run_id,
+                user_id=str(uid_b),
+                tool_name="get_today_checkin",
+                side_effect_class="read",
+                status="ok",
+            )
+        assert exc.value.code == "agent_entity_not_found"
+
+
 # --------------------------------------------------------------------------- #
 # Proposal lifecycle                                                           #
 # --------------------------------------------------------------------------- #
@@ -248,22 +308,102 @@ async def test_pending_retains_arguments_and_terminal_scrubs():
 
     async with TestSession() as db:
         uid = await _make_user(db)
-        run = await _seed_run(db, uid)
-        p = await ap.create_proposal(
-            db,
-            run_id=run.run_id,
-            user_id=str(uid),
-            tool_name="create_weight_record",
-            arguments_json={"weight_kg": 70.0},
-            arguments_hash="h",
-        )
+        p = await _create_weight_proposal(db, uid)
         proposal = await ap.load_owned_proposal(db, str(uid), p.proposal_id)
         assert proposal.status == "pending"
-        assert proposal.arguments_json == {"weight_kg": 70.0}
+        assert proposal.arguments_json["weight_kg"] == 70.0
+        assert set(proposal.arguments_json) == {"recorded_at", "weight_kg"}
 
         cancelled = await ap.cancel_proposal(db, str(uid), p.proposal_id)
         assert cancelled.status == "cancelled"
         assert cancelled.arguments_json is None
+
+
+async def test_create_proposal_rejects_foreign_run_binding():
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        uid_a = await _make_user(db)
+        uid_b = await _make_user(db)
+        run = await _seed_run(db, uid_a)
+        await _ensure_consent(db, uid_b)
+        args = S.CreateWeightRecordArguments(
+            recorded_at=datetime.now(timezone.utc), weight_kg=70.0
+        )
+        fp = at.compute_arguments_fingerprint(args)
+        with pytest.raises(AppException) as exc:
+            await ap.create_proposal(
+                db,
+                run_id=run.run_id,
+                user_id=str(uid_b),
+                tool_name="create_weight_record",
+                arguments_json=args.model_dump(mode="json"),
+                arguments_hash=fp.value,
+                fingerprint_key_version=fp.key_version,
+                iana_timezone=TZ,
+            )
+        assert exc.value.code == "agent_entity_not_found"
+
+
+async def test_create_proposal_requires_current_server_consent():
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        uid = await _make_user(db)
+        run = await _seed_run(db, uid)
+        args = S.CreateWeightRecordArguments(
+            recorded_at=datetime.now(timezone.utc), weight_kg=70.0
+        )
+        fp = at.compute_arguments_fingerprint(args)
+        with pytest.raises(AppException) as exc:
+            await ap.create_proposal(
+                db,
+                run_id=run.run_id,
+                user_id=str(uid),
+                tool_name=S.CREATE_WEIGHT_RECORD,
+                arguments_json=args.model_dump(mode="json"),
+                arguments_hash=fp.value,
+                fingerprint_key_version=fp.key_version,
+                iana_timezone=TZ,
+            )
+        assert exc.value.code == "agent_consent_required"
+
+
+async def test_create_proposal_rejects_untyped_or_identity_arguments():
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        uid = await _make_user(db)
+        run = await _seed_run(db, uid)
+        await _ensure_consent(db, uid)
+        with pytest.raises(AppException) as exc:
+            await ap.create_proposal(
+                db,
+                run_id=run.run_id,
+                user_id=str(uid),
+                tool_name="create_weight_record",
+                arguments_json={
+                    "recorded_at": datetime.now(timezone.utc).isoformat(),
+                    "weight_kg": 70.0,
+                    "user_id": str(uid),
+                    "note": "must never be persisted",
+                },
+                arguments_hash="not-trusted",
+                iana_timezone=TZ,
+            )
+        assert exc.value.code == "agent_tool_not_allowed"
+
+
+async def test_one_write_proposal_per_run():
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        uid = await _make_user(db)
+        run = await _seed_run(db, uid)
+        await _create_weight_proposal(db, uid, run=run, weight_kg=70.0)
+        with pytest.raises(AppException) as exc:
+            await _create_weight_proposal(db, uid, run=run, weight_kg=71.0)
+        assert exc.value.code == "agent_proposal_already_exists"
 
 
 async def test_cancel_is_idempotent_terminal():
@@ -271,15 +411,7 @@ async def test_cancel_is_idempotent_terminal():
 
     async with TestSession() as db:
         uid = await _make_user(db)
-        run = await _seed_run(db, uid)
-        p = await ap.create_proposal(
-            db,
-            run_id=run.run_id,
-            user_id=str(uid),
-            tool_name="create_weight_record",
-            arguments_json={"weight_kg": 70.0},
-            arguments_hash="h",
-        )
+        p = await _create_weight_proposal(db, uid)
         await ap.cancel_proposal(db, str(uid), p.proposal_id)
         # Second cancel is a no-op (already cancelled), not an error.
         again = await ap.cancel_proposal(db, str(uid), p.proposal_id)
@@ -292,15 +424,7 @@ async def test_load_owned_proposal_non_enumerating_for_foreign():
     async with TestSession() as db:
         uid_a = await _make_user(db)
         uid_b = await _make_user(db)
-        run = await _seed_run(db, uid_a)
-        p = await ap.create_proposal(
-            db,
-            run_id=run.run_id,
-            user_id=str(uid_a),
-            tool_name="create_weight_record",
-            arguments_json={"weight_kg": 70.0},
-            arguments_hash="h",
-        )
+        p = await _create_weight_proposal(db, uid_a)
         # Foreign user loading the proposal gets None (same as missing).
         assert await ap.load_owned_proposal(db, str(uid_b), p.proposal_id) is None
 
@@ -310,15 +434,10 @@ async def test_lazy_expire_scrubs_past_ttl():
 
     async with TestSession() as db:
         uid = await _make_user(db)
-        run = await _seed_run(db, uid)
         past = datetime.now(timezone.utc) - timedelta(minutes=1)
-        p = await ap.create_proposal(
+        p = await _create_weight_proposal(
             db,
-            run_id=run.run_id,
-            user_id=str(uid),
-            tool_name="create_weight_record",
-            arguments_json={"weight_kg": 70.0},
-            arguments_hash="h",
+            uid,
             now=past - timedelta(minutes=14),  # created well in the past
             ttl=timedelta(seconds=1),
         )
@@ -334,14 +453,9 @@ async def test_load_pending_expired_inline():
 
     async with TestSession() as db:
         uid = await _make_user(db)
-        run = await _seed_run(db, uid)
-        p = await ap.create_proposal(
+        p = await _create_weight_proposal(
             db,
-            run_id=run.run_id,
-            user_id=str(uid),
-            tool_name="create_weight_record",
-            arguments_json={"weight_kg": 70.0},
-            arguments_hash="h",
+            uid,
             ttl=timedelta(seconds=1),
         )
         import asyncio
@@ -363,16 +477,7 @@ async def test_key_rotation_invalidates_old_version_proposals():
 
     async with TestSession() as db:
         uid = await _make_user(db)
-        run = await _seed_run(db, uid)
-        p = await ap.create_proposal(
-            db,
-            run_id=run.run_id,
-            user_id=str(uid),
-            tool_name="create_weight_record",
-            arguments_json={"weight_kg": 70.0},
-            arguments_hash="h",
-            fingerprint_key_version="v1",
-        )
+        p = await _create_weight_proposal(db, uid)
         count = await ap.scrub_pending_on_key_change(db, str(uid), "v2")
         assert count == 1
         proposal = await ap.load_owned_proposal(db, str(uid), p.proposal_id)
@@ -408,13 +513,10 @@ async def test_cleanup_expired_runs_deletes_dependents_keeps_recent():
             side_effect_class="read",
             status="ok",
         )
-        await ap.create_proposal(
+        await _create_weight_proposal(
             db,
-            run_id=old_run.run_id,
-            user_id=str(uid),
-            tool_name="create_weight_record",
-            arguments_json={},
-            arguments_hash="h",
+            uid,
+            run=old_run,
             ttl=timedelta(seconds=1),
         )
         # A recent run that must survive.
@@ -466,14 +568,7 @@ async def test_delete_agent_data_removes_agent_rows_and_namespaces_preserves_dom
             side_effect_class="read",
             status="ok",
         )
-        await ap.create_proposal(
-            db,
-            run_id=run.run_id,
-            user_id=str(uid),
-            tool_name="create_weight_record",
-            arguments_json={"weight_kg": 70.0},
-            arguments_hash="h",
-        )
+        await _create_weight_proposal(db, uid, run=run)
         # Domain idempotency evidence (training + posture) must be preserved.
         now = datetime.now(timezone.utc)
         db.add(

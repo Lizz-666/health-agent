@@ -682,7 +682,7 @@ class GenerateTrainingPlanDraftArguments(WriteActionArguments):
 
     fitness_goal: str = Field(..., min_length=1, max_length=30)
     weekly_frequency: int = Field(..., ge=2, le=5)
-    session_duration_minutes: int = Field(..., ge=15, le=60)
+    session_duration_minutes: Literal[15, 30, 45, 60]
     equipment_bodyweight: bool
     equipment_resistance_band: bool
 

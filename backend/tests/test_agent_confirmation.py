@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.agent import action_tools as at
 from app.agent import persistence as ap
@@ -73,6 +73,7 @@ async def _make_weight_proposal(db, uid, weight_kg=72.5, recorded_at=None):
         db, run_id=run_id, user_id=str(uid), tool_name=S.CREATE_WEIGHT_RECORD,
         arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
         context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
+        iana_timezone=TZ,
     )
 
 
@@ -96,7 +97,11 @@ async def test_zero_domain_writes_before_confirm_then_exactly_one_after():
         # Before confirm: no weight record exists.
         assert await _weight_rows(db, uid) == []
 
-        res = await ap.confirm_proposal(db, str(uid), prop.proposal_id, idempotency_key="c1", iana_timezone=TZ)
+        # Confirmation uses the validated timezone persisted with the proposal;
+        # the confirm request itself does not carry a client-controlled timezone.
+        res = await ap.confirm_proposal(
+            db, str(uid), prop.proposal_id, idempotency_key="c1"
+        )
         assert res.status == "executed"
         rows = await _weight_rows(db, uid)
         assert len(rows) == 1
@@ -118,7 +123,34 @@ async def test_replay_does_not_duplicate_and_returns_same_ref():
         assert first.status == "executed"
         assert second.status == "replayed"
         assert second.result_ref == first.result_ref
+        assert second.result_code == first.result_code
         assert len(await _weight_rows(db, uid)) == 1  # exactly one write
+
+
+async def test_mutated_pending_arguments_fail_closed_before_write():
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        uid = await _make_user(db)
+        await _grant_consent(db, uid)
+        prop = await _make_weight_proposal(db, uid, weight_kg=72.5)
+        proposal = await ap.load_owned_proposal(db, str(uid), prop.proposal_id)
+        proposal.arguments_json = {
+            **proposal.arguments_json,
+            "weight_kg": 99.0,
+        }
+        await db.commit()
+
+        res = await ap.confirm_proposal(
+            db,
+            str(uid),
+            prop.proposal_id,
+            idempotency_key="tampered",
+            iana_timezone=TZ,
+        )
+        assert res.status == "invalidated"
+        assert res.result_code == "agent_context_stale"
+        assert await _weight_rows(db, uid) == []
 
 
 async def test_same_key_different_proposal_conflicts():
@@ -169,14 +201,20 @@ async def test_expired_proposal_rejected():
         assert await _weight_rows(db, uid) == []
 
 
-async def test_inactive_consent_rejects_confirm():
+async def test_inactive_consent_rejects_confirm(monkeypatch):
     from tests.conftest import TestSession
 
     async with TestSession() as db:
         uid = await _make_user(db)
-        # No consent granted.
+        await _grant_consent(db, uid)
         prop = await _make_weight_proposal(db, uid)
         await db.commit()
+        from app.agent.privacy_gate import ActiveConsentSnapshot
+
+        async def _inactive(*args, **kwargs):
+            return ActiveConsentSnapshot(active=False)
+
+        monkeypatch.setattr(ap, "active_consent", _inactive)
         res = await ap.confirm_proposal(db, str(uid), prop.proposal_id, idempotency_key="c", iana_timezone=TZ)
         assert res.status == "invalidated"
         assert res.result_code == "agent_consent_required"
@@ -185,6 +223,14 @@ async def test_inactive_consent_rejects_confirm():
         proposal = await ap.load_owned_proposal(db, str(uid), prop.proposal_id)
         assert proposal.status == "invalidated"
         assert proposal.arguments_json is None
+        replay = await ap.confirm_proposal(
+            db,
+            str(uid),
+            prop.proposal_id,
+            idempotency_key="c",
+        )
+        assert replay.status == "replayed"
+        assert replay.result_code == "agent_consent_required"
 
 
 # --------------------------------------------------------------------------- #
@@ -235,6 +281,7 @@ async def test_existing_abnormal_pain_checkin_is_not_overwritten():
             db, run_id=run_id, user_id=str(uid), tool_name=S.UPSERT_TODAY_CHECKIN,
             arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
             context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
+            iana_timezone=TZ,
         )
         await db.commit()
 
@@ -353,6 +400,7 @@ async def test_training_draft_confirm_records_both_idempotency_layers(monkeypatc
             db, run_id=run_id, user_id=str(uid), tool_name=S.GENERATE_TRAINING_PLAN_DRAFT,
             arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
             context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
+            iana_timezone=TZ,
         )
         await db.commit()
 
@@ -385,6 +433,27 @@ async def test_training_draft_confirm_records_both_idempotency_layers(monkeypatc
         # Replay returns the same result without a second plan.
         res2 = await ap.confirm_proposal(db, str(uid), prop.proposal_id, idempotency_key="c1", iana_timezone=TZ)
         assert res2.status == "replayed"
+        assert len((await db.execute(
+            select(TrainingPlanVersion).where(TrainingPlanVersion.user_id == uid)
+        )).scalars().all()) == 1
+
+        # Corrupt the atomic pair by removing only the domain idempotency row.
+        # Agent-layer replay must fail closed rather than report success.
+        await db.execute(
+            delete(IdempotencyRecord).where(
+                IdempotencyRecord.user_id == uid,
+                IdempotencyRecord.operation == training_service.P.OP_PLAN_GENERATE,
+            )
+        )
+        await db.commit()
+        with pytest.raises(AppException) as exc:
+            await ap.confirm_proposal(
+                db,
+                str(uid),
+                prop.proposal_id,
+                idempotency_key="c1",
+            )
+        assert exc.value.code == ap.AGENT_IDEMPOTENCY_INCONSISTENT
         assert len((await db.execute(
             select(TrainingPlanVersion).where(TrainingPlanVersion.user_id == uid)
         )).scalars().all()) == 1
@@ -423,6 +492,7 @@ async def test_training_partial_idempotency_inconsistency_fails_closed(monkeypat
             db, run_id=run_id, user_id=str(uid), tool_name=S.GENERATE_TRAINING_PLAN_DRAFT,
             arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
             context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
+            iana_timezone=TZ,
         )
         await db.commit()
 
@@ -451,3 +521,228 @@ async def test_training_partial_idempotency_inconsistency_fails_closed(monkeypat
             select(TrainingPlanVersion).where(TrainingPlanVersion.user_id == uid)
         )).scalars().all()
         assert plans == []
+
+
+async def test_training_substitution_and_feedback_confirm_exactly_once(monkeypatch):
+    """The two remaining training actions execute only through confirmation
+    and record both Agent and domain idempotency evidence."""
+    from tests.conftest import TestSession
+    from app.training import service as training_service
+    from app.training.models import (
+        TrainingSessionFeedback,
+        TrainingSessionSubstitution,
+    )
+    from app.training.safety import classify_safety
+    from app.training.schemas_api import ConfirmRequest, DraftRequest
+    from tests.test_training_api import _draft_body, _eligible_ctx, SPOLICY
+
+    fixed_now = datetime(2026, 7, 27, 1, 0, tzinfo=timezone.utc)
+    ctx = _eligible_ctx()
+    decision = classify_safety(ctx, SPOLICY)
+
+    async def _fake_classify(db2, user_id, request, now=None):
+        return ctx, decision
+
+    monkeypatch.setattr(training_service, "_classify", _fake_classify)
+    monkeypatch.setattr(training_service, "_utc_now", lambda: fixed_now)
+
+    async with TestSession() as db:
+        uid = await _make_user(db)
+        await _grant_consent(db, uid)
+        await training_service.generate_draft(
+            db, str(uid), DraftRequest(**_draft_body(key="agent-seed"))
+        )
+        await training_service.confirm(
+            db, str(uid), ConfirmRequest(**_draft_body(key="agent-activate"))
+        )
+        today = await training_service.get_today(
+            db, str(uid), TZ, now=fixed_now
+        )
+        assert today.state == "session"
+        prescription = next(
+            p for p in today.session.prescriptions if p.exercise.substitution_ids
+        )
+        replacement = prescription.exercise.substitution_ids[0]
+
+        sub_args = S.SubstituteTodayExerciseArguments(
+            original_exercise_id=prescription.exercise_id,
+            replacement_exercise_id=replacement,
+        )
+        sub_prepared = await at.prepare(
+            db,
+            S.SUBSTITUTE_TODAY_EXERCISE,
+            sub_args,
+            str(uid),
+            iana_timezone=TZ,
+            now=fixed_now,
+        )
+        sub_afp = at.compute_arguments_fingerprint(sub_args)
+        sub_cfp = at.compute_context_fingerprint(
+            sub_prepared.context_fingerprint_payload
+        )
+        sub_run = await ap.record_run(
+            db,
+            str(uid),
+            client_turn_id="sub-turn",
+            entry_type="training_exercise",
+            now=fixed_now,
+        )
+        sub_proposal = await ap.create_proposal(
+            db,
+            run_id=sub_run.run.run_id,
+            user_id=str(uid),
+            tool_name=S.SUBSTITUTE_TODAY_EXERCISE,
+            arguments_json=sub_args.model_dump(mode="json"),
+            arguments_hash=sub_afp.value,
+            context_fingerprint=sub_cfp.value,
+            fingerprint_key_version=sub_cfp.key_version,
+            iana_timezone=TZ,
+            now=fixed_now,
+        )
+        stale_sub_run = await ap.record_run(
+            db,
+            str(uid),
+            client_turn_id="stale-sub-turn",
+            entry_type="training_exercise",
+            now=fixed_now,
+        )
+        stale_sub_proposal = await ap.create_proposal(
+            db,
+            run_id=stale_sub_run.run.run_id,
+            user_id=str(uid),
+            tool_name=S.SUBSTITUTE_TODAY_EXERCISE,
+            arguments_json=sub_args.model_dump(mode="json"),
+            arguments_hash=sub_afp.value,
+            context_fingerprint=sub_cfp.value,
+            fingerprint_key_version=sub_cfp.key_version,
+            iana_timezone=TZ,
+            now=fixed_now,
+        )
+        assert (
+            await db.execute(select(TrainingSessionSubstitution))
+        ).scalars().all() == []
+        sub_result = await ap.confirm_proposal(
+            db,
+            str(uid),
+            sub_proposal.proposal_id,
+            idempotency_key="confirm-sub",
+            now=fixed_now,
+        )
+        assert sub_result.status == "executed"
+        assert len(
+            (await db.execute(select(TrainingSessionSubstitution))).scalars().all()
+        ) == 1
+        replay_sub = await ap.confirm_proposal(
+            db,
+            str(uid),
+            sub_proposal.proposal_id,
+            idempotency_key="confirm-sub",
+            now=fixed_now,
+        )
+        assert replay_sub.status == "replayed"
+        stale_sub_result = await ap.confirm_proposal(
+            db,
+            str(uid),
+            stale_sub_proposal.proposal_id,
+            idempotency_key="confirm-stale-sub",
+            now=fixed_now,
+        )
+        assert stale_sub_result.status == "invalidated"
+        assert stale_sub_result.result_code == "substitution_limit_reached"
+        assert len(
+            (await db.execute(select(TrainingSessionSubstitution))).scalars().all()
+        ) == 1
+
+        feedback_args = S.RecordTrainingFeedbackArguments(
+            outcome_state="completed"
+        )
+        feedback_prepared = await at.prepare(
+            db,
+            S.RECORD_TRAINING_FEEDBACK,
+            feedback_args,
+            str(uid),
+            iana_timezone=TZ,
+            now=fixed_now,
+        )
+        feedback_afp = at.compute_arguments_fingerprint(feedback_args)
+        feedback_cfp = at.compute_context_fingerprint(
+            feedback_prepared.context_fingerprint_payload
+        )
+        feedback_run = await ap.record_run(
+            db,
+            str(uid),
+            client_turn_id="feedback-turn",
+            entry_type="training_session",
+            now=fixed_now,
+        )
+        feedback_proposal = await ap.create_proposal(
+            db,
+            run_id=feedback_run.run.run_id,
+            user_id=str(uid),
+            tool_name=S.RECORD_TRAINING_FEEDBACK,
+            arguments_json=feedback_args.model_dump(mode="json"),
+            arguments_hash=feedback_afp.value,
+            context_fingerprint=feedback_cfp.value,
+            fingerprint_key_version=feedback_cfp.key_version,
+            iana_timezone=TZ,
+            now=fixed_now,
+        )
+        stale_feedback_run = await ap.record_run(
+            db,
+            str(uid),
+            client_turn_id="stale-feedback-turn",
+            entry_type="training_session",
+            now=fixed_now,
+        )
+        stale_feedback_proposal = await ap.create_proposal(
+            db,
+            run_id=stale_feedback_run.run.run_id,
+            user_id=str(uid),
+            tool_name=S.RECORD_TRAINING_FEEDBACK,
+            arguments_json=feedback_args.model_dump(mode="json"),
+            arguments_hash=feedback_afp.value,
+            context_fingerprint=feedback_cfp.value,
+            fingerprint_key_version=feedback_cfp.key_version,
+            iana_timezone=TZ,
+            now=fixed_now,
+        )
+        assert (
+            await db.execute(select(TrainingSessionFeedback))
+        ).scalars().all() == []
+        feedback_result = await ap.confirm_proposal(
+            db,
+            str(uid),
+            feedback_proposal.proposal_id,
+            idempotency_key="confirm-feedback",
+            now=fixed_now,
+        )
+        assert feedback_result.status == "executed"
+        assert len(
+            (await db.execute(select(TrainingSessionFeedback))).scalars().all()
+        ) == 1
+        stale_feedback_result = await ap.confirm_proposal(
+            db,
+            str(uid),
+            stale_feedback_proposal.proposal_id,
+            idempotency_key="confirm-stale-feedback",
+            now=fixed_now,
+        )
+        assert stale_feedback_result.status == "invalidated"
+        assert stale_feedback_result.result_code == "feedback_already_recorded"
+        assert len(
+            (await db.execute(select(TrainingSessionFeedback))).scalars().all()
+        ) == 1
+
+        operations = {
+            row.operation
+            for row in (
+                await db.execute(
+                    select(IdempotencyRecord).where(
+                        IdempotencyRecord.user_id == uid
+                    )
+                )
+            ).scalars().all()
+        }
+        assert ap.OP_AGENT_ACTION_CONFIRM in operations
+        assert training_service.P.OP_SESSION_SUBSTITUTE in operations
+        assert training_service.P.OP_SESSION_FEEDBACK in operations

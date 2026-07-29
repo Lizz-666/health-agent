@@ -6,6 +6,8 @@ deterministic typed diffs (no provider prose), the pain-check-in / weight-note
 boundaries, and that write action names are NOT registered in the provider-
 exposed read registry.
 """
+from datetime import date, datetime, timezone
+
 import pytest
 
 from app.agent import action_tools as at
@@ -13,6 +15,7 @@ from app.agent import schemas as S
 from app.agent import tool_registry as read_registry
 from app.agent.messages import AgentError
 from app.core.config import settings
+from app.core.exceptions import AppException
 
 HMAC_KEY = "test-agent-audit-key-0123456789abcdef"
 HMAC_VERSION = "v1"
@@ -128,3 +131,49 @@ def test_arguments_fingerprint_is_keyed_and_stable():
         {"recorded_at": "2026-07-29T08:00:00+00:00", "weight_kg": 71.0},
     )
     assert at.compute_arguments_fingerprint(w2).value != fp.value
+
+
+@pytest.mark.asyncio
+async def test_health_prepare_rejects_invalid_timezone_before_reads(monkeypatch):
+    async def _unexpected(*args, **kwargs):
+        raise AssertionError("health read occurred before timezone rejection")
+
+    monkeypatch.setattr(at, "get_profile_result", _unexpected)
+    args = S.CreateWeightRecordArguments(
+        recorded_at=datetime.now(timezone.utc), weight_kg=70.0
+    )
+    with pytest.raises(AppException) as exc:
+        await at.prepare(
+            None,
+            S.CREATE_WEIGHT_RECORD,
+            args,
+            "00000000-0000-0000-0000-000000000001",
+            iana_timezone="UTC+8",
+        )
+    assert exc.value.code == "invalid_timezone"
+
+
+@pytest.mark.asyncio
+async def test_checkin_prepare_rejects_non_current_local_date(monkeypatch):
+    async def _unexpected(*args, **kwargs):
+        raise AssertionError("health read occurred before date rejection")
+
+    monkeypatch.setattr(at, "get_profile_result", _unexpected)
+    args = S.UpsertTodayCheckinArguments(
+        local_date=date(2026, 7, 28),
+        sleep_quality="good",
+        energy="high",
+        muscle_soreness="none",
+        available_time="30_min",
+        daily_status="checked_in",
+    )
+    with pytest.raises(AppException) as exc:
+        await at.prepare(
+            None,
+            S.UPSERT_TODAY_CHECKIN,
+            args,
+            "00000000-0000-0000-0000-000000000001",
+            iana_timezone="Asia/Shanghai",
+            now=datetime(2026, 7, 29, 4, 0, tzinfo=timezone.utc),
+        )
+    assert exc.value.code == "agent_context_stale"

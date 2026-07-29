@@ -574,6 +574,7 @@ async def test_draft_button_and_agent_share_transaction_neutral_core(
             db, run_id=run.run_id, user_id=uid, tool_name=AS.GENERATE_TRAINING_PLAN_DRAFT,
             arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
             context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
+            iana_timezone="Asia/Shanghai",
         )
         await db.commit()
         res = await agent_persistence.confirm_proposal(

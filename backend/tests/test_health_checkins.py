@@ -577,7 +577,7 @@ async def test_checkin_button_and_agent_share_transaction_neutral_core(monkeypat
     """Both the committing API wrapper and the Agent confirmation executor call
     the same ``upsert_today_core`` (ADR-0003; spec Write Confirmation)."""
     import uuid as _uuid
-    from datetime import date
+    from datetime import datetime, timezone
 
     import app.health.service as hsvc
     from app.agent import action_tools as at
@@ -617,8 +617,13 @@ async def test_checkin_button_and_agent_share_transaction_neutral_core(monkeypat
             current_provider_id="prov", current_disclosure_version="d1",
             idempotency_key="ck",
         )
+        from app.training.context import derive_local_date
+
+        current_local_date = derive_local_date(
+            datetime.now(timezone.utc), "Asia/Shanghai"
+        )
         data = CheckInCreate(
-            local_date=date(2026, 7, 29),
+            local_date=current_local_date,
             sleep_quality=SleepQuality("good"), energy=Energy("high"),
             muscle_soreness=MuscleSoreness("none"), available_time=AvailableTime("30_min"),
             daily_status=DailyStatus("checked_in"), abnormal_pain=False,
@@ -627,9 +632,10 @@ async def test_checkin_button_and_agent_share_transaction_neutral_core(monkeypat
         await hsvc.upsert_today(db, uid, data)
         assert calls.count("core") == 1
 
-        # Agent path: a different local date so it is a new check-in.
+        # Agent path: the same current local date; the action is intentionally
+        # limited to today's owned check-in.
         args = S.UpsertTodayCheckinArguments(
-            local_date=date(2026, 7, 30), sleep_quality=SleepQuality("good"),
+            local_date=current_local_date, sleep_quality=SleepQuality("good"),
             energy=Energy("high"), muscle_soreness=MuscleSoreness("none"),
             available_time=AvailableTime("30_min"), daily_status=DailyStatus("checked_in"),
         )
@@ -641,6 +647,7 @@ async def test_checkin_button_and_agent_share_transaction_neutral_core(monkeypat
             db, run_id=run.run_id, user_id=uid, tool_name=S.UPSERT_TODAY_CHECKIN,
             arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
             context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
+            iana_timezone="Asia/Shanghai",
         )
         await db.commit()
         res = await ap.confirm_proposal(db, uid, prop.proposal_id, idempotency_key="c1", iana_timezone="Asia/Shanghai")

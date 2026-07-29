@@ -344,25 +344,25 @@ async def generate_draft(db: AsyncSession, user_id: str, req) -> DraftResponse:
             draft=await _version_to_view(db, version),
             decision_gate=version.decision_gate,
         )
-    request = _request_snapshot(
-        req.fitness_goal, req.weekly_frequency, req.session_duration_minutes,
-        req.equipment_bodyweight, req.equipment_resistance_band, req.iana_timezone, now,
+    evaluation = await evaluate_draft_request(
+        db,
+        user_id,
+        fitness_goal=req.fitness_goal,
+        weekly_frequency=req.weekly_frequency,
+        session_duration_minutes=req.session_duration_minutes,
+        equipment_bodyweight=req.equipment_bodyweight,
+        equipment_resistance_band=req.equipment_resistance_band,
+        iana_timezone=req.iana_timezone,
+        now=now,
     )
-    ctx, decision = await _classify(db, user_id, request, now)
-    cat = catalog()
-    candidates = select_candidates(ctx, decision, cat, TRAINING_POLICY, SAFETY_POLICY)
-    result = generate_plan_draft(ctx, decision, candidates, cat, TRAINING_POLICY, SAFETY_POLICY)
-    if not result.ok:
-        _raise_from_reason(result.reason_codes[0])
-        raise AssertionError  # _raise_from_reason always raises
 
     persisted = await P.create_draft(
         db, user_id,
-        draft=result.draft,
-        weekly_frequency=req.weekly_frequency,
-        session_duration_minutes=req.session_duration_minutes,
-        decision_gate=decision.gate_status.value,
-        decision_fingerprint=decision.fingerprint,
+        draft=evaluation.draft,
+        weekly_frequency=evaluation.weekly_frequency,
+        session_duration_minutes=evaluation.session_duration_minutes,
+        decision_gate=evaluation.decision_gate,
+        decision_fingerprint=evaluation.decision_fingerprint,
         generated_at=now,
         change_reason=rationale.INITIAL_GENERATION,
         idempotency_key=req.idempotency_key,
@@ -372,7 +372,9 @@ async def generate_draft(db: AsyncSession, user_id: str, req) -> DraftResponse:
     if version is None:
         raise AppException(410, "草案幂等记录指向的计划已被清除", "idempotency_result_gone")
     view = await _version_to_view(db, version)
-    return DraftResponse(has_draft=True, draft=view, decision_gate=decision.gate_status.value)
+    return DraftResponse(
+        has_draft=True, draft=view, decision_gate=evaluation.decision_gate
+    )
 
 
 async def get_draft(db: AsyncSession, user_id: str) -> DraftResponse:
@@ -471,14 +473,20 @@ async def get_active(db: AsyncSession, user_id: str) -> ActivePlanResponse:
 # --- today ------------------------------------------------------------------
 
 
-async def get_today(db: AsyncSession, user_id: str, iana_timezone: str) -> TodayResponse:
+async def get_today(
+    db: AsyncSession,
+    user_id: str,
+    iana_timezone: str,
+    *,
+    now: Optional[datetime] = None,
+) -> TodayResponse:
     if not validate_iana_timezone(iana_timezone):
         raise AppException(400, "时区标识无效", "invalid_timezone")
     active = await P.get_active_version(db, user_id)
     if active is None:
         return TodayResponse(state="no_active_plan")
 
-    now = _utc_now()
+    now = now or _utc_now()
     local_date = derive_local_date(now, iana_timezone)
     # Re-check current safety; a blocked gate surfaces as an honest state.
     bw, band = await _profile_equipment(db, user_id)
@@ -599,7 +607,12 @@ async def get_today(db: AsyncSession, user_id: str, iana_timezone: str) -> Today
 
 
 async def _execution_context(
-    db: AsyncSession, user_id: str, session_id: str, iana_timezone: str,
+    db: AsyncSession,
+    user_id: str,
+    session_id: str,
+    iana_timezone: str,
+    *,
+    now: Optional[datetime] = None,
 ):
     if not validate_iana_timezone(iana_timezone):
         raise AppException(400, "时区标识无效", "invalid_timezone")
@@ -611,7 +624,7 @@ async def _execution_context(
     if target is None:
         raise AppException(404, "训练场次不存在", "not_owner_or_missing_session")
 
-    now = _utc_now()
+    now = now or _utc_now()
     local_date = derive_local_date(now, iana_timezone)
     if active.confirmed_at is None:
         raise AppException(409, "生效计划缺少确认时间", "active_plan_invalid")
@@ -662,12 +675,17 @@ async def record_feedback(db: AsyncSession, user_id: str, session_id: str,
             outcome_state=feedback.outcome_state,
             status="replayed",
         )
-    active, _target, local_date, _ctx, _decision, _candidates = (
-        await _execution_context(db, user_id, session_id, iana_timezone))
-    result = await P.record_feedback(
-        db, user_id, plan_version_id=active.plan_version_id,
-        session_id=uuid.UUID(session_id), local_date=local_date,
+    evaluation = await evaluate_feedback(
+        db,
+        user_id,
+        session_id=session_id,
         outcome_state=req.outcome_state,
+        iana_timezone=iana_timezone,
+    )
+    result = await P.record_feedback(
+        db, user_id, plan_version_id=evaluation.plan_version_id,
+        session_id=evaluation.session_id, local_date=evaluation.local_date,
+        outcome_state=evaluation.outcome_state,
         idempotency_key=req.idempotency_key,
         request_hash=request_hash,
     )
@@ -700,55 +718,22 @@ async def record_substitution(db: AsyncSession, user_id: str, session_id: str,
             substitution_id=str(substitution.substitution_id),
             status="replayed",
         )
-    index = _index()
-    if req.original_exercise_id not in index or req.replacement_exercise_id not in index:
-        raise AppException(400, "动作不存在", "exercise_not_found")
-    if req.original_exercise_id == req.replacement_exercise_id:
-        raise AppException(400, "替换动作不能与原动作相同", "invalid_substitution")
-    active, target, local_date, ctx, decision, candidates = (
-        await _execution_context(db, user_id, session_id, iana_timezone))
-    existing_feedback = await P.get_feedback(
-        db, user_id, target.session_id, local_date)
-    if existing_feedback is not None:
-        raise AppException(409, "今天的训练反馈已经记录", "feedback_already_recorded")
-
-    prescriptions = await P.load_prescriptions(db, target.session_id)
-    original = next(
-        (p for p in prescriptions if p.exercise_id == req.original_exercise_id),
-        None,
-    )
-    if original is None:
-        raise AppException(400, "原动作不在今天的处方中", "original_not_prescribed")
-    source = index[req.original_exercise_id]
-    if req.replacement_exercise_id not in source.substitution_ids:
-        raise AppException(400, "该动作不是原动作的允许替代项", "substitution_not_allowed")
-    if req.replacement_exercise_id not in {
-            candidate.exercise_id for candidate in candidates.candidates}:
-        raise AppException(409, "替代动作不符合当前安全条件", "substitution_not_safe")
-
-    effective = await _version_to_draft(
-        db, active,
-        context_fingerprint=decision.fingerprint,
-        profile_version=ctx.health.profile_version,
-    )
-    if not _apply_substitution(
-            effective, target.week_index, target.day_of_week,
-            req.original_exercise_id, req.replacement_exercise_id):
-        raise AppException(
-            409, "替换后的计划无法重建", "substitution_not_safe")
-    validation = validate_plan(
-        effective, ctx, decision, candidates, catalog(),
-        TRAINING_POLICY, SAFETY_POLICY,
-    )
-    if not validation.valid:
-        raise AppException(409, "替换后的计划未通过安全校验", "substitution_not_safe")
-
-    result = await P.record_substitution(
-        db, user_id, plan_version_id=active.plan_version_id,
-        session_id=target.session_id, local_date=local_date,
+    evaluation = await evaluate_substitution(
+        db,
+        user_id,
+        session_id=session_id,
         original_exercise_id=req.original_exercise_id,
         replacement_exercise_id=req.replacement_exercise_id,
-        relation_reason="substitution", decision_gate=decision.gate_status.value,
+        iana_timezone=iana_timezone,
+    )
+
+    result = await P.record_substitution(
+        db, user_id, plan_version_id=evaluation.plan_version_id,
+        session_id=evaluation.session_id, local_date=evaluation.local_date,
+        original_exercise_id=evaluation.original_exercise_id,
+        replacement_exercise_id=evaluation.replacement_exercise_id,
+        relation_reason=evaluation.relation_reason,
+        decision_gate=evaluation.decision_gate,
         idempotency_key=req.idempotency_key,
         request_hash=request_hash,
     )
@@ -855,8 +840,15 @@ async def evaluate_feedback(
         }
     )
     active, _target, local_date, _ctx, decision, _candidates = (
-        await _execution_context(db, user_id, session_id, iana_timezone)
+        await _execution_context(
+            db, user_id, session_id, iana_timezone, now=now
+        )
     )
+    existing_feedback = await P.get_feedback(
+        db, user_id, uuid.UUID(session_id), local_date
+    )
+    if existing_feedback is not None:
+        raise AppException(409, "该训练日已记录反馈", "feedback_already_recorded")
     return FeedbackEvaluation(
         plan_version_id=active.plan_version_id,
         session_id=uuid.UUID(session_id),
@@ -908,13 +900,20 @@ async def evaluate_substitution(
     if original_exercise_id == replacement_exercise_id:
         raise AppException(400, "替换动作不能与原动作相同", "invalid_substitution")
     active, target, local_date, ctx, decision, candidates = (
-        await _execution_context(db, user_id, session_id, iana_timezone)
+        await _execution_context(
+            db, user_id, session_id, iana_timezone, now=now
+        )
     )
     existing_feedback = await P.get_feedback(
         db, user_id, target.session_id, local_date
     )
     if existing_feedback is not None:
         raise AppException(409, "今天的训练反馈已经记录", "feedback_already_recorded")
+    existing_substitution = await P.get_substitution(
+        db, user_id, target.session_id, local_date
+    )
+    if existing_substitution is not None:
+        raise AppException(409, "该训练日已替换过动作", "substitution_limit_reached")
 
     prescriptions = await P.load_prescriptions(db, target.session_id)
     original = next(

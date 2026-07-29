@@ -97,6 +97,7 @@ async def test_proposal_check_constraint_rejects_illegal_status():
             entry_type="general",
             status="started",
             started_at=_now(),
+            expires_at=_now() + timedelta(days=30),
         )
         db.add(run)
         await db.flush()
@@ -108,6 +109,7 @@ async def test_proposal_check_constraint_rejects_illegal_status():
                 arguments_json={},
                 arguments_hash="h",
                 status="bogus",
+                iana_timezone="Asia/Shanghai",
                 expires_at=_now(),
             )
         )
@@ -150,6 +152,41 @@ async def test_run_unique_user_turn_constraint():
                     entry_type="general",
                     status="started",
                     started_at=ts,
+                    expires_at=ts + timedelta(days=30),
+                )
+            )
+        with pytest.raises(IntegrityError):
+            await db.commit()
+
+
+async def test_proposal_unique_run_constraint():
+    """The database enforces the one-write-proposal-per-turn limit."""
+    from tests.conftest import TestSession
+
+    async with TestSession() as db:
+        uid = await _make_user(db)
+        now = _now()
+        run = AgentRun(
+            user_id=uid,
+            client_turn_id="one-proposal",
+            entry_type="general",
+            status="completed",
+            started_at=now,
+            expires_at=now + timedelta(days=30),
+        )
+        db.add(run)
+        await db.flush()
+        for index in range(2):
+            db.add(
+                AgentActionProposal(
+                    run_id=run.run_id,
+                    user_id=uid,
+                    tool_name="create_weight_record",
+                    arguments_json={"weight_kg": 70.0 + index},
+                    arguments_hash=f"h{index}",
+                    iana_timezone="Asia/Shanghai",
+                    status="pending",
+                    expires_at=now + timedelta(minutes=15),
                 )
             )
         with pytest.raises(IntegrityError):
@@ -197,6 +234,7 @@ async def test_valid_agent_rows_persist():
             tool_name="upsert_today_checkin",
             arguments_json={"local_date": "2026-07-29"},
             arguments_hash="abc",
+            iana_timezone="Asia/Shanghai",
             status="pending",
             expires_at=now + timedelta(minutes=15),
         )

@@ -27,6 +27,9 @@ short-lived typed write-proposal lifecycle.
   cancelled. ``arguments_json`` is nullable and scrubbed (NULL) on every
   terminal transition, withdrawal, Agent-data deletion, and lazy expiry; only
   ``pending`` rows retain arguments.
+  ``run_id`` is unique (one proposal per turn); ``iana_timezone`` is validated
+  server-owned metadata needed for the separate confirmation request to rebuild
+  local-day context without accepting a client-controlled timezone there.
 
 Idempotency is NOT a new table: Phase 5 reuses the existing
 ``idempotency_records`` table (ADR-0001) with three new ``operation`` values
@@ -113,7 +116,7 @@ def upgrade() -> None:
             "started_at", sa.DateTime(timezone=True), nullable=False
         ),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -190,6 +193,7 @@ def upgrade() -> None:
             "fingerprint_key_version", sa.String(length=40), nullable=True
         ),
         sa.Column("context_fingerprint", sa.String(length=64), nullable=True),
+        sa.Column("iana_timezone", sa.String(length=60), nullable=False),
         sa.Column("status", sa.String(length=20), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("result_ref", sa.String(length=64), nullable=True),
@@ -209,6 +213,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["run_id"], ["agent_runs.run_id"]),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("proposal_id"),
+        sa.UniqueConstraint("run_id", name="uq_agent_action_proposals_run"),
         sa.CheckConstraint(
             "status IN ('pending', 'executed', 'invalidated', 'expired', 'cancelled')",
             name="ck_agent_action_proposals_status",

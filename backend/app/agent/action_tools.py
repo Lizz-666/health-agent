@@ -42,6 +42,7 @@ from app.health.service import (
 )
 from app.training import persistence as P
 from app.training import service as training_service
+from app.training.context import derive_local_date, validate_iana_timezone
 
 # Domain idempotency operations reused for the two-layer training contract.
 _DOMAIN_OP = {
@@ -115,6 +116,11 @@ def is_write_action(name: str) -> bool:
     return name in _ARGUMENTS_MODELS
 
 
+def domain_operation_for(name: str) -> Optional[str]:
+    """Return the existing domain idempotency namespace for a write action."""
+    return _DOMAIN_OP.get(name)
+
+
 # --------------------------------------------------------------------------- #
 # Diff builders (deterministic, server-rendered, no provider free text)       #
 # --------------------------------------------------------------------------- #
@@ -178,6 +184,12 @@ async def _prepare_upsert_today_checkin(
     a safety signal that must NOT be overwritten or downgraded (spec Tool
     Registry). The ordinary Agent check-in is ``abnormal_pain=false`` with no
     pain fields."""
+    if args.local_date != derive_local_date(now, iana_timezone):
+        raise AppException(
+            409,
+            "签到日期与当前本地日期不一致",
+            "agent_context_stale",
+        )
     user_uuid = uuid.UUID(user_id)
     existing = (
         await db.execute(
@@ -315,7 +327,9 @@ async def _resolve_current_session_id(
     ``get_today`` re-runs the current safety gate; a blocked/rest/no-plan state
     means there is no confirmable session today (the proposal becomes stale).
     """
-    today = await training_service.get_today(db, user_id, iana_timezone)
+    today = await training_service.get_today(
+        db, user_id, iana_timezone, now=now
+    )
     if today.state != "session" or today.session is None:
         raise AppException(409, "今天没有可记录的训练场次", "session_not_today")
     return today.session.session_id
@@ -431,6 +445,8 @@ async def prepare(
     if preparer is None:
         raise AgentError(ResultCode.TOOL_NOT_ALLOWED)
     now = now or _now()
+    if not validate_iana_timezone(iana_timezone):
+        raise AppException(400, "时区标识无效", ResultCode.INVALID_TIMEZONE)
     return await preparer(db, user_id, arguments, iana_timezone, now)
 
 
@@ -447,6 +463,7 @@ __all__ = [
     "compute_arguments_fingerprint",
     "compute_context_fingerprint",
     "is_write_action",
+    "domain_operation_for",
     "build_diff",
     "prepare",
 ]

@@ -404,6 +404,7 @@ async def test_account_deletion_purges_agent_tables():
             entry_type="general",
             status="completed",
             started_at=now,
+            expires_at=now + timedelta(days=30),
         )
         db.add(run)
         await db.flush()
@@ -423,6 +424,7 @@ async def test_account_deletion_purges_agent_tables():
                 tool_name="create_weight_record",
                 arguments_json={"weight_kg": 70.0},
                 arguments_hash="h",
+                iana_timezone="Asia/Shanghai",
                 status="pending",
                 expires_at=now + timedelta(minutes=15),
             )
@@ -468,6 +470,7 @@ async def test_account_deletion_agent_data_does_not_delete_other_user():
                 entry_type="general",
                 status="completed",
                 started_at=datetime.now(timezone.utc),
+                expires_at=datetime.now(timezone.utc) + timedelta(days=30),
             )
         )
         # user_a needs purgeable data to drive a purge.

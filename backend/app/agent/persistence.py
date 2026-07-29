@@ -21,6 +21,7 @@ success, a normal/healthy result, or an executed side effect.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import uuid
 from dataclasses import dataclass
@@ -46,9 +47,11 @@ from app.agent.models import (
     PROPOSAL_TERMINAL_STATUSES,
 )
 from app.agent.privacy_gate import ActiveConsentSnapshot
+from app.agent.messages import AgentError, ResultCode
 from app.core.exceptions import AppException
 from app.posture.models import IdempotencyRecord
 from app.posture.user_lock import acquire_user_transaction_lock
+from app.training.context import validate_iana_timezone
 
 # --- Shared idempotency operation namespaces (ADR-0001; must not collide). ---
 OP_AGENT_ACTION_CONFIRM = "agent_action_confirm"
@@ -233,14 +236,6 @@ async def active_consent(db: AsyncSession, user_id: str) -> ActiveConsentSnapsho
     )
 
 
-async def _next_sequence_no(
-    db: AsyncSession, user_id: str, now: datetime
-) -> int:
-    """Allocate the next per-user sequence number (caller holds the user lock)."""
-    row = await _highest_consent_row(db, user_id)
-    return (row.sequence_no + 1) if row is not None else 1
-
-
 @dataclass(frozen=True)
 class ConsentGrantResult:
     consent_id: uuid.UUID
@@ -303,7 +298,8 @@ async def grant_consent(
     if action == "conflict":
         raise _idempotency_conflict()
 
-    seq = await _next_sequence_no(db, user_id, now)
+    previous = await _highest_consent_row(db, user_id)
+    seq = (previous.sequence_no + 1) if previous is not None else 1
     row = AgentCloudConsent(
         user_id=_to_uuid(user_id),
         purpose=AGENT_CLOUD_PROCESSING_PURPOSE,
@@ -368,12 +364,15 @@ async def withdraw_consent(
     if action == "conflict":
         raise _idempotency_conflict()
 
-    seq = await _next_sequence_no(db, user_id, now)
+    previous = await _highest_consent_row(db, user_id)
+    seq = (previous.sequence_no + 1) if previous is not None else 1
     row = AgentCloudConsent(
         user_id=_to_uuid(user_id),
         purpose=AGENT_CLOUD_PROCESSING_PURPOSE,
-        provider_id="",
-        disclosure_version="",
+        provider_id=previous.provider_id if previous is not None else "",
+        disclosure_version=(
+            previous.disclosure_version if previous is not None else ""
+        ),
         status=CONSENT_WITHDRAWN,
         sequence_no=seq,
     )
@@ -484,6 +483,19 @@ async def record_tool_event(
 
     Never accepts raw arguments or a Tool result payload.
     """
+    owned_run = (
+        await db.execute(
+            select(AgentRun.run_id).where(
+                AgentRun.run_id
+                == (_to_uuid(run_id) if not isinstance(run_id, uuid.UUID) else run_id),
+                AgentRun.user_id == _to_uuid(user_id),
+            )
+        )
+    ).scalar_one_or_none()
+    if owned_run is None:
+        raise AppException(
+            404, "未找到可访问的对应内容", ResultCode.ENTITY_NOT_FOUND
+        )
     event = AgentToolEvent(
         run_id=_to_uuid(run_id) if not isinstance(run_id, uuid.UUID) else run_id,
         user_id=_to_uuid(user_id),
@@ -590,6 +602,7 @@ async def create_proposal(
     tool_name: str,
     arguments_json: dict,
     arguments_hash: str,
+    iana_timezone: str,
     context_fingerprint: Optional[str] = None,
     fingerprint_key_version: Optional[str] = None,
     context_version: Optional[str] = None,
@@ -599,27 +612,75 @@ async def create_proposal(
 ) -> ProposalCreate:
     """Create one owned pending proposal. No domain write occurs here.
 
-    Arguments are typed/bounded and contain no free text/secrets/actor IDs
-    (enforced by the strict action schemas). Only ``pending`` retains them.
+    The persistence boundary independently validates and normalizes the closed
+    write-action schema, recomputes the keyed argument fingerprint, verifies
+    run ownership/current consent, and serializes creation with withdrawal and
+    Agent-data deletion. Only ``pending`` retains arguments.
     """
+    from app.agent import action_tools
+
     now = now or _now()
+    if not validate_iana_timezone(iana_timezone):
+        raise AppException(400, "时区标识无效", ResultCode.INVALID_TIMEZONE)
+    try:
+        validated = action_tools.validate_arguments(tool_name, arguments_json)
+        computed_arguments = action_tools.compute_arguments_fingerprint(validated)
+    except AgentError as exc:
+        raise AppException(400, "操作参数无效", exc.code) from exc
+    if not hmac.compare_digest(arguments_hash, computed_arguments.value):
+        raise AppException(409, "操作参数校验失败", AGENT_CONTEXT_STALE)
+    if (
+        fingerprint_key_version is not None
+        and fingerprint_key_version != computed_arguments.key_version
+    ):
+        raise AppException(409, "指纹密钥版本不一致", AGENT_CONTEXT_STALE)
+
+    await acquire_user_transaction_lock(db, user_id)
+    owned_run = (
+        await db.execute(
+            select(AgentRun.run_id).where(
+                AgentRun.run_id
+                == (_to_uuid(run_id) if not isinstance(run_id, uuid.UUID) else run_id),
+                AgentRun.user_id == _to_uuid(user_id),
+            )
+        )
+    ).scalar_one_or_none()
+    if owned_run is None:
+        raise AppException(
+            404, "未找到可访问的对应内容", ResultCode.ENTITY_NOT_FOUND
+        )
+    if not (await active_consent(db, user_id)).active:
+        raise AppException(409, "需要有效的云处理同意", "agent_consent_required")
+    existing = (
+        await db.execute(
+            select(AgentActionProposal.proposal_id).where(
+                AgentActionProposal.run_id == owned_run
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise AppException(409, "该轮次已存在操作提案", "agent_proposal_already_exists")
+
     expires_at = now + (ttl or PROPOSAL_TTL)
     proposal = AgentActionProposal(
         run_id=_to_uuid(run_id) if not isinstance(run_id, uuid.UUID) else run_id,
         user_id=_to_uuid(user_id),
         tool_name=tool_name,
-        arguments_json=arguments_json,
-        arguments_hash=arguments_hash,
+        arguments_json=validated.model_dump(mode="json"),
+        arguments_hash=computed_arguments.value,
         context_fingerprint=context_fingerprint,
-        fingerprint_key_version=fingerprint_key_version,
+        fingerprint_key_version=computed_arguments.key_version,
         context_version=context_version,
         policy_version=policy_version,
+        iana_timezone=iana_timezone,
         status=PROPOSAL_PENDING,
         expires_at=expires_at,
     )
     db.add(proposal)
     await db.commit()
-    return ProposalCreate(proposal.proposal_id, expires_at, arguments_hash)
+    return ProposalCreate(
+        proposal.proposal_id, expires_at, computed_arguments.value
+    )
 
 
 async def load_owned_proposal(
@@ -924,7 +985,7 @@ async def confirm_proposal(
     proposal_id,
     *,
     idempotency_key: str,
-    iana_timezone: str,
+    iana_timezone: Optional[str] = None,
     now: Optional[datetime] = None,
 ) -> ConfirmationResult:
     """Execute one owned pending proposal after authenticated confirmation.
@@ -959,9 +1020,36 @@ async def confirm_proposal(
     )
     if action == "replay":
         result_ref = record.result_ref or None
-        rec_status = record.status
+        proposal_result_ref = proposal.result_ref or None
+        inconsistent = (
+            proposal.status == PROPOSAL_PENDING
+            or result_ref != proposal_result_ref
+        )
+        domain_operation = action_tools.domain_operation_for(proposal.tool_name)
+        if not inconsistent and proposal.status == PROPOSAL_EXECUTED and domain_operation:
+            domain_record = (
+                await db.execute(
+                    select(IdempotencyRecord).where(
+                        IdempotencyRecord.user_id == _to_uuid(user_id),
+                        IdempotencyRecord.operation == domain_operation,
+                        IdempotencyRecord.idempotency_key
+                        == _domain_idempotency_key(proposal.proposal_id),
+                    )
+                )
+            ).scalar_one_or_none()
+            inconsistent = (
+                domain_record is None
+                or (domain_record.result_ref or None) != proposal_result_ref
+            )
+        result_code = proposal.result_code or record.status or "replayed"
         await db.rollback()
-        return ConfirmationResult(pid, "replayed", result_ref, rec_status or "replayed")
+        if inconsistent:
+            raise AppException(
+                409,
+                "幂等记录状态不一致",
+                AGENT_IDEMPOTENCY_INCONSISTENT,
+            )
+        return ConfirmationResult(pid, "replayed", result_ref, result_code)
     if action == "conflict":
         raise _idempotency_conflict()
 
@@ -983,13 +1071,47 @@ async def confirm_proposal(
     # (proceed path continues below)
 
     # Latest-context revalidation (deterministic; may raise on safety/stale).
-    arguments = action_tools.validate_arguments(
-        proposal.tool_name, proposal.arguments_json
-    )
+    stored_timezone = proposal.iana_timezone
+    if iana_timezone is not None and iana_timezone != stored_timezone:
+        return await _reject_proposal(
+            db,
+            proposal,
+            result_code=ResultCode.INVALID_TIMEZONE,
+            now=now,
+            confirm_key=idempotency_key,
+            confirm_request_hash=confirm_hash,
+        )
+    try:
+        arguments = action_tools.validate_arguments(
+            proposal.tool_name, proposal.arguments_json
+        )
+        current_arguments_fp = action_tools.compute_arguments_fingerprint(arguments)
+    except AgentError as exc:
+        return await _reject_proposal(
+            db,
+            proposal,
+            result_code=exc.code,
+            now=now,
+            confirm_key=idempotency_key,
+            confirm_request_hash=confirm_hash,
+        )
+    if (
+        not hmac.compare_digest(current_arguments_fp.value, proposal.arguments_hash)
+        or current_arguments_fp.key_version
+        != (proposal.fingerprint_key_version or "")
+    ):
+        return await _reject_proposal(
+            db,
+            proposal,
+            result_code=AGENT_CONTEXT_STALE,
+            now=now,
+            confirm_key=idempotency_key,
+            confirm_request_hash=confirm_hash,
+        )
     try:
         prepared = await action_tools.prepare(
             db, proposal.tool_name, arguments, user_id,
-            iana_timezone=iana_timezone, now=now,
+            iana_timezone=stored_timezone, now=now,
         )
     except AppException as exc:
         return await _reject_proposal(
@@ -1024,7 +1146,14 @@ async def confirm_proposal(
                 confirm_key=idempotency_key, confirm_request_hash=confirm_hash,
             )
         if dom_action == "conflict":
-            raise _idempotency_conflict()
+            return await _reject_proposal(
+                db,
+                proposal,
+                result_code=AGENT_IDEMPOTENCY_INCONSISTENT,
+                now=now,
+                confirm_key=idempotency_key,
+                confirm_request_hash=confirm_hash,
+            )
 
     # Execute the transaction-neutral domain side effect (flush only). A
     # deterministic rejection raised by the executor (e.g. an existing

@@ -163,8 +163,8 @@ class AgentRun(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    expires_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -226,6 +226,9 @@ class AgentActionProposal(Base):
     expiry scrubs (NULLs) the arguments. Arguments never contain free text,
     photos, secrets, actor IDs, or safety claims (enforced by the strict
     ``extra="forbid"`` action schemas in ``app.agent.schemas``).
+    ``run_id`` is unique (one proposal per turn), and ``iana_timezone`` is
+    validated server-owned turn metadata used to rebuild current-day context at
+    confirmation; it is never a provider argument.
 
     Confirmation reuses the shared ``idempotency_records`` operation
     ``agent_action_confirm``. ``arguments_hash``/context/request fingerprints
@@ -236,6 +239,7 @@ class AgentActionProposal(Base):
 
     __tablename__ = "agent_action_proposals"
     __table_args__ = (
+        UniqueConstraint("run_id", name="uq_agent_action_proposals_run"),
         Index(
             "ix_agent_action_proposals_user_status",
             "user_id",
@@ -271,6 +275,7 @@ class AgentActionProposal(Base):
     context_fingerprint: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True
     )
+    iana_timezone: Mapped[str] = mapped_column(String(60), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

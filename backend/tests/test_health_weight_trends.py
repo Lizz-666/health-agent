@@ -437,6 +437,7 @@ async def test_weight_button_and_agent_share_transaction_neutral_core(monkeypatc
             db, run_id=run.run_id, user_id=uid, tool_name=S.CREATE_WEIGHT_RECORD,
             arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
             context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
+            iana_timezone="Asia/Shanghai",
         )
         await db.commit()
         res = await ap.confirm_proposal(db, uid, prop.proposal_id, idempotency_key="c1", iana_timezone="Asia/Shanghai")

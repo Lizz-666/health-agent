@@ -917,6 +917,7 @@ async def test_pg_account_deletion_purges_agent_tables(pg_session):
         entry_type="general",
         status="completed",
         started_at=now,
+        expires_at=now + timedelta(days=30),
     )
     pg_session.add(run)
     await pg_session.flush()
@@ -936,6 +937,7 @@ async def test_pg_account_deletion_purges_agent_tables(pg_session):
             tool_name="create_weight_record",
             arguments_json={"weight_kg": 70.0},
             arguments_hash="h",
+            iana_timezone="Asia/Shanghai",
             status="pending",
             expires_at=now + timedelta(minutes=15),
         )
