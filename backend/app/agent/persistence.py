@@ -857,6 +857,220 @@ async def delete_agent_data(
     return AgentDataDeletionResult(cc, rr, te, pp, ide)
 
 
+# --------------------------------------------------------------------------- #
+# Confirmed write execution (Task 3)                                          #
+# --------------------------------------------------------------------------- #
+#
+# ``confirm_proposal`` executes one owned pending proposal inside a single unit
+# of work: per-user lock -> lazy expiry -> consent check -> agent_action_confirm
+# idempotency -> latest-context revalidation + fingerprint comparison ->
+# (training) domain two-layer idempotency consistency -> transaction-neutral
+# domain side effect (flush only) -> tool event + proposal terminal state +
+# commit. A deterministic stale/safety/validation rejection invalidates +
+# scrubs the proposal with NO domain write; a transient exception rolls the
+# whole unit of work back and leaves the proposal pending/retriable.
+
+AGENT_CONTEXT_STALE = "agent_context_stale"
+AGENT_IDEMPOTENCY_INCONSISTENT = "agent_idempotency_inconsistent"
+
+
+@dataclass(frozen=True)
+class ConfirmationResult:
+    proposal_id: uuid.UUID
+    status: str  # executed | invalidated | replayed | expired
+    result_ref: Optional[str]
+    result_code: str
+
+
+def _domain_idempotency_key(proposal_id) -> str:
+    """Server-derived per-proposal domain idempotency key (training two-layer).
+
+    Reuses the existing plan_generate/session_substitute/session_feedback
+    namespaces with a derived key scoped to this proposal (spec Persistence).
+    """
+    pid = proposal_id if isinstance(proposal_id, uuid.UUID) else uuid.UUID(str(proposal_id))
+    return f"agent:{pid}"
+
+
+def _agent_confirm_request_hash(proposal_id) -> str:
+    pid = proposal_id if isinstance(proposal_id, uuid.UUID) else uuid.UUID(str(proposal_id))
+    return hash_request({"op": "agent_action_confirm", "proposal_id": str(pid)})
+
+
+async def _reject_proposal(
+    db: AsyncSession,
+    proposal: AgentActionProposal,
+    *,
+    result_code: str,
+    now: datetime,
+    confirm_key: Optional[str] = None,
+    confirm_request_hash: Optional[str] = None,
+) -> ConfirmationResult:
+    """Deterministic rejection: invalidate + scrub the proposal with NO domain
+    write, optionally record the agent_action_confirm terminal result, commit."""
+    mark_invalidated(proposal, result_code=result_code, now=now)
+    if confirm_key is not None and confirm_request_hash is not None:
+        await _record_idempotency(
+            db, str(proposal.user_id), OP_AGENT_ACTION_CONFIRM, confirm_key,
+            confirm_request_hash, "", now, status="invalidated",
+        )
+    await db.commit()
+    return ConfirmationResult(proposal.proposal_id, PROPOSAL_INVALIDATED, None, result_code)
+
+
+async def confirm_proposal(
+    db: AsyncSession,
+    user_id: str,
+    proposal_id,
+    *,
+    idempotency_key: str,
+    iana_timezone: str,
+    now: Optional[datetime] = None,
+) -> ConfirmationResult:
+    """Execute one owned pending proposal after authenticated confirmation.
+
+    Re-validates the latest context/safety, enforces two-layer idempotency
+    (training) or single-layer (health), and atomically records the domain
+    result, Tool event, idempotency, and proposal terminal state. The model
+    never calls this; only the authenticated confirmation API does.
+    """
+    from app.agent import action_tools
+
+    now = now or _now()
+    await acquire_user_transaction_lock(db, user_id)
+
+    # Lazy expiry at the confirm boundary.
+    proposal, expired_now = await load_pending_owned_proposal(db, user_id, proposal_id, now)
+    if proposal is None:
+        raise AppException(404, "未找到可访问的对应内容", "agent_entity_not_found")
+    pid = proposal.proposal_id
+    if expired_now or proposal.status == PROPOSAL_EXPIRED:
+        await db.commit()
+        return ConfirmationResult(pid, PROPOSAL_EXPIRED, None, "agent_action_expired")
+
+    # Agent-layer idempotency (agent_action_confirm) is resolved FIRST so that a
+    # same-key replay returns the recorded terminal result read-only (even for a
+    # proposal that has since reached a terminal state), before any consent or
+    # status rejection. Attributes are captured before the lock-releasing
+    # rollback so no expired-object lazy load occurs.
+    confirm_hash = _agent_confirm_request_hash(pid)
+    action, record = await _check_idempotency(
+        db, user_id, OP_AGENT_ACTION_CONFIRM, idempotency_key, confirm_hash, now
+    )
+    if action == "replay":
+        result_ref = record.result_ref or None
+        rec_status = record.status
+        await db.rollback()
+        return ConfirmationResult(pid, "replayed", result_ref, rec_status or "replayed")
+    if action == "conflict":
+        raise _idempotency_conflict()
+
+    # Not a replay. A non-pending proposal cannot be (re)executed with a new key.
+    if proposal.status != PROPOSAL_PENDING:
+        status = proposal.status
+        rref = proposal.result_ref
+        rcode = proposal.result_code
+        await db.rollback()
+        return ConfirmationResult(pid, status, rref, rcode or "agent_action_invalidated")
+
+    consent = await active_consent(db, user_id)
+    if not consent.active:
+        return await _reject_proposal(
+            db, proposal, result_code="agent_consent_required", now=now,
+            confirm_key=idempotency_key, confirm_request_hash=confirm_hash,
+        )
+
+    # (proceed path continues below)
+
+    # Latest-context revalidation (deterministic; may raise on safety/stale).
+    arguments = action_tools.validate_arguments(
+        proposal.tool_name, proposal.arguments_json
+    )
+    try:
+        prepared = await action_tools.prepare(
+            db, proposal.tool_name, arguments, user_id,
+            iana_timezone=iana_timezone, now=now,
+        )
+    except AppException as exc:
+        return await _reject_proposal(
+            db, proposal, result_code=exc.code or "agent_action_invalidated", now=now,
+            confirm_key=idempotency_key, confirm_request_hash=confirm_hash,
+        )
+
+    # Context-fingerprint staleness: the context the user saw must match now.
+    current_fp = action_tools.compute_context_fingerprint(prepared.context_fingerprint_payload)
+    if (
+        proposal.context_fingerprint is None
+        or current_fp.value != proposal.context_fingerprint
+        or (proposal.fingerprint_key_version or "") != current_fp.key_version
+    ):
+        return await _reject_proposal(
+            db, proposal, result_code=AGENT_CONTEXT_STALE, now=now,
+            confirm_key=idempotency_key, confirm_request_hash=confirm_hash,
+        )
+
+    # Domain two-layer idempotency (training only).
+    domain_key: Optional[str] = None
+    if prepared.domain_operation:
+        domain_key = _domain_idempotency_key(proposal.proposal_id)
+        dom_action, dom_record = await _check_idempotency(
+            db, user_id, prepared.domain_operation, domain_key,
+            prepared.domain_request_hash, now,
+        )
+        if dom_action == "replay":
+            # Domain already recorded but agent did not -> partial inconsistency.
+            return await _reject_proposal(
+                db, proposal, result_code=AGENT_IDEMPOTENCY_INCONSISTENT, now=now,
+                confirm_key=idempotency_key, confirm_request_hash=confirm_hash,
+            )
+        if dom_action == "conflict":
+            raise _idempotency_conflict()
+
+    # Execute the transaction-neutral domain side effect (flush only). A
+    # deterministic rejection raised by the executor (e.g. an existing
+    # abnormal-pain safety signal surfacing at execution time) invalidates the
+    # proposal with NO domain write; a transient exception propagates and rolls
+    # the whole unit of work back, leaving the proposal pending/retriable.
+    try:
+        execution = await prepared.execute()
+    except AppException as exc:
+        return await _reject_proposal(
+            db, proposal, result_code=exc.code or "agent_action_invalidated", now=now,
+            confirm_key=idempotency_key, confirm_request_hash=confirm_hash,
+        )
+    result_ref = execution.result_ref
+
+    # Record domain idempotency (training two-layer) + agent idempotency.
+    if prepared.domain_operation and domain_key is not None:
+        await _record_idempotency(
+            db, user_id, prepared.domain_operation, domain_key,
+            prepared.domain_request_hash, execution.domain_result_ref or result_ref, now,
+        )
+    await _record_idempotency(
+        db, user_id, OP_AGENT_ACTION_CONFIRM, idempotency_key, confirm_hash,
+        result_ref, now,
+    )
+
+    # Tool event + proposal terminal state.
+    await record_tool_event(
+        db,
+        run_id=proposal.run_id,
+        user_id=user_id,
+        tool_name=proposal.tool_name,
+        side_effect_class="write",
+        status=execution.result_code,
+        request_fingerprint=proposal.arguments_hash,
+        fingerprint_key_version=proposal.fingerprint_key_version,
+        result_code=execution.result_code,
+        result_ref=result_ref,
+    )
+    mark_executed(proposal, result_ref=result_ref, result_code=execution.result_code, now=now)
+    await db.commit()
+    return ConfirmationResult(
+        proposal.proposal_id, PROPOSAL_EXECUTED, result_ref, execution.result_code
+    )
+
+
 __all__ = [
     "OP_AGENT_ACTION_CONFIRM",
     "OP_AGENT_CONSENT_GRANT",
@@ -885,4 +1099,8 @@ __all__ = [
     "cleanup_expired_runs",
     "AgentDataDeletionResult",
     "delete_agent_data",
+    "AGENT_CONTEXT_STALE",
+    "AGENT_IDEMPOTENCY_INCONSISTENT",
+    "ConfirmationResult",
+    "confirm_proposal",
 ]

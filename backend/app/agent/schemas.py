@@ -19,11 +19,19 @@ positionally into server code and are not model-controllable parameters.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.health.schemas import (
+    AvailableTime,
+    DailyStatus,
+    Energy,
+    MuscleSoreness,
+    SleepQuality,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -613,6 +621,140 @@ class ResolvedContext:
     fingerprint_payload: Dict[str, object] = field(default_factory=dict)
 
 
+# --------------------------------------------------------------------------- #
+# Write action contracts (Task 3)                                             #
+# --------------------------------------------------------------------------- #
+#
+# Exactly five server-side write actions. Each has a strict (``extra="forbid"``)
+# typed Arguments model carrying ONLY the provider-typeable domain values: no
+# actor/user_id, no server time, no policy/consent/fingerprint fields, and no
+# free text. Arguments are bounded and stored only while a proposal is pending.
+# A deterministic typed Diff is rendered server-side from these values; the
+# provider never supplies the diff or any user-visible prose.
+
+# The closed set of allowed write action tool names (server-side registry only;
+# never registered in the provider-exposed read registry).
+UPSERT_TODAY_CHECKIN = "upsert_today_checkin"
+CREATE_WEIGHT_RECORD = "create_weight_record"
+GENERATE_TRAINING_PLAN_DRAFT = "generate_training_plan_draft"
+SUBSTITUTE_TODAY_EXERCISE = "substitute_today_exercise"
+RECORD_TRAINING_FEEDBACK = "record_training_feedback"
+WRITE_ACTION_NAMES = (
+    UPSERT_TODAY_CHECKIN,
+    CREATE_WEIGHT_RECORD,
+    GENERATE_TRAINING_PLAN_DRAFT,
+    SUBSTITUTE_TODAY_EXERCISE,
+    RECORD_TRAINING_FEEDBACK,
+)
+
+
+class WriteActionArguments(BaseModel):
+    """Base for all write-action argument models: strict and identity-free."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class UpsertTodayCheckinArguments(WriteActionArguments):
+    """Ordinary check-in only: ``abnormal_pain`` is implicitly false and there
+    are NO pain fields (no ``pain_followup`` / ``pain_area`` / ``pain_note``).
+    A pain report uses the dedicated structured check-in/safety flow, never this
+    action. The enums are reused from the health domain so parity is exact."""
+
+    local_date: date
+    sleep_quality: SleepQuality
+    energy: Energy
+    muscle_soreness: MuscleSoreness
+    available_time: AvailableTime
+    daily_status: DailyStatus
+
+
+class CreateWeightRecordArguments(WriteActionArguments):
+    """One manual weight record. ``note`` is forced null and is NOT a field; any
+    free text is rejected (spec Tool Registry And Permission Matrix)."""
+
+    recorded_at: datetime
+    weight_kg: float = Field(..., ge=20.0, le=300.0)
+
+
+class GenerateTrainingPlanDraftArguments(WriteActionArguments):
+    """Create/replace a pending plan draft. Activation still requires Phase 4's
+    independent plan-review confirmation; the Agent never activates a plan."""
+
+    fitness_goal: str = Field(..., min_length=1, max_length=30)
+    weekly_frequency: int = Field(..., ge=2, le=5)
+    session_duration_minutes: int = Field(..., ge=15, le=60)
+    equipment_bodyweight: bool
+    equipment_resistance_band: bool
+
+
+class SubstituteTodayExerciseArguments(WriteActionArguments):
+    """One current-day, owned, revalidated exercise substitution."""
+
+    original_exercise_id: str = Field(..., min_length=1, max_length=60)
+    replacement_exercise_id: str = Field(..., min_length=1, max_length=60)
+
+
+class RecordTrainingFeedbackArguments(WriteActionArguments):
+    """One current-day, owned session outcome. A pain/discomfort report routes
+    to the dedicated safety flow, so ``discomfort`` is intentionally NOT an
+    ordinary Agent feedback outcome (spec Tool Registry And Permission Matrix)."""
+
+    outcome_state: Literal["completed", "partial", "too_busy", "intentional_rest"]
+
+
+# --- deterministic typed diffs (server-rendered; no provider free text) -----
+
+
+class WriteActionDiff(BaseModel):
+    """Base for server-rendered write-action diffs (typed values only)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: str
+    summary_code: str
+
+
+class UpsertTodayCheckinDiff(WriteActionDiff):
+    local_date: date
+    abnormal_pain: bool = False
+
+
+class CreateWeightRecordDiff(WriteActionDiff):
+    recorded_at: datetime
+    weight_kg: float
+
+
+class GenerateTrainingPlanDraftDiff(WriteActionDiff):
+    fitness_goal: str
+    weekly_frequency: int
+    session_duration_minutes: int
+    requires_plan_review: bool = True
+
+
+class SubstituteTodayExerciseDiff(WriteActionDiff):
+    session_id: Optional[str] = None
+    original_exercise_id: str
+    replacement_exercise_id: str
+
+
+class RecordTrainingFeedbackDiff(WriteActionDiff):
+    session_id: Optional[str] = None
+    outcome_state: str
+
+
+# --- typed execution results (returned to the caller, never provider prose) -
+
+
+class WriteActionResult(BaseModel):
+    """Base for write-action execution results."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action: str
+    status: str  # "executed" | "replayed"
+    result_ref: Optional[str] = None
+
+
 __all__ = [
     "EntryType",
     "SideEffectClass",
@@ -661,4 +803,23 @@ __all__ = [
     "ReadToolResult",
     "ContextProviderView",
     "ResolvedContext",
+    "UPSERT_TODAY_CHECKIN",
+    "CREATE_WEIGHT_RECORD",
+    "GENERATE_TRAINING_PLAN_DRAFT",
+    "SUBSTITUTE_TODAY_EXERCISE",
+    "RECORD_TRAINING_FEEDBACK",
+    "WRITE_ACTION_NAMES",
+    "WriteActionArguments",
+    "UpsertTodayCheckinArguments",
+    "CreateWeightRecordArguments",
+    "GenerateTrainingPlanDraftArguments",
+    "SubstituteTodayExerciseArguments",
+    "RecordTrainingFeedbackArguments",
+    "WriteActionDiff",
+    "UpsertTodayCheckinDiff",
+    "CreateWeightRecordDiff",
+    "GenerateTrainingPlanDraftDiff",
+    "SubstituteTodayExerciseDiff",
+    "RecordTrainingFeedbackDiff",
+    "WriteActionResult",
 ]

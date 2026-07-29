@@ -8,6 +8,7 @@ deletion, and the "free-text note never overrides safety" invariant.
 
 import pytest
 
+import app.agent.models  # noqa: F401  (Phase 5 spy test needs the Agent tables)
 from app.auth.models import VerificationCode
 from sqlalchemy import select
 from tests.conftest import TestSession
@@ -564,3 +565,84 @@ async def test_delete_invalid_uuid_is_422(client):
         f"{CHECKINS}/not-a-uuid", headers=_auth_header(token)
     )
     assert resp.status_code == 422, resp.text
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 Task 3: chat and button share the transaction-neutral core.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_checkin_button_and_agent_share_transaction_neutral_core(monkeypatch):
+    """Both the committing API wrapper and the Agent confirmation executor call
+    the same ``upsert_today_core`` (ADR-0003; spec Write Confirmation)."""
+    import uuid as _uuid
+    from datetime import date
+
+    import app.health.service as hsvc
+    from app.agent import action_tools as at
+    from app.agent import persistence as ap
+    from app.agent import schemas as S
+    from app.auth.models import User
+    from app.core.config import settings
+    from app.health.schemas import CheckInCreate
+    from app.health.schemas import (
+        AvailableTime,
+        DailyStatus,
+        Energy,
+        MuscleSoreness,
+        SleepQuality,
+    )
+
+    monkeypatch.setattr(settings, "AGENT_AUDIT_HMAC_KEY", "spy-key-0123456789abcdef")
+    monkeypatch.setattr(settings, "AGENT_AUDIT_HMAC_KEY_VERSION", "v1")
+
+    calls = []
+    real = hsvc.upsert_today_core
+
+    async def spy(db, user_id, data):
+        calls.append("core")
+        return await real(db, user_id, data)
+
+    monkeypatch.setattr(hsvc, "upsert_today_core", spy)
+    monkeypatch.setattr(at, "upsert_today_core", spy, raising=False)
+
+    async with TestSession() as db:
+        user = User(phone="139" + _uuid.uuid4().hex[:8])
+        db.add(user)
+        await db.flush()
+        uid = str(user.id)
+        await ap.grant_consent(
+            db, uid, accepted_provider_id="prov", accepted_disclosure_version="d1",
+            current_provider_id="prov", current_disclosure_version="d1",
+            idempotency_key="ck",
+        )
+        data = CheckInCreate(
+            local_date=date(2026, 7, 29),
+            sleep_quality=SleepQuality("good"), energy=Energy("high"),
+            muscle_soreness=MuscleSoreness("none"), available_time=AvailableTime("30_min"),
+            daily_status=DailyStatus("checked_in"), abnormal_pain=False,
+        )
+        # Button path.
+        await hsvc.upsert_today(db, uid, data)
+        assert calls.count("core") == 1
+
+        # Agent path: a different local date so it is a new check-in.
+        args = S.UpsertTodayCheckinArguments(
+            local_date=date(2026, 7, 30), sleep_quality=SleepQuality("good"),
+            energy=Energy("high"), muscle_soreness=MuscleSoreness("none"),
+            available_time=AvailableTime("30_min"), daily_status=DailyStatus("checked_in"),
+        )
+        afp = at.compute_arguments_fingerprint(args)
+        prepared = await at.prepare(db, S.UPSERT_TODAY_CHECKIN, args, uid, iana_timezone="Asia/Shanghai")
+        cfp = at.compute_context_fingerprint(prepared.context_fingerprint_payload)
+        run = (await ap.record_run(db, uid, client_turn_id="t1", entry_type="general")).run
+        prop = await ap.create_proposal(
+            db, run_id=run.run_id, user_id=uid, tool_name=S.UPSERT_TODAY_CHECKIN,
+            arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
+            context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
+        )
+        await db.commit()
+        res = await ap.confirm_proposal(db, uid, prop.proposal_id, idempotency_key="c1", iana_timezone="Asia/Shanghai")
+        assert res.status == "executed"
+        assert calls.count("core") == 2  # button + agent both used the core

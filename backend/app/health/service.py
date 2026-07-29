@@ -253,20 +253,17 @@ async def get_today(
     return CheckInTodayResultResponse(checked_in=True, checkin=_checkin_response(row))
 
 
-async def upsert_today(
+async def upsert_today_core(
     db: AsyncSession, user_id: str, data: CheckInCreate
 ) -> CheckInResponse:
-    """Create or fully replace the caller's check-in for ``data.local_date``.
+    """Transaction-neutral core of ``upsert_today``.
 
-    Safety gates (deterministic):
-    - ``abnormal_pain=true`` requires a complete ``pain_followup``; otherwise a
-      ``pain_followup_required`` error is raised and nothing is stored.
-    - ``abnormal_pain=false`` discards any supplied follow-up (stored as None).
-    - ``risk_summary`` is computed deterministically from the structured
-      follow-up signals plus the profile ``restricted`` qualifier, then stored.
-
-    At most one check-in per user per local_date: an existing row for that date
-    is replaced in place; a different date creates a new row.
+    Performs the deterministic safety gate, classification, and the insert/
+    in-place replace, then ``flush`` + ``refresh`` so the caller receives the
+    fully-populated row. It does NOT commit: the existing committing API
+    wrapper and the Agent confirmation path both call this core so chat and
+    button behaviour share one operation (ADR-0003; spec Write Confirmation
+    Semantics). No business rule is duplicated.
     """
     if data.abnormal_pain and data.pain_followup is None:
         raise AppException(
@@ -316,9 +313,22 @@ async def upsert_today(
         row.risk_summary = risk.risk_summary
         row.risk_version = risk.risk_version
 
-    await db.commit()
+    await db.flush()
     await db.refresh(row)
     return _checkin_response(row)
+
+
+async def upsert_today(
+    db: AsyncSession, user_id: str, data: CheckInCreate
+) -> CheckInResponse:
+    """Create or fully replace the caller's check-in for ``data.local_date``.
+
+    Thin committing wrapper around ``upsert_today_core``; existing button/API
+    behaviour and signature are unchanged.
+    """
+    response = await upsert_today_core(db, user_id, data)
+    await db.commit()
+    return response
 
 
 async def list_checkins(
@@ -416,13 +426,15 @@ def _recorded_at_bounds(
     return start_dt, end_dt
 
 
-async def create_weight_record(
+async def create_weight_record_core(
     db: AsyncSession, user_id: str, data: WeightRecordCreate
 ) -> WeightRecordResponse:
-    """Create one manual weight record for the caller.
+    """Transaction-neutral core of ``create_weight_record``.
 
-    ``source`` is forced to ``manual`` server-side (never client-set). Raw
-    weight values are never logged.
+    Inserts the row and ``flush`` + ``refresh`` without committing. Both the
+    committing API wrapper and the Agent confirmation path call this core
+    (ADR-0003). ``source`` is forced to ``manual`` server-side; raw weight
+    values are never logged.
     """
     user_uuid = _to_uuid(user_id)
     row = WeightRecord(
@@ -433,9 +445,22 @@ async def create_weight_record(
         note=data.note,
     )
     db.add(row)
-    await db.commit()
+    await db.flush()
     await db.refresh(row)
     return _weight_response(row)
+
+
+async def create_weight_record(
+    db: AsyncSession, user_id: str, data: WeightRecordCreate
+) -> WeightRecordResponse:
+    """Create one manual weight record for the caller.
+
+    Thin committing wrapper around ``create_weight_record_core``; existing
+    button/API behaviour and signature are unchanged.
+    """
+    response = await create_weight_record_core(db, user_id, data)
+    await db.commit()
+    return response
 
 
 async def list_weight_records(

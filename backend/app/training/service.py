@@ -13,6 +13,7 @@ or another user's identifiers.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Tuple
@@ -41,6 +42,7 @@ from app.training.schemas_api import (
     ConfirmResponse,
     DraftResponse,
     ExerciseView,
+    FeedbackRequest,
     FeedbackResponse,
     PlanVersionView,
     PrescriptionView,
@@ -753,6 +755,211 @@ async def record_substitution(db: AsyncSession, user_id: str, session_id: str,
     return SubstitutionResponse(substitution_id=str(result.substitution_id), status=result.status)
 
 
+# --- transaction-neutral evaluation helpers (shared by button + Agent) --------
+#
+# Each ``evaluate_*`` function re-runs the LATEST deterministic safety/validation
+# against current structured data and returns the resolved inputs needed to
+# persist, WITHOUT persisting or committing. The committing button flow and the
+# Agent confirmation path both call these so chat and button share one validation
+# path (ADR-0003; spec Write Confirmation Semantics). ``request_hash`` is the
+# domain idempotency request hash for the operation.
+
+
+@dataclass
+class DraftEvaluation:
+    draft: TrainingPlanDraft
+    weekly_frequency: int
+    session_duration_minutes: int
+    decision_gate: str
+    decision_fingerprint: str
+    request_hash: str
+
+
+async def evaluate_draft_request(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    fitness_goal: str,
+    weekly_frequency: int,
+    session_duration_minutes: int,
+    equipment_bodyweight: bool,
+    equipment_resistance_band: bool,
+    iana_timezone: str,
+    now: Optional[datetime] = None,
+) -> DraftEvaluation:
+    """Re-validate a draft-generation request against the latest context and
+    deterministically generate the draft without persisting. Raises on any
+    blocking gate. Reused by the button flow and the Agent confirmation path."""
+    now = now or _utc_now()
+    request_hash = P.hash_request(
+        {
+            "op": "draft",
+            "fitness_goal": fitness_goal,
+            "weekly_frequency": weekly_frequency,
+            "session_duration_minutes": session_duration_minutes,
+            "equipment_bodyweight": equipment_bodyweight,
+            "equipment_resistance_band": equipment_resistance_band,
+            "iana_timezone": iana_timezone,
+        }
+    )
+    request = _request_snapshot(
+        fitness_goal, weekly_frequency, session_duration_minutes,
+        equipment_bodyweight, equipment_resistance_band, iana_timezone, now,
+    )
+    ctx, decision = await _classify(db, user_id, request, now)
+    cat = catalog()
+    candidates = select_candidates(ctx, decision, cat, TRAINING_POLICY, SAFETY_POLICY)
+    result = generate_plan_draft(ctx, decision, candidates, cat, TRAINING_POLICY, SAFETY_POLICY)
+    if not result.ok:
+        _raise_from_reason(result.reason_codes[0])
+        raise AssertionError  # _raise_from_reason always raises
+    return DraftEvaluation(
+        draft=result.draft,
+        weekly_frequency=weekly_frequency,
+        session_duration_minutes=session_duration_minutes,
+        decision_gate=decision.gate_status.value,
+        decision_fingerprint=decision.fingerprint,
+        request_hash=request_hash,
+    )
+
+
+@dataclass
+class FeedbackEvaluation:
+    plan_version_id: uuid.UUID
+    session_id: uuid.UUID
+    local_date: date
+    outcome_state: str
+    decision_fingerprint: str
+    request_hash: str
+
+
+async def evaluate_feedback(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    session_id: str,
+    outcome_state: str,
+    iana_timezone: str,
+    now: Optional[datetime] = None,
+) -> FeedbackEvaluation:
+    """Re-validate a session-feedback request against the latest context (active
+    plan, today, current safety gate) without persisting."""
+    if outcome_state not in FeedbackRequest.allowed_outcomes():
+        raise AppException(400, "执行状态无效", "invalid_outcome_state")
+    request_hash = P.hash_request(
+        {
+            "op": "feedback",
+            "session_id": session_id,
+            "outcome": outcome_state,
+            "iana_timezone": iana_timezone,
+        }
+    )
+    active, _target, local_date, _ctx, decision, _candidates = (
+        await _execution_context(db, user_id, session_id, iana_timezone)
+    )
+    return FeedbackEvaluation(
+        plan_version_id=active.plan_version_id,
+        session_id=uuid.UUID(session_id),
+        local_date=local_date,
+        outcome_state=outcome_state,
+        decision_fingerprint=decision.fingerprint,
+        request_hash=request_hash,
+    )
+
+
+@dataclass
+class SubstitutionEvaluation:
+    plan_version_id: uuid.UUID
+    session_id: uuid.UUID
+    local_date: date
+    original_exercise_id: str
+    replacement_exercise_id: str
+    relation_reason: str
+    decision_gate: str
+    decision_fingerprint: str
+    request_hash: str
+
+
+async def evaluate_substitution(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    session_id: str,
+    original_exercise_id: str,
+    replacement_exercise_id: str,
+    iana_timezone: str,
+    now: Optional[datetime] = None,
+) -> SubstitutionEvaluation:
+    """Re-validate a same-day substitution against the latest context, catalog,
+    candidate set, and plan validator without persisting. Raises on any safety,
+    ownership, or validation failure."""
+    request_hash = P.hash_request(
+        {
+            "op": "substitute",
+            "session_id": session_id,
+            "orig": original_exercise_id,
+            "repl": replacement_exercise_id,
+            "iana_timezone": iana_timezone,
+        }
+    )
+    index = _index()
+    if original_exercise_id not in index or replacement_exercise_id not in index:
+        raise AppException(400, "动作不存在", "exercise_not_found")
+    if original_exercise_id == replacement_exercise_id:
+        raise AppException(400, "替换动作不能与原动作相同", "invalid_substitution")
+    active, target, local_date, ctx, decision, candidates = (
+        await _execution_context(db, user_id, session_id, iana_timezone)
+    )
+    existing_feedback = await P.get_feedback(
+        db, user_id, target.session_id, local_date
+    )
+    if existing_feedback is not None:
+        raise AppException(409, "今天的训练反馈已经记录", "feedback_already_recorded")
+
+    prescriptions = await P.load_prescriptions(db, target.session_id)
+    original = next(
+        (p for p in prescriptions if p.exercise_id == original_exercise_id),
+        None,
+    )
+    if original is None:
+        raise AppException(400, "原动作不在今天的处方中", "original_not_prescribed")
+    source = index[original_exercise_id]
+    if replacement_exercise_id not in source.substitution_ids:
+        raise AppException(400, "该动作不是原动作的允许替代项", "substitution_not_allowed")
+    if replacement_exercise_id not in {
+        candidate.exercise_id for candidate in candidates.candidates
+    }:
+        raise AppException(409, "替代动作不符合当前安全条件", "substitution_not_safe")
+
+    effective = await _version_to_draft(
+        db, active,
+        context_fingerprint=decision.fingerprint,
+        profile_version=ctx.health.profile_version,
+    )
+    if not _apply_substitution(
+        effective, target.week_index, target.day_of_week,
+        original_exercise_id, replacement_exercise_id,
+    ):
+        raise AppException(409, "替换后的计划无法重建", "substitution_not_safe")
+    validation = validate_plan(
+        effective, ctx, decision, candidates, catalog(),
+        TRAINING_POLICY, SAFETY_POLICY,
+    )
+    if not validation.valid:
+        raise AppException(409, "替换后的计划未通过安全校验", "substitution_not_safe")
+    return SubstitutionEvaluation(
+        plan_version_id=active.plan_version_id,
+        session_id=target.session_id,
+        local_date=local_date,
+        original_exercise_id=original_exercise_id,
+        replacement_exercise_id=replacement_exercise_id,
+        relation_reason="substitution",
+        decision_gate=decision.gate_status.value,
+        decision_fingerprint=decision.fingerprint,
+        request_hash=request_hash,
+    )
+
+
 __all__ = [
     "generate_draft",
     "get_draft",
@@ -764,4 +971,10 @@ __all__ = [
     "catalog",
     "SAFETY_POLICY",
     "TRAINING_POLICY",
+    "evaluate_draft_request",
+    "evaluate_feedback",
+    "evaluate_substitution",
+    "DraftEvaluation",
+    "FeedbackEvaluation",
+    "SubstitutionEvaluation",
 ]

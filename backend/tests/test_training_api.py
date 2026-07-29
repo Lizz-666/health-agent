@@ -510,3 +510,74 @@ async def test_today_blocks_when_current_plan_validation_fails(
         assert today.state == "blocked"
         assert today.session is None
         assert today.change_reason == "safety_revalidation_failed"
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 Task 3: chat and button share the transaction-neutral core.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_draft_button_and_agent_share_transaction_neutral_core(
+        eligible_user, monkeypatch):
+    """Both the committing button flow (service.generate_draft -> P.create_draft)
+    and the Agent confirmation executor call the same ``_persist_draft_core``
+    (ADR-0003; spec Write Confirmation)."""
+    import app.agent.action_tools as at
+    import app.agent.schemas as AS
+    import app.agent.models  # noqa: F401  (Agent tables for the spy test)
+    from app.agent import persistence as agent_persistence
+    from app.core.config import settings
+    from app.training import persistence as P
+    from app.training.schemas_api import DraftRequest
+
+    monkeypatch.setattr(settings, "AGENT_AUDIT_HMAC_KEY", "spy-key-0123456789abcdef")
+    monkeypatch.setattr(settings, "AGENT_AUDIT_HMAC_KEY_VERSION", "v1")
+
+    uid, _ctx, _decision = eligible_user
+    fixed_now = datetime(2026, 7, 27, 1, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(service, "_utc_now", lambda: fixed_now)
+
+    calls = []
+    real = P._persist_draft_core
+
+    async def spy(db, user_id, **kw):
+        calls.append("core")
+        return await real(db, user_id, **kw)
+
+    monkeypatch.setattr(P, "_persist_draft_core", spy)
+
+    async with TestSession() as db:
+        await agent_persistence.grant_consent(
+            db, uid, accepted_provider_id="prov", accepted_disclosure_version="d1",
+            current_provider_id="prov", current_disclosure_version="d1",
+            idempotency_key="ck",
+        )
+        # Button path: generate_draft -> P.create_draft -> _persist_draft_core.
+        await service.generate_draft(db, uid, DraftRequest(**{**_draft_body(key="btn")}))
+        assert calls.count("core") == 1
+
+        # Agent path: build a proposal then confirm; the executor calls the core.
+        args = AS.GenerateTrainingPlanDraftArguments(
+            fitness_goal="basic_strength", weekly_frequency=3,
+            session_duration_minutes=30, equipment_bodyweight=True,
+            equipment_resistance_band=False,
+        )
+        afp = at.compute_arguments_fingerprint(args)
+        prepared = await at.prepare(
+            db, AS.GENERATE_TRAINING_PLAN_DRAFT, args, uid, iana_timezone="Asia/Shanghai"
+        )
+        cfp = at.compute_context_fingerprint(prepared.context_fingerprint_payload)
+        run = (await agent_persistence.record_run(
+            db, uid, client_turn_id="t1", entry_type="general")).run
+        prop = await agent_persistence.create_proposal(
+            db, run_id=run.run_id, user_id=uid, tool_name=AS.GENERATE_TRAINING_PLAN_DRAFT,
+            arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
+            context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
+        )
+        await db.commit()
+        res = await agent_persistence.confirm_proposal(
+            db, uid, prop.proposal_id, idempotency_key="c1", iana_timezone="Asia/Shanghai"
+        )
+        assert res.status == "executed"
+        assert calls.count("core") == 2  # button + agent both used the core
