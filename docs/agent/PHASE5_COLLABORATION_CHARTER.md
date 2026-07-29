@@ -1,9 +1,10 @@
 # Phase 5 Agent MVP Collaboration Charter
 
-> Date: 2026-07-29. Status: Gate 1 accepted; Batch B (Tasks 2-3) is the only
-> authorized implementation batch. Accepted Task 0 specification:
+> Date: 2026-07-29. Status: Gate 2 accepted; Batch C (Task 4) is next but is
+> not authorized until its explicit prompt is issued. Accepted Task 0 specification:
 > `f6c2eae59c784398fbf1ae38967be3c2ee720940`. Accepted Gate 1 implementation:
-> `3df574b7051ef9a9342816c9b116f436ddf8513c`.
+> `3df574b7051ef9a9342816c9b116f436ddf8513c`. Accepted Gate 2 implementation:
+> `57facf2a7e4589ef843645d7549b89538f1e79fe`.
 
 ## 1. Decision
 
