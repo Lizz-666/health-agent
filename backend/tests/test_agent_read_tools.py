@@ -11,6 +11,8 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, timezone
 
+import pytest
+
 from app.agent import read_tools
 from app.agent.schemas import (
     DisplayView,
@@ -21,6 +23,7 @@ from app.agent.schemas import (
     WeightTrendDisplayView,
 )
 from app.core.actor_context import ActorContext
+from app.training import service as training_service
 
 _UID = str(uuid.uuid4())
 _ACTOR = ActorContext(user_id=_UID)
@@ -367,3 +370,145 @@ async def test_every_result_uses_the_base_view_types(monkeypatch):
     result = await read_tools.adapt_health_profile_summary(None, _ACTOR)
     assert isinstance(result.provider_view, ProviderView)
     assert isinstance(result.display_view, DisplayView)
+
+
+# --------------------------------------------------------------------------- #
+# get_training_exercise: ownership-first, safety-filtered, stop-conditions     #
+# --------------------------------------------------------------------------- #
+
+
+def _session_today(exercise_id="ex1", substitution_ids=("repl1",)):
+    from app.training.schemas_api import (
+        ExerciseView,
+        PrescriptionView,
+        SessionView,
+    )
+
+    exercise = ExerciseView(
+        exercise_id=exercise_id,
+        name_en="Plank",
+        name_zh="平板支撑",
+        training_roles=["core"],
+        difficulty="beginner",
+        illustration_asset_key="",
+        illustration_alt_zh="",
+        instruction_steps=["step"],
+        form_cues=["cue"],
+        substitution_ids=list(substitution_ids),
+    )
+    return SessionView(
+        session_id="sess1",
+        week_index=1,
+        day_of_week=1,
+        session_order=0,
+        target_minutes=30,
+        prescriptions=[
+            PrescriptionView(
+                prescription_id="p1",
+                exercise_id=exercise_id,
+                sets=3,
+                reps=12,
+                duration_seconds=None,
+                rest_seconds=45,
+                relation_reason=None,
+                exercise=exercise,
+            )
+        ],
+    )
+
+
+def _today_with_session(session):
+    from app.training.schemas_api import TodayResponse
+
+    return TodayResponse(
+        state="session",
+        local_date=date(2026, 7, 30),
+        change_reason=None,
+        decision_gate="normal",
+        session=session,
+        feedback_outcome_state=None,
+        substitution_applied=False,
+    )
+
+
+async def test_exercise_non_prescribed_does_not_query_catalog(monkeypatch):
+    session = _session_today(exercise_id="ex1")
+    spy = _Spy(_today_with_session(session))
+    monkeypatch.setattr("app.training.service.get_today", spy)
+
+    catalog_calls = {"hit": False}
+    real_index = training_service._index
+
+    def _spy_index():
+        catalog_calls["hit"] = True
+        return real_index()
+
+    monkeypatch.setattr("app.training.service._index", _spy_index)
+
+    from app.agent.messages import AgentError, ResultCode
+
+    with pytest.raises(AgentError) as exc:
+        await read_tools.adapt_get_training_exercise(
+            None, _ACTOR, "Asia/Shanghai", "not_prescribed"
+        )
+    assert exc.value.code == ResultCode.ENTITY_NOT_FOUND
+    # The catalog (``_index``) MUST NOT be read before ownership is confirmed.
+    assert catalog_calls["hit"] is False
+
+
+async def test_exercise_no_session_is_non_enumerating(monkeypatch):
+    from app.training.schemas_api import TodayResponse
+
+    spy = _Spy(TodayResponse(state="rest_day", local_date=date(2026, 7, 30)))
+    monkeypatch.setattr("app.training.service.get_today", spy)
+
+    from app.agent.messages import AgentError, ResultCode
+
+    with pytest.raises(AgentError) as exc:
+        await read_tools.adapt_get_training_exercise(
+            None, _ACTOR, "Asia/Shanghai", "ex1"
+        )
+    assert exc.value.code == ResultCode.ENTITY_NOT_FOUND
+
+
+async def test_exercise_exposes_only_safety_filtered_substitutions_and_stop_conditions(
+    monkeypatch,
+):
+    session = _session_today(exercise_id="ex1", substitution_ids=("repl1",))
+    spy = _Spy(_today_with_session(session))
+    monkeypatch.setattr("app.training.service.get_today", spy)
+
+    # Catalog stop-conditions only (read AFTER ownership confirmation).
+    from app.training.schemas import StopCondition
+
+    class _FakeExercise:
+        def __init__(self):
+            self.stop_conditions = [
+                StopCondition(
+                    code="sharp_pain",
+                    display_text_en="Stop if sharp pain",
+                    display_text_zh="剧烈疼痛时停止",
+                )
+            ]
+
+    class _FakeIndex(dict):
+        pass
+
+    fake_index = _FakeIndex()
+    fake_index["ex1"] = _FakeExercise()
+    monkeypatch.setattr("app.training.service._index", lambda: fake_index)
+
+    result = await read_tools.adapt_get_training_exercise(
+        None, _ACTOR, "Asia/Shanghai", "ex1"
+    )
+    assert result.provider_view.prescribed is True
+    # Provider sees stop-condition codes and the safety-filtered substitution
+    # flag only - never the full catalog substitution list.
+    assert result.provider_view.stop_condition_codes == ["sharp_pain"]
+    assert result.provider_view.catalog.has_substitutions is True
+    assert "substitution_ids" not in result.provider_view.model_dump()
+    # Display carries bounded reviewed stop-condition text and the safety-filtered
+    # substitution ids (the full list is never re-expanded).
+    assert result.display_view.stop_conditions[0].code == "sharp_pain"
+    assert result.display_view.stop_conditions[0].display_text_zh == "剧烈疼痛时停止"
+    assert result.display_view.catalog.substitution_ids == ["repl1"]

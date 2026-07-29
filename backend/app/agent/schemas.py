@@ -71,6 +71,48 @@ class TurnInput(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# Strict Tool input models                                                     #
+# --------------------------------------------------------------------------- #
+#
+# Each provider-selectable read Tool binds a strict (``extra="forbid"``) input
+# model containing ONLY the provider-typeable arguments. Identity (``db``,
+# ``ActorContext``/``user_id``), the server clock, and the validated timezone
+# are server-injected positional adapter arguments and are NEVER fields here, so
+# the provider cannot select an actor, a tool set, or a clock.
+
+
+class ToolInput(BaseModel):
+    """Base for all Tool input models: strict and identity-free by construction."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class EmptyToolInput(ToolInput):
+    """No provider-typeable arguments: identity/context comes from the server."""
+
+
+class ListPostureIssuesInput(ToolInput):
+    category: Optional[str] = Field(default=None, min_length=1, max_length=30)
+
+
+class GetPostureIssueInput(ToolInput):
+    issue_id: str = Field(..., min_length=1, max_length=60)
+
+
+class GetTrainingExerciseInput(ToolInput):
+    exercise_id: str = Field(..., min_length=1, max_length=60)
+
+
+class AuthModel(str, Enum):
+    """How a Tool's authorization/identity is bound (server-side only)."""
+
+    PUBLIC = "public"  # catalog knowledge only, no identity
+    OWNER = "owner"  # actor-scoped owned data
+    ENTRY_OWNER = "entry_owner"  # entity must match a current owned entity
+    CURRENT_SESSION = "current_session"  # bound to today's owned session
+
+
+# --------------------------------------------------------------------------- #
 # View base classes                                                            #
 # --------------------------------------------------------------------------- #
 
@@ -395,9 +437,33 @@ class ExerciseCatalogDisplayView(DisplayView):
     training_roles: List[str] = Field(default_factory=list)
     instruction_steps: List[str] = Field(default_factory=list)
     form_cues: List[str] = Field(default_factory=list)
+    # Only the safety-filtered substitutions (already returned by ``get_today``
+    # on ``prescription.exercise``); the full catalog list is never re-expanded.
     substitution_ids: List[str] = Field(default_factory=list)
     illustration_asset_key: Optional[str] = None
     illustration_alt_zh: Optional[str] = None
+
+
+class StopConditionCode(BaseModel):
+    """A structured training stop-condition code (machine-readable only)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    code: str
+
+
+class StopConditionView(BaseModel):
+    """A stop condition with bounded, reviewed display text (no free-text rule).
+
+    Mirrors ``training.schemas.StopCondition`` but re-validated here so the
+    agent projection stays independent of the domain model surface. The display
+    text is bounded wellness-scope wording, never a clinical protocol.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    code: str
+    display_text_zh: str
 
 
 class TrainingExerciseProviderView(ProviderView):
@@ -408,6 +474,7 @@ class TrainingExerciseProviderView(ProviderView):
     duration_seconds: Optional[int] = None
     rest_seconds: Optional[int] = None
     catalog: Optional[ExerciseCatalogProviderView] = None
+    stop_condition_codes: List[str] = Field(default_factory=list)
 
 
 class TrainingExerciseDisplayView(DisplayView):
@@ -419,6 +486,7 @@ class TrainingExerciseDisplayView(DisplayView):
     rest_seconds: Optional[int] = None
     relation_reason: Optional[str] = None
     catalog: Optional[ExerciseCatalogDisplayView] = None
+    stop_conditions: List[StopConditionView] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
@@ -441,22 +509,49 @@ class ReadToolResult:
 
 
 class ContextProviderView(BaseModel):
-    """Minimal, redacted context the provider may see for the resolved entry."""
+    """Minimal, redacted context the provider may see for the resolved entry.
+
+    Fields are optional because each entry populates only its minimal subset.
+    They carry only structured codes/version/presence flags - never raw health
+    payloads, free text, owner identity, or a full Tool result.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     entry_type: EntryType
     entity_id: Optional[str] = None
     current_local_date: date
+    # Health readiness / current safety decision.
     profile_configured: Optional[bool] = None
+    readiness_code: Optional[str] = None
+    restricted: Optional[bool] = None
     today_checkin_present: Optional[bool] = None
+    today_checkin_risk: Optional[str] = None
+    risk_gate_code: Optional[str] = None
+    today_decision_gate: Optional[str] = None
+    # Plan / today training presence + version/status codes.
     active_plan_present: Optional[bool] = None
     draft_present: Optional[bool] = None
+    plan_version_id: Optional[str] = None
+    plan_status: Optional[str] = None
+    plan_decision_gate: Optional[str] = None
+    draft_decision_gate: Optional[str] = None
     today_state: Optional[str] = None
+    # Posture issue codes.
     posture_issue_id: Optional[str] = None
+    posture_issue_name_cn: Optional[str] = None
+    posture_severity_levels: List[str] = Field(default_factory=list)
+    posture_self_test_count: Optional[int] = None
+    posture_has_confirmed_goal: Optional[bool] = None
+    # Current owned session / exercise references.
     session_id: Optional[str] = None
     exercise_id: Optional[str] = None
-    risk_gate_code: Optional[str] = None
+    prescription_exercise_ids: List[str] = Field(default_factory=list)
+    exercise_stop_condition_codes: List[str] = Field(default_factory=list)
+    # Structured version codes.
+    health_risk_version: Optional[str] = None
+    posture_risk_version: Optional[str] = None
+    catalog_version: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -476,6 +571,12 @@ __all__ = [
     "EntryType",
     "SideEffectClass",
     "TurnInput",
+    "ToolInput",
+    "EmptyToolInput",
+    "ListPostureIssuesInput",
+    "GetPostureIssueInput",
+    "GetTrainingExerciseInput",
+    "AuthModel",
     "ProviderView",
     "DisplayView",
     "HealthProfileProviderView",
@@ -507,6 +608,8 @@ __all__ = [
     "TodayTrainingDisplayView",
     "ExerciseCatalogProviderView",
     "ExerciseCatalogDisplayView",
+    "StopConditionCode",
+    "StopConditionView",
     "TrainingExerciseProviderView",
     "TrainingExerciseDisplayView",
     "ReadToolResult",

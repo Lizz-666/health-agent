@@ -240,3 +240,70 @@ def test_low_entropy_health_value_is_not_a_plain_hash():
     keyed = fingerprints.compute_fingerprint(payload, key=_KEY, key_version=_KEY_V)
     plain = hashlib.sha256(fingerprints.canonical_serialize(payload)).hexdigest()
     assert keyed.value != plain
+
+
+def test_canonical_serialize_rejects_non_json_values():
+    import datetime as _dt
+
+    # Arbitrary objects (no default=str coercion) fail closed.
+    with pytest.raises(AgentError):
+        fingerprints.canonical_serialize({"when": _dt.datetime(2026, 7, 29)})
+    # Sets are not JSON-serializable.
+    with pytest.raises(AgentError):
+        fingerprints.canonical_serialize({"ids": {1, 2}})
+
+
+def test_canonical_serialize_rejects_nan_and_infinity():
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(AgentError):
+            fingerprints.canonical_serialize({"value": bad})
+
+
+def test_canonical_serialize_accepts_only_json_native_structured_values():
+    # Strings, ints, bools, lists and nested dicts of those are accepted.
+    payload = {
+        "entry_type": "training_plan",
+        "plan_version_id": "pv1",
+        "active_plan_present": True,
+        "prescription_exercise_ids": ["ex1", "ex2"],
+        "nested": {"gate": "normal", "count": 3},
+    }
+    data = fingerprints.canonical_serialize(payload)
+    assert isinstance(data, bytes)
+    # Stable / order-independent.
+    other = {
+        "nested": {"count": 3, "gate": "normal"},
+        "prescription_exercise_ids": ["ex1", "ex2"],
+        "active_plan_present": True,
+        "entry_type": "training_plan",
+        "plan_version_id": "pv1",
+    }
+    assert data == fingerprints.canonical_serialize(other)
+
+
+def test_fingerprint_fails_closed_with_empty_key_version():
+    # Even with a non-empty key, a missing/blank key version fails closed.
+    with pytest.raises(AgentError) as exc:
+        fingerprints.compute_fingerprint({"x": "y"}, key=_KEY, key_version="")
+    assert exc.value.code == "agent_fingerprint_key_missing"
+    with pytest.raises(AgentError) as exc:
+        fingerprints.compute_fingerprint({"x": "y"}, key=_KEY, key_version="   ")
+    assert exc.value.code == "agent_fingerprint_key_missing"
+
+
+def test_fingerprint_is_fresh_to_context_version_and_risk_changes():
+    base = {
+        "entry_type": "training_plan",
+        "plan_version_id": "pv1",
+        "plan_status": "active",
+        "risk_gate_code": "normal",
+    }
+    same = fingerprints.compute_fingerprint(base, key=_KEY, key_version=_KEY_V)
+    changed_version = fingerprints.compute_fingerprint(
+        {**base, "plan_version_id": "pv2"}, key=_KEY, key_version=_KEY_V
+    )
+    changed_risk = fingerprints.compute_fingerprint(
+        {**base, "risk_gate_code": "red_flag"}, key=_KEY, key_version=_KEY_V
+    )
+    assert same.value != changed_version.value
+    assert same.value != changed_risk.value

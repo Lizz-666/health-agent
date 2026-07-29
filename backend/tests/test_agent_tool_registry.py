@@ -11,7 +11,20 @@ import pytest
 
 from app.agent import tool_registry
 from app.agent.messages import AgentError, ResultCode
-from app.agent.schemas import DisplayView, EntryType, ProviderView, SideEffectClass
+from app.agent.schemas import (
+    AuthModel,
+    BaseModel,
+    DisplayView,
+    EntryType,
+    GetPostureIssueInput,
+    GetTrainingExerciseInput,
+    HealthProfileDisplayView,
+    ListPostureIssuesInput,
+    ProviderView,
+    ReadToolResult,
+    SideEffectClass,
+    WeightTrendProviderView,
+)
 
 # The exact read Tools named in the spec Tool Registry And Permission Matrix.
 _READ_TOOLS = {
@@ -148,3 +161,110 @@ def test_resolve_rejects_unknown_entry_membership_for_known_tool():
             "get_training_exercise", EntryType.health_profile
         )
     assert exc.value.code == ResultCode.TOOL_NOT_ALLOWED
+
+
+# ===========================================================================
+# Fix #2: strict Tool input models + auth/context binding + validators
+# ===========================================================================
+
+
+def test_every_tool_binds_strict_input_output_and_auth_metadata():
+    for name, spec in tool_registry.READ_TOOLS.items():
+        assert spec.side_effect is SideEffectClass.READ
+        assert spec.requires_confirmation is False
+        # input model is strict (extra forbidden).
+        assert issubclass(spec.input_model, BaseModel)
+        assert spec.input_model.model_config.get("extra") == "forbid"
+        # output models are the typed projections.
+        assert issubclass(spec.provider_view_model, ProviderView)
+        assert issubclass(spec.display_view_model, DisplayView)
+        assert isinstance(spec.auth_model, AuthModel)
+        assert callable(spec.adapter)
+
+
+def test_tools_with_provider_typeable_args_have_typed_input_models():
+    assert (
+        tool_registry.READ_TOOLS["list_posture_issues"].input_model
+        is ListPostureIssuesInput
+    )
+    assert (
+        tool_registry.READ_TOOLS["get_posture_issue"].input_model
+        is GetPostureIssueInput
+    )
+    assert (
+        tool_registry.READ_TOOLS["get_training_exercise"].input_model
+        is GetTrainingExerciseInput
+    )
+
+
+def test_identity_bearing_tools_carry_no_identity_in_their_input_model():
+    # No input model may accept a server-injected identity/authority value.
+    forbidden = {
+        "user_id",
+        "actor",
+        "db",
+        "consent",
+        "consent_record",
+        "risk_tier",
+        "policy_version",
+        "iana_timezone",
+        "server_time",
+        "now",
+        "allowed_tools",
+    }
+    for spec in tool_registry.READ_TOOLS.values():
+        assert not (forbidden & set(spec.input_model.model_fields)), spec.name
+
+
+@pytest.mark.parametrize(
+    "name, raw",
+    [
+        ("get_health_profile_summary", {"user_id": "attacker"}),
+        ("get_today_checkin", {"now": "2026-01-01"}),
+        ("list_posture_issues", {"category": "x", "extra": 1}),
+        ("get_posture_issue", {"issue_id": "x", "actor": object()}),
+        ("get_training_exercise", {"exercise_id": "ex1", "user_id": "u"}),
+    ],
+)
+def test_unknown_or_identity_input_field_fails_closed(name, raw):
+    with pytest.raises(AgentError) as exc:
+        tool_registry.validate_tool_input(name, raw)
+    assert exc.value.code == ResultCode.TOOL_NOT_ALLOWED
+
+
+def test_invalid_argument_value_fails_closed():
+    # A missing required field is an invalid tool input, not a server error.
+    with pytest.raises(AgentError) as exc:
+        tool_registry.validate_tool_input("get_training_exercise", {})
+    assert exc.value.code == ResultCode.TOOL_NOT_ALLOWED
+
+
+def test_post_validator_rejects_wrong_output_type():
+    spec = tool_registry.get_read_tool("get_health_profile_summary")
+    # A non-ReadToolResult object fails closed.
+    with pytest.raises(AgentError) as exc:
+        spec.validate_output(object())
+    assert exc.value.code == ResultCode.TOOL_NOT_ALLOWED
+
+
+def test_post_validator_rejects_wrong_provider_view_type():
+    spec = tool_registry.get_read_tool("get_health_profile_summary")
+    # Correct display view but a provider_view of the wrong bound type.
+    bogus = ReadToolResult(
+        tool_name="get_health_profile_summary",
+        provider_view=WeightTrendProviderView(
+            sufficient=False, window=7, record_count=0, trend_point_count=0
+        ),
+        display_view=HealthProfileDisplayView(configured=False),
+    )
+    with pytest.raises(AgentError) as exc:
+        spec.validate_output(bogus)
+    assert exc.value.code == ResultCode.TOOL_NOT_ALLOWED
+
+
+def test_valid_input_round_trips_through_pre_validator():
+    parsed = tool_registry.validate_tool_input(
+        "get_training_exercise", {"exercise_id": "ex1"}
+    )
+    assert isinstance(parsed, GetTrainingExerciseInput)
+    assert parsed.exercise_id == "ex1"

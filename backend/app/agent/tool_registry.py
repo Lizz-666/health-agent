@@ -1,11 +1,16 @@
 """Static typed read Tool Registry + entry allowlists (Task 1).
 
 The registry is static code (never model-selected). Each entry binds a stable
-Tool name to its typed ``provider_view`` / ``display_view`` models, allowed
-entry types, ``read`` side-effect class, and the server adapter that reuses an
-existing domain service. Unknown Tools, unknown entry combinations, and every
+Tool name to a strict typed ``input_model``, its typed ``provider_view`` /
+``display_view`` output models, allowed entry types, ``read`` side-effect class,
+a ``requires_confirmation`` flag, a server-only ``auth_model`` describing how
+identity is bound, an ``ownership_from_context`` flag, the server adapter that
+reuses an existing domain service, and deterministic pre/post validators.
+
+Unknown Tools, unknown entry combinations, unknown input fields, and every
 write/risk/validator name fail closed (spec Tool Registry And Permission Matrix,
-ADR-0003).
+ADR-0003). Identity (``db`` / ``ActorContext`` / timezone / server clock) is
+server-injected only and is NEVER a field on a Tool input model.
 
 Decision 1 (Gate 0 minimal scope): Task 1 registers ONLY read Tools. Write Tool
 schemas, confirmation metadata, and execution adapters are deferred to Task 3;
@@ -14,16 +19,21 @@ until then a write Tool name is simply unknown and rejected.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, FrozenSet, Tuple
+from typing import Any, Callable, Dict, FrozenSet, Tuple
 
 from app.agent import read_tools
 from app.agent.messages import AgentError, ResultCode
 from app.agent.schemas import (
     ActivePlanDisplayView,
     ActivePlanProviderView,
+    AuthModel,
+    EmptyToolInput,
     EntryType,
+    GetPostureIssueInput,
+    GetTrainingExerciseInput,
     HealthProfileDisplayView,
     HealthProfileProviderView,
+    ListPostureIssuesInput,
     PostureIssueDetailDisplayView,
     PostureIssueDetailProviderView,
     PostureIssueListDisplayView,
@@ -32,6 +42,7 @@ from app.agent.schemas import (
     PostureProfileProviderView,
     PosturePrioritiesDisplayView,
     PosturePrioritiesProviderView,
+    ReadToolResult,
     SelfTestGuideDisplayView,
     SelfTestGuideProviderView,
     SideEffectClass,
@@ -46,6 +57,7 @@ from app.agent.schemas import (
     WeightTrendDisplayView,
     WeightTrendProviderView,
 )
+from pydantic import BaseModel, ValidationError
 
 
 @dataclass(frozen=True)
@@ -55,26 +67,71 @@ class ReadToolSpec:
     name: str
     allowed_entries: FrozenSet[EntryType]
     side_effect: SideEffectClass
+    input_model: type
     provider_view_model: type
     display_view_model: type
     adapter: Callable
+    auth_model: AuthModel
+    ownership_from_context: bool
     requires_confirmation: bool = False
+
+    def validate_input(self, raw: Dict[str, Any]) -> BaseModel:
+        """Pre-validator: reject unknown fields and invalid arguments.
+
+        Raises ``AgentError(agent_tool_not_allowed)`` for any malformed input so
+        the orchestrator cannot forward attacker-controlled fields to an adapter.
+        """
+        try:
+            return self.input_model.model_validate(raw or {})
+        except ValidationError as exc:
+            raise AgentError(
+                ResultCode.TOOL_NOT_ALLOWED, f"invalid tool input: {exc}"
+            ) from exc
+
+    def validate_output(self, result: Any) -> ReadToolResult:
+        """Post-validator: the adapter must return a spec-bound ``ReadToolResult``.
+
+        Fails closed if the adapter returns the wrong shape or a projection that
+        is not an instance of the bound typed output models.
+        """
+        if not isinstance(result, ReadToolResult):
+            raise AgentError(
+                ResultCode.TOOL_NOT_ALLOWED, "adapter returned non-ReadToolResult"
+            )
+        if not isinstance(result.provider_view, self.provider_view_model):
+            raise AgentError(
+                ResultCode.TOOL_NOT_ALLOWED,
+                f"provider_view is not {self.provider_view_model.__name__}",
+            )
+        if not isinstance(result.display_view, self.display_view_model):
+            raise AgentError(
+                ResultCode.TOOL_NOT_ALLOWED,
+                f"display_view is not {self.display_view_model.__name__}",
+            )
+        return result
 
 
 def _spec(
     name: str,
     entries: FrozenSet[EntryType],
+    input_model: type,
     provider_view_model: type,
     display_view_model: type,
     adapter: Callable,
+    *,
+    auth_model: AuthModel = AuthModel.OWNER,
+    ownership_from_context: bool = True,
 ) -> ReadToolSpec:
     return ReadToolSpec(
         name=name,
         allowed_entries=entries,
         side_effect=SideEffectClass.READ,
+        input_model=input_model,
         provider_view_model=provider_view_model,
         display_view_model=display_view_model,
         adapter=adapter,
+        auth_model=auth_model,
+        ownership_from_context=ownership_from_context,
         requires_confirmation=False,
     )
 
@@ -101,6 +158,7 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
         _spec(
             "get_health_profile_summary",
             _HEALTH_ENTRIES,
+            EmptyToolInput,
             HealthProfileProviderView,
             HealthProfileDisplayView,
             read_tools.adapt_health_profile_summary,
@@ -108,6 +166,7 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
         _spec(
             "get_today_checkin",
             _HEALTH_ENTRIES,
+            EmptyToolInput,
             TodayCheckinProviderView,
             TodayCheckinDisplayView,
             read_tools.adapt_today_checkin,
@@ -115,6 +174,7 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
         _spec(
             "get_weight_trend_summary",
             _HEALTH_ENTRIES,
+            EmptyToolInput,
             WeightTrendProviderView,
             WeightTrendDisplayView,
             read_tools.adapt_weight_trend_summary,
@@ -122,20 +182,27 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
         _spec(
             "list_posture_issues",
             _POSTURE_ENTRIES,
+            ListPostureIssuesInput,
             PostureIssueListProviderView,
             PostureIssueListDisplayView,
             read_tools.adapt_list_posture_issues,
+            auth_model=AuthModel.PUBLIC,
+            ownership_from_context=False,
         ),
         _spec(
             "get_posture_issue",
             frozenset({EntryType.posture_issue}),
+            GetPostureIssueInput,
             PostureIssueDetailProviderView,
             PostureIssueDetailDisplayView,
             read_tools.adapt_get_posture_issue,
+            auth_model=AuthModel.PUBLIC,
+            ownership_from_context=False,
         ),
         _spec(
             "guide_posture_self_test",
             frozenset({EntryType.posture_issue}),
+            EmptyToolInput,
             SelfTestGuideProviderView,
             SelfTestGuideDisplayView,
             read_tools.adapt_guide_posture_self_test,
@@ -143,6 +210,7 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
         _spec(
             "get_posture_profile",
             _POSTURE_ENTRIES,
+            EmptyToolInput,
             PostureProfileProviderView,
             PostureProfileDisplayView,
             read_tools.adapt_get_posture_profile,
@@ -150,6 +218,7 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
         _spec(
             "get_posture_priorities",
             _POSTURE_ENTRIES,
+            EmptyToolInput,
             PosturePrioritiesProviderView,
             PosturePrioritiesDisplayView,
             read_tools.adapt_get_posture_priorities,
@@ -157,6 +226,7 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
         _spec(
             "get_training_draft",
             _PLAN_ENTRIES,
+            EmptyToolInput,
             TrainingDraftProviderView,
             TrainingDraftDisplayView,
             read_tools.adapt_get_training_draft,
@@ -164,6 +234,7 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
         _spec(
             "get_active_training_plan",
             _PLAN_ENTRIES,
+            EmptyToolInput,
             ActivePlanProviderView,
             ActivePlanDisplayView,
             read_tools.adapt_get_active_training_plan,
@@ -171,6 +242,7 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
         _spec(
             "get_today_training",
             _TRAINING_TODAY_ENTRIES,
+            EmptyToolInput,
             TodayTrainingProviderView,
             TodayTrainingDisplayView,
             read_tools.adapt_get_today_training,
@@ -178,9 +250,11 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
         _spec(
             "get_training_exercise",
             _EXERCISE_ENTRIES,
+            GetTrainingExerciseInput,
             TrainingExerciseProviderView,
             TrainingExerciseDisplayView,
             read_tools.adapt_get_training_exercise,
+            auth_model=AuthModel.CURRENT_SESSION,
         ),
     )
 }
@@ -234,6 +308,11 @@ def resolve_tool_for_entry(name: str, entry_type: EntryType) -> ReadToolSpec:
     return spec
 
 
+def validate_tool_input(name: str, raw: Dict[str, Any]) -> BaseModel:
+    """Resolve a Tool by name and run its deterministic pre-validator."""
+    return get_read_tool(name).validate_input(raw)
+
+
 __all__ = [
     "ReadToolSpec",
     "READ_TOOLS",
@@ -242,4 +321,5 @@ __all__ = [
     "is_tool_allowed",
     "allowed_tools_for",
     "resolve_tool_for_entry",
+    "validate_tool_input",
 ]

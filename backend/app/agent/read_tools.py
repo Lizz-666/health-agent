@@ -37,6 +37,7 @@ from app.agent.schemas import (
     ReadToolResult,
     SelfTestGuideDisplayView,
     SelfTestGuideProviderView,
+    StopConditionView,
     TodayCheckinDisplayView,
     TodayCheckinProviderView,
     TodayTrainingDisplayView,
@@ -386,11 +387,19 @@ async def adapt_get_today_training(
 async def adapt_get_training_exercise(
     db: AsyncSession, actor: ActorContext, iana_timezone: str, exercise_id: str
 ) -> ReadToolResult:
-    """Explain a prescribed exercise in the current owned session.
+    """Explain a prescribed exercise in the current local-date session.
 
-    Reuses the SAME verified versioned catalog projection (``_exercise_view``)
-    and the current owned ``get_today`` state; it adds no new data-access path.
+    Ordering and safety (spec Tool Registry And Permission Matrix, Acceptance
+    #1/#2): a ``get_today`` call resolves the current owned session; the
+    exercise must be prescribed there (including a safety-validated same-day
+    substitution). Otherwise ``agent_entity_not_found`` is raised BEFORE the
+    catalog is touched. The catalog is read ONLY for stop-conditions after
+    ownership is confirmed; ``substitution_ids`` come from
+    ``prescription.exercise`` (already safety-filtered by ``get_today``) and are
+    never re-expanded to the full catalog list.
     """
+    from app.agent.messages import AgentError, ResultCode
+
     today = await training_service.get_today(db, actor.user_id, iana_timezone)
     session = today.session
     prescription = None
@@ -398,55 +407,74 @@ async def adapt_get_training_exercise(
         prescription = next(
             (p for p in session.prescriptions if p.exercise_id == exercise_id), None
         )
-    catalog = training_service._exercise_view(exercise_id)
+    if prescription is None:
+        # Non-prescribed / no session / foreign id share one non-enumerating
+        # result; the catalog is NOT queried before this point.
+        raise AgentError(ResultCode.ENTITY_NOT_FOUND)
+
+    exercise_view = prescription.exercise  # already safety-filtered by get_today
 
     provider_catalog = (
         ExerciseCatalogProviderView(
-            exercise_id=catalog.exercise_id,
-            name_en=catalog.name_en,
-            name_zh=catalog.name_zh,
-            difficulty=catalog.difficulty,
-            training_roles=list(catalog.training_roles),
-            has_substitutions=bool(catalog.substitution_ids),
+            exercise_id=exercise_view.exercise_id,
+            name_en=exercise_view.name_en,
+            name_zh=exercise_view.name_zh,
+            difficulty=exercise_view.difficulty,
+            training_roles=list(exercise_view.training_roles),
+            has_substitutions=bool(exercise_view.substitution_ids),
         )
-        if catalog is not None
+        if exercise_view is not None
         else None
     )
     display_catalog = (
         ExerciseCatalogDisplayView(
-            exercise_id=catalog.exercise_id,
-            name_en=catalog.name_en,
-            name_zh=catalog.name_zh,
-            difficulty=catalog.difficulty,
-            training_roles=list(catalog.training_roles),
-            instruction_steps=list(catalog.instruction_steps),
-            form_cues=list(catalog.form_cues),
-            substitution_ids=list(catalog.substitution_ids),
-            illustration_asset_key=catalog.illustration_asset_key,
-            illustration_alt_zh=catalog.illustration_alt_zh,
+            exercise_id=exercise_view.exercise_id,
+            name_en=exercise_view.name_en,
+            name_zh=exercise_view.name_zh,
+            difficulty=exercise_view.difficulty,
+            training_roles=list(exercise_view.training_roles),
+            instruction_steps=list(exercise_view.instruction_steps),
+            form_cues=list(exercise_view.form_cues),
+            substitution_ids=list(exercise_view.substitution_ids),
+            illustration_asset_key=exercise_view.illustration_asset_key,
+            illustration_alt_zh=exercise_view.illustration_alt_zh,
         )
-        if catalog is not None
+        if exercise_view is not None
         else None
     )
 
+    # Stop-conditions: read the catalog Exercise ONLY after ownership is
+    # confirmed. These are bounded reviewed wellness-scope wording.
+    stop_codes: List[str] = []
+    stop_views: List[StopConditionView] = []
+    catalog_exercise = training_service._index().get(exercise_id)
+    if catalog_exercise is not None:
+        for sc in catalog_exercise.stop_conditions:
+            stop_codes.append(sc.code)
+            stop_views.append(
+                StopConditionView(code=sc.code, display_text_zh=sc.display_text_zh)
+            )
+
     provider = TrainingExerciseProviderView(
         exercise_id=exercise_id,
-        prescribed=prescription is not None,
-        sets=getattr(prescription, "sets", None),
-        reps=getattr(prescription, "reps", None),
-        duration_seconds=getattr(prescription, "duration_seconds", None),
-        rest_seconds=getattr(prescription, "rest_seconds", None),
+        prescribed=True,
+        sets=prescription.sets,
+        reps=prescription.reps,
+        duration_seconds=prescription.duration_seconds,
+        rest_seconds=prescription.rest_seconds,
         catalog=provider_catalog,
+        stop_condition_codes=stop_codes,
     )
     display = TrainingExerciseDisplayView(
         exercise_id=exercise_id,
-        prescribed=prescription is not None,
-        sets=getattr(prescription, "sets", None),
-        reps=getattr(prescription, "reps", None),
-        duration_seconds=getattr(prescription, "duration_seconds", None),
-        rest_seconds=getattr(prescription, "rest_seconds", None),
-        relation_reason=getattr(prescription, "relation_reason", None),
+        prescribed=True,
+        sets=prescription.sets,
+        reps=prescription.reps,
+        duration_seconds=prescription.duration_seconds,
+        rest_seconds=prescription.rest_seconds,
+        relation_reason=prescription.relation_reason,
         catalog=display_catalog,
+        stop_conditions=stop_views,
     )
     return ReadToolResult("get_training_exercise", provider, display)
 

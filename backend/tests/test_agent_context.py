@@ -9,7 +9,7 @@ minimal context assembly. Synthetic data only; no live model call.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 
@@ -369,3 +369,179 @@ async def test_resolved_context_fingerprint_payload_has_no_raw_text():
     joined = " ".join(str(v) for v in resolved.fingerprint_payload.values()).lower()
     assert "message" not in resolved.fingerprint_payload
     assert "pain" not in joined
+
+
+# ===========================================================================
+# Fix #3: minimal provider context composed for every entry
+# ===========================================================================
+
+
+def _patch_general_reads(monkeypatch, *, has_active=True, today_state="rest_day"):
+    async def _profile(db, user_id):
+        from app.health.schemas import (
+            HealthProfileResultResponse,
+            HealthReadinessResponse,
+        )
+
+        return HealthProfileResultResponse(
+            configured=True,
+            profile=object(),  # adapter only reads .profile for booleans below
+            readiness=HealthReadinessResponse(
+                readiness="ready",
+                risk_version="rv1",
+                reason="ok",
+                missing_fields=[],
+                restricted_reason=None,
+            ),
+        )
+
+    # The adapter reads pain/allergies/diet off profile; return a None profile
+    # to exercise the not-configured branch deterministically instead.
+    async def _profile_not_configured(db, user_id):
+        from app.health.schemas import (
+            HealthProfileResultResponse,
+            HealthReadinessResponse,
+        )
+
+        return HealthProfileResultResponse(
+            configured=False,
+            profile=None,
+            readiness=HealthReadinessResponse(
+                readiness="missing_required_data",
+                risk_version="rv1",
+                reason="missing",
+                missing_fields=[],
+                restricted_reason=None,
+            ),
+        )
+
+    async def _today(db, user_id, local_date):
+        return CheckInTodayResultResponse(checked_in=True, checkin=None)
+
+    from app.agent import read_tools as _rt
+    from app.agent.schemas import (
+        ActivePlanDisplayView,
+        ActivePlanProviderView,
+        ReadToolResult,
+        TodayTrainingDisplayView,
+        TodayTrainingProviderView,
+    )
+
+    async def _active(db, actor):
+        return ReadToolResult(
+            "get_active_training_plan",
+            ActivePlanProviderView(has_active=has_active, plan=None),
+            ActivePlanDisplayView(has_active=has_active, plan=None),
+        )
+
+    async def _today_training(db, actor, tz):
+        return ReadToolResult(
+            "get_today_training",
+            TodayTrainingProviderView(
+                state=today_state, decision_gate="normal", has_session=False
+            ),
+            TodayTrainingDisplayView(
+                state=today_state, decision_gate="normal", session_id=None
+            ),
+        )
+
+    monkeypatch.setattr("app.health.service.get_profile_result", _profile_not_configured)
+    monkeypatch.setattr("app.health.service.get_today", _today)
+    monkeypatch.setattr(_rt, "adapt_get_active_training_plan", _active)
+    monkeypatch.setattr(_rt, "adapt_get_today_training", _today_training)
+    monkeypatch.setattr(
+        "app.agent.context_resolver.read_tools.adapt_get_active_training_plan",
+        _active,
+    )
+    monkeypatch.setattr(
+        "app.agent.context_resolver.read_tools.adapt_get_today_training",
+        _today_training,
+    )
+    return _profile_not_configured
+
+
+async def test_general_context_carries_readiness_gate_and_plan_today_presence(
+    monkeypatch,
+):
+    uid = await _seed_user()
+    _patch_general_reads(monkeypatch, has_active=True, today_state="rest_day")
+    async with TestSession() as db:
+        resolved = await context_resolver.resolve_context(
+            db,
+            ActorContext(user_id=uid),
+            entry_type=EntryType.general,
+            entity_id=None,
+            iana_timezone="Asia/Shanghai",
+            now=_UTC,
+        )
+    ctx = resolved.provider_context
+    assert ctx.readiness_code == "missing_required_data"
+    assert ctx.active_plan_present is True
+    assert ctx.today_state == "rest_day"
+    assert ctx.today_decision_gate == "normal"
+    assert ctx.risk_gate_code == "normal"
+
+
+async def test_training_session_rejects_active_plan_session_that_is_not_today(
+    monkeypatch,
+):
+    uid = await _seed_user()
+    from app.training.schemas_api import ActivePlanResponse, TodayResponse
+
+    async def _today(db, user_id, tz):
+        return TodayResponse(state="rest_day", local_date=date(2026, 7, 30))
+
+    async def _active(db, user_id):
+        # An active plan with sessions, but none of them is "today".
+        plan = type(
+            "P",
+            (),
+            {
+                "plan_version_id": "pv1",
+                "status": "active",
+                "sessions": [
+                    type("S", (), {"session_id": "other_session"})(),
+                ],
+            },
+        )()
+        return ActivePlanResponse(has_active=True, plan=plan)
+
+    monkeypatch.setattr("app.training.service.get_today", _today)
+    monkeypatch.setattr("app.training.service.get_active", _active)
+
+    async with TestSession() as db:
+        with pytest.raises(AgentError) as exc:
+            await context_resolver.resolve_context(
+                db,
+                ActorContext(user_id=uid),
+                entry_type=EntryType.training_session,
+                entity_id="other_session",  # exists in active plan but not today
+                iana_timezone="Asia/Shanghai",
+                now=_UTC,
+            )
+    assert exc.value.code == ResultCode.ENTITY_NOT_FOUND
+
+
+async def test_fingerprint_payload_changes_with_plan_status_and_risk(monkeypatch):
+    uid = await _seed_user()
+
+    async def _ctx(monkeypatch_extra=None):
+        async with TestSession() as db:
+            return await context_resolver.resolve_context(
+                db,
+                ActorContext(user_id=uid),
+                entry_type=EntryType.general,
+                entity_id=None,
+                iana_timezone="Asia/Shanghai",
+                now=_UTC,
+            )
+
+    _patch_general_reads(monkeypatch, has_active=True, today_state="rest_day")
+    a = (await _ctx()).fingerprint_payload
+    _patch_general_reads(monkeypatch, has_active=False, today_state="blocked")
+    b = (await _ctx()).fingerprint_payload
+    # Active-plan presence and today gate changed -> the structured payload and
+    # thus the keyed fingerprint must change.
+    assert a.get("active_plan_present") is not None
+    assert a.get("active_plan_present") != b.get("active_plan_present")
+    assert a.get("today_state") != b.get("today_state")
