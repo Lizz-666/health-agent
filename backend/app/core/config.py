@@ -50,5 +50,16 @@ class Settings(BaseSettings):
     DEV_ADMIN_PHONE: str = ""
     DEV_ADMIN_PASSWORD: str = ""
 
+    # Phase 5 Agent MVP (Task 1): dedicated server-only audit HMAC key + version.
+    # Empty by default and never client/model input. The Agent audit/context/
+    # argument fingerprints are keyed HMAC-SHA256 with this secret; when it is
+    # empty the fingerprint capability fails closed (spec Provider And
+    # Orchestrator Contract, Consent And Privacy Gate #9, Acceptance #15).
+    # Changing the key/version invalidates and scrubs pending proposals before
+    # new runs are accepted (wired in a later batch). The secret never enters the
+    # repository, responses, logs, CI artifacts, or Flutter defines.
+    AGENT_AUDIT_HMAC_KEY: str = ""
+    AGENT_AUDIT_HMAC_KEY_VERSION: str = ""
+
 
 settings = Settings()

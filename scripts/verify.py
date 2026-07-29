@@ -13,6 +13,12 @@ targets are appended here by the same task that creates each test file (Tasks
 that do not yet exist. ``full`` always runs the COMPLETE backend suite, so every
 Phase 4 test is covered regardless of the fast list.
 
+Phase 5 (Agent MVP) appends its backend targets the same way. Batch A / Task 1
+adds the read-only Agent boundary tests (strict schemas, keyed fingerprints,
+deterministic safety-text routing, minimal context resolution, static read Tool
+registry, and read adapters). Later Phase 5 batches append their own test files
+as they land; ``full`` still runs the complete suite.
+
 Design contract (docs/product/roadmap.md section 13.1 and the Phase 3/4 plans):
 
 - ``fast`` is the fast feedback layer: deterministic lint + targeted Phase 3
@@ -76,6 +82,11 @@ FAST_TEST_TARGETS = [
     "tests/test_training_generator.py",
     "tests/test_training_api.py",
     "tests/test_phase4_e2e.py",
+    # Phase 5 Batch A / Task 1: read-only Agent context + tool boundary.
+    "tests/test_agent_schemas.py",
+    "tests/test_agent_context.py",
+    "tests/test_agent_tool_registry.py",
+    "tests/test_agent_read_tools.py",
 ]
 
 
