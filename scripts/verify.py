@@ -94,6 +94,12 @@ FAST_TEST_TARGETS = [
     # Phase 5 Batch B / Task 3: confirmed write adapters + confirmation.
     "tests/test_agent_action_tools.py",
     "tests/test_agent_confirmation.py",
+    # Phase 5 Batch C / Task 4: provider/orchestrator/API/adversarial boundary.
+    "tests/test_agent_provider.py",
+    "tests/test_agent_orchestrator.py",
+    "tests/test_agent_api.py",
+    "tests/test_agent_adversarial.py",
+    "tests/test_openapi_contracts.py",
 ]
 
 

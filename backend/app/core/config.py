@@ -61,5 +61,19 @@ class Settings(BaseSettings):
     AGENT_AUDIT_HMAC_KEY: str = ""
     AGENT_AUDIT_HMAC_KEY_VERSION: str = ""
 
+    # Phase 5 Agent runtime/live provider. The runtime remains fail-closed until
+    # every value, current consent, disclosure, and privacy-gate condition is
+    # satisfied. No client/model field can override these server settings.
+    AGENT_RUNTIME_ENABLED: bool = False
+    AGENT_PROVIDER_ID: str = ""
+    AGENT_MODEL_ID: str = ""
+    AGENT_DISCLOSURE_VERSION: str = ""
+    AGENT_PROVIDER_BASE_URL: str = (
+        "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
+    AGENT_PROVIDER_CONNECT_TIMEOUT_SECONDS: float = 5.0
+    AGENT_PROVIDER_READ_TIMEOUT_SECONDS: float = 20.0
+    AGENT_PROVIDER_MAX_RESPONSE_BYTES: int = 65536
+
 
 settings = Settings()

@@ -1,16 +1,21 @@
 # Phase 5 Agent MVP Collaboration Charter
 
-> Date: 2026-07-29. Status: Gate 2 accepted; Batch C (Task 4) is next but is
-> not authorized until its explicit prompt is issued. Accepted Task 0 specification:
+> Date: 2026-07-30. Status: Gate 2 accepted; Codex directly owns remaining
+> Batches C-D implementation, review, CI and acceptance. Accepted Task 0 specification:
 > `f6c2eae59c784398fbf1ae38967be3c2ee720940`. Accepted Gate 1 implementation:
 > `3df574b7051ef9a9342816c9b116f436ddf8513c`. Accepted Gate 2 implementation:
 > `57facf2a7e4589ef843645d7549b89538f1e79fe`.
 
 ## 1. Decision
 
-Phase 5 uses a gated hybrid model. OpenCode remains the primary implementation
-and CI operator, while Codex owns scope, architecture, safety/privacy contracts,
-gate review, corrective integration, and final acceptance.
+Phase 5 began with a gated hybrid model. OpenCode was the primary implementation
+and CI operator through Batches A-B, while Codex owned scope, architecture,
+safety/privacy contracts, gate review, corrective integration, and acceptance.
+
+Execution update (2026-07-30): after Gate 2, the user directed Codex to finish
+the remaining project phases directly. The historical hybrid decisions remain
+the record for Batches A-B; Codex is the sole writer for Batches C-D and later
+phases, with the same gate, cold-review, CI and safety requirements.
 
 Phase 5 must not use blind whole-phase delegation. The Phase 4 experiment
 delivered high implementation throughput, but its first complete handoff left

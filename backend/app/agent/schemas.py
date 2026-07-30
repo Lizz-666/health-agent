@@ -21,7 +21,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -74,7 +75,7 @@ class TurnInput(BaseModel):
     client_turn_id: str = Field(..., min_length=1, max_length=64)
     entry_type: EntryType
     entity_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
-    message: str = Field(..., max_length=2000)
+    message: str = Field(..., min_length=1, max_length=2000)
     iana_timezone: str = Field(..., min_length=1, max_length=60)
 
 
@@ -755,6 +756,108 @@ class WriteActionResult(BaseModel):
     result_ref: Optional[str] = None
 
 
+# --------------------------------------------------------------------------- #
+# Task 4 authenticated API envelopes                                           #
+# --------------------------------------------------------------------------- #
+
+
+class AgentApiModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class AgentDisclosureView(AgentApiModel):
+    disclosure_version: str
+    provider_id: str
+    provider_name_zh: str
+    purpose_code: str
+    processing_boundary_code: str
+    data_scope_codes: List[str]
+    application_retention_code: str
+    withdrawal_available: bool
+    agent_data_deletion_available: bool
+
+
+class AgentCapabilitiesResponse(AgentApiModel):
+    runtime_enabled: bool
+    provider_configured: bool
+    provider_id: Optional[str] = None
+    model_id: Optional[str] = None
+    disclosure_version: Optional[str] = None
+    consent_active: bool
+    available: bool
+    result_code: str
+    message: str
+    disclosure: Optional[AgentDisclosureView] = None
+
+
+class AgentConsentGrantRequest(AgentApiModel):
+    accepted_provider_id: str = Field(..., min_length=1, max_length=60)
+    accepted_disclosure_version: str = Field(..., min_length=1, max_length=60)
+    idempotency_key: str = Field(..., min_length=1, max_length=128)
+
+
+class AgentConsentWithdrawRequest(AgentApiModel):
+    idempotency_key: str = Field(..., min_length=1, max_length=128)
+
+
+class AgentConsentResponse(AgentApiModel):
+    consent_id: UUID
+    sequence_no: int
+    status: Literal["granted", "withdrawn"]
+    replayed: bool
+
+
+class AgentDataDeletionResponse(AgentApiModel):
+    deleted: bool = True
+    consents_deleted: int
+    runs_deleted: int
+    tool_events_deleted: int
+    proposals_deleted: int
+    idempotency_deleted: int
+
+
+class AgentToolDisplay(AgentApiModel):
+    tool_name: str
+    data: Dict[str, Any]
+
+
+class AgentProposalView(AgentApiModel):
+    proposal_id: UUID
+    action: str
+    diff: Dict[str, Any]
+    expires_at: datetime
+
+
+class AgentTurnResponse(AgentApiModel):
+    run_id: Optional[UUID] = None
+    status: Literal[
+        "answer",
+        "clarify",
+        "unsupported",
+        "proposal_pending",
+        "safety_routed",
+        "failed",
+        "replayed",
+    ]
+    message: Optional[str] = None
+    result_code: str
+    display_data: List[AgentToolDisplay] = Field(default_factory=list)
+    proposal: Optional[AgentProposalView] = None
+    replayed: bool = False
+
+
+class AgentConfirmRequest(AgentApiModel):
+    idempotency_key: str = Field(..., min_length=1, max_length=128)
+
+
+class AgentActionResponse(AgentApiModel):
+    proposal_id: UUID
+    status: str
+    result_code: str
+    result_ref: Optional[str] = None
+    message: str
+
+
 __all__ = [
     "EntryType",
     "SideEffectClass",
@@ -822,4 +925,16 @@ __all__ = [
     "SubstituteTodayExerciseDiff",
     "RecordTrainingFeedbackDiff",
     "WriteActionResult",
+    "AgentApiModel",
+    "AgentDisclosureView",
+    "AgentCapabilitiesResponse",
+    "AgentConsentGrantRequest",
+    "AgentConsentWithdrawRequest",
+    "AgentConsentResponse",
+    "AgentDataDeletionResponse",
+    "AgentToolDisplay",
+    "AgentProposalView",
+    "AgentTurnResponse",
+    "AgentConfirmRequest",
+    "AgentActionResponse",
 ]

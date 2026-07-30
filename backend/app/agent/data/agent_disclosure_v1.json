@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent-disclosure-schema-v1",
+  "disclosure_version": "agent-cloud-v1",
+  "provider_id": "dashscope",
+  "provider_name_zh": "阿里云百炼（DashScope）",
+  "purpose_code": "agent_cloud_processing",
+  "processing_boundary_code": "cloud_provider_china_mainland",
+  "data_scope_codes": [
+    "ephemeral_user_message",
+    "minimal_structured_health_context",
+    "allowlisted_tool_metadata"
+  ],
+  "application_retention_code": "no_chat_transcript_persistence",
+  "withdrawal_available": true,
+  "agent_data_deletion_available": true,
+  "reviewed_at": "2026-07-30",
+  "official_api_reference": "https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-chat-completions"
+}

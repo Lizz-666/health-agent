@@ -418,6 +418,7 @@ async def record_run(
     started_at: Optional[datetime] = None,
     expires_at: Optional[datetime] = None,
     now: Optional[datetime] = None,
+    commit: bool = True,
 ) -> RunRecordResult:
     """Record one run; a duplicate ``client_turn_id`` returns the prior run.
 
@@ -460,8 +461,40 @@ async def record_run(
         expires_at=expires_at or (now + RUN_RETENTION),
     )
     db.add(run)
-    await db.commit()
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
     return RunRecordResult(run, created=True)
+
+
+async def load_run_for_client_turn(
+    db: AsyncSession, user_id: str, client_turn_id: str
+) -> Optional[AgentRun]:
+    """Load prior owned turn metadata without creating or mutating state."""
+    return (
+        await db.execute(
+            select(AgentRun).where(
+                AgentRun.user_id == _to_uuid(user_id),
+                AgentRun.client_turn_id == client_turn_id,
+            )
+        )
+    ).scalar_one_or_none()
+
+
+async def load_proposal_for_run(
+    db: AsyncSession, user_id: str, run_id
+) -> Optional[AgentActionProposal]:
+    """Load the one owned proposal associated with a run, if present."""
+    return (
+        await db.execute(
+            select(AgentActionProposal).where(
+                AgentActionProposal.user_id == _to_uuid(user_id),
+                AgentActionProposal.run_id
+                == (_to_uuid(run_id) if not isinstance(run_id, uuid.UUID) else run_id),
+            )
+        )
+    ).scalar_one_or_none()
 
 
 async def record_tool_event(
@@ -609,6 +642,7 @@ async def create_proposal(
     policy_version: Optional[str] = None,
     now: Optional[datetime] = None,
     ttl: Optional[timedelta] = None,
+    commit: bool = True,
 ) -> ProposalCreate:
     """Create one owned pending proposal. No domain write occurs here.
 
@@ -677,7 +711,10 @@ async def create_proposal(
         expires_at=expires_at,
     )
     db.add(proposal)
-    await db.commit()
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
     return ProposalCreate(
         proposal.proposal_id, expires_at, computed_arguments.value
     )
@@ -1214,6 +1251,8 @@ __all__ = [
     "active_consent",
     "RunRecordResult",
     "record_run",
+    "load_run_for_client_turn",
+    "load_proposal_for_run",
     "record_tool_event",
     "ProposalCreate",
     "create_proposal",
