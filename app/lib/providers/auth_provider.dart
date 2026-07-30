@@ -6,6 +6,7 @@ import '../core/api_client.dart';
 import '../core/storage.dart';
 import '../models/token.dart';
 import 'activity_grid_provider.dart';
+import 'agent_provider.dart';
 import 'assessment_provider.dart';
 import 'daily_checkin_provider.dart';
 import 'health_profile_provider.dart';
@@ -208,6 +209,9 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
       // Phase 4 plan state: clear so no previous user's plan/today data leaks
       // across accounts.
       ref.invalidate(planProvider);
+      // Phase 5 chat is memory-only and must never cross an auth, token, or
+      // account boundary.
+      ref.invalidate(agentProvider);
     },
   );
 });

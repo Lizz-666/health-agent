@@ -25,9 +25,9 @@ ApiClient _apiWith(FakeDioAdapter adapter) {
 }
 
 Widget _wrap(ApiClient api) => ProviderScope(
-      overrides: [apiClientProvider.overrideWithValue(api)],
-      child: const MaterialApp(home: TodayScreen()),
-    );
+  overrides: [apiClientProvider.overrideWithValue(api)],
+  child: const MaterialApp(home: TodayScreen()),
+);
 
 Map<String, dynamic> _checkin({
   String id = 'c1',
@@ -35,27 +35,26 @@ Map<String, dynamic> _checkin({
   String dailyStatus = 'checked_in',
   bool abnormalPain = false,
   Map<String, dynamic>? painFollowup,
-}) =>
-    {
-      'id': id,
-      'local_date': '2026-07-24',
-      'sleep_quality': 'good',
-      'energy': 'normal',
-      'muscle_soreness': 'mild',
-      'available_time': '30_min',
-      'daily_status': dailyStatus,
-      'abnormal_pain': abnormalPain,
-      'pain_followup': painFollowup,
-      'risk_summary': riskSummary,
-      'risk_version': '2026-07-22-v1',
-      'created_at': '2026-07-24T08:00:00Z',
-      'updated_at': '2026-07-24T08:00:00Z',
-    };
+}) => {
+  'id': id,
+  'local_date': '2026-07-24',
+  'sleep_quality': 'good',
+  'energy': 'normal',
+  'muscle_soreness': 'mild',
+  'available_time': '30_min',
+  'daily_status': dailyStatus,
+  'abnormal_pain': abnormalPain,
+  'pain_followup': painFollowup,
+  'risk_summary': riskSummary,
+  'risk_version': '2026-07-22-v1',
+  'created_at': '2026-07-24T08:00:00Z',
+  'updated_at': '2026-07-24T08:00:00Z',
+};
 
 Map<String, dynamic> _todayResult(Map<String, dynamic>? checkin) => {
-      'checked_in': checkin != null,
-      'checkin': checkin,
-    };
+  'checked_in': checkin != null,
+  'checkin': checkin,
+};
 
 final _followup = <String, dynamic>{
   'pain_area': '下背',
@@ -169,10 +168,7 @@ void main() {
       await tester.tap(find.byKey(const Key('today-checkin-submit')));
       await tester.pumpAndSettle();
       expect(find.textContaining('请补充疼痛追问信息'), findsOneWidget);
-      expect(
-        adapter.calls.where((c) => c.method == 'PUT').toList(),
-        isEmpty,
-      );
+      expect(adapter.calls.where((c) => c.method == 'PUT').toList(), isEmpty);
 
       // Fill the required follow-up fields.
       await tester.ensureVisible(find.byKey(const Key('today-pain-area')));
@@ -252,7 +248,9 @@ void main() {
     expect(find.text('状态正常'), findsNothing);
   });
 
-  testWidgets('active_rest is shown as a valid, non-failure state', (tester) async {
+  testWidgets('active_rest is shown as a valid, non-failure state', (
+    tester,
+  ) async {
     final adapter = FakeDioAdapter()
       ..registerJson(
         'GET',
@@ -286,7 +284,9 @@ void main() {
     expect(find.textContaining('有效选择'), findsOneWidget);
   });
 
-  testWidgets('already checked-in (normal) shows summary, no form', (tester) async {
+  testWidgets('already checked-in (normal) shows summary, no form', (
+    tester,
+  ) async {
     final adapter = FakeDioAdapter()
       ..registerJson(
         'GET',
@@ -306,12 +306,10 @@ void main() {
     tester,
   ) async {
     final adapter = FakeDioAdapter()
-      ..registerError(
-        'GET',
-        '/health/checkins/today',
-        503,
-        {'detail': '今日签到加载失败', 'code': 'service_unavailable'},
-      );
+      ..registerError('GET', '/health/checkins/today', 503, {
+        'detail': '今日签到加载失败',
+        'code': 'service_unavailable',
+      });
     await tester.pumpWidget(_wrap(_apiWith(adapter)));
     await tester.pumpAndSettle();
 
@@ -366,7 +364,9 @@ void main() {
     },
   );
 
-  testWidgets('bottom nav exposes Today and can switch to Home', (tester) async {
+  testWidgets('bottom nav exposes Today, Plan, Agent and Profile', (
+    tester,
+  ) async {
     final adapter = FakeDioAdapter()
       ..registerJson(
         'GET',
@@ -388,16 +388,16 @@ void main() {
             StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: '/',
-                  builder: (_, _) => const Scaffold(body: Text('HOME_PAGE')),
+                  path: '/plan',
+                  builder: (_, _) => const Scaffold(body: Text('PLAN_PAGE')),
                 ),
               ],
             ),
             StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: '/history',
-                  builder: (_, _) => const Scaffold(body: Text('HISTORY_PAGE')),
+                  path: '/agent',
+                  builder: (_, _) => const Scaffold(body: Text('AGENT_PAGE')),
                 ),
               ],
             ),
@@ -423,13 +423,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('今日'), findsWidgets);
-    expect(find.text('首页'), findsOneWidget);
+    expect(find.text('计划'), findsOneWidget);
+    expect(find.text('Agent'), findsOneWidget);
+    expect(find.text('我的'), findsOneWidget);
+    expect(find.text('首页'), findsNothing);
     expect(find.textContaining('今日尚未签到'), findsOneWidget);
 
-    await tester.tap(find.text('首页'));
+    await tester.tap(find.text('Agent'));
     await tester.pumpAndSettle();
 
-    expect(find.text('HOME_PAGE'), findsOneWidget);
+    expect(find.text('AGENT_PAGE'), findsOneWidget);
   });
 
   testWidgets('narrow screen + large text does not overflow', (tester) async {

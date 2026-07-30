@@ -223,7 +223,7 @@ async def _require_owned_version(
 # --- Plan version writes ----------------------------------------------------
 
 
-async def create_draft(
+async def _persist_draft_core(
     db: AsyncSession,
     user_id: str,
     *,
@@ -234,32 +234,16 @@ async def create_draft(
     decision_fingerprint: str,
     generated_at: datetime,
     change_reason: str,
-    idempotency_key: str,
-    request_hash: str,
-) -> DraftResult:
-    """Persist a generated draft (idempotent).
+) -> uuid.UUID:
+    """Transaction-neutral side-effect core of ``create_draft``.
 
-    A pending ``draft`` has no execution effect. Generating a new draft when a
-    pending draft already exists supersedes that pending draft (it never had an
-    effect). The active plan is never touched by generation.
+    Supersedes any existing pending draft, inserts the plan version + sessions +
+    prescriptions, and ``flush``es so the caller receives populated ids. It does
+    NOT acquire the user lock, record idempotency, or commit: the committing
+    ``create_draft`` wrapper and the Agent confirmation path both call this core
+    so chat and button behaviour share one operation (ADR-0003). No business
+    rule is duplicated. Returns the new ``plan_version_id``.
     """
-    now = _now()
-    await acquire_user_transaction_lock(db, user_id)
-    action, record = await _check_idempotency(
-        db, user_id, OP_PLAN_GENERATE, idempotency_key, request_hash, now
-    )
-    if action == "replay":
-        # Replay: return the recorded draft. The replayed read performs no write.
-        result_ref = record.result_ref
-        await db.rollback()
-        assert result_ref is not None
-        return DraftResult(uuid.UUID(result_ref), "replayed")
-    if action == "conflict":
-        raise AppException(
-            400, "idempotency_key 已用于不同的请求", "idempotency_key_conflict"
-        )
-
-    # Supersede any existing pending draft (it never had execution effect).
     pending = await get_pending_draft(db, user_id)
     if pending is not None:
         assert_transition(PlanStatus.draft, PlanStatus.superseded)
@@ -310,13 +294,64 @@ async def create_draft(
                     display_order=order,
                 )
             )
+    return version.plan_version_id
 
+
+async def create_draft(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    draft: TrainingPlanDraft,
+    weekly_frequency: int,
+    session_duration_minutes: int,
+    decision_gate: str,
+    decision_fingerprint: str,
+    generated_at: datetime,
+    change_reason: str,
+    idempotency_key: str,
+    request_hash: str,
+) -> DraftResult:
+    """Persist a generated draft (idempotent).
+
+    Thin committing wrapper around ``_persist_draft_core`` plus the user lock +
+    domain idempotency record. A pending ``draft`` has no execution effect.
+    Generating a new draft when a pending draft already exists supersedes that
+    pending draft (it never had an effect). The active plan is never touched by
+    generation.
+    """
+    now = _now()
+    await acquire_user_transaction_lock(db, user_id)
+    action, record = await _check_idempotency(
+        db, user_id, OP_PLAN_GENERATE, idempotency_key, request_hash, now
+    )
+    if action == "replay":
+        # Replay: return the recorded draft. The replayed read performs no write.
+        result_ref = record.result_ref
+        await db.rollback()
+        assert result_ref is not None
+        return DraftResult(uuid.UUID(result_ref), "replayed")
+    if action == "conflict":
+        raise AppException(
+            400, "idempotency_key 已用于不同的请求", "idempotency_key_conflict"
+        )
+
+    plan_version_id = await _persist_draft_core(
+        db,
+        user_id,
+        draft=draft,
+        weekly_frequency=weekly_frequency,
+        session_duration_minutes=session_duration_minutes,
+        decision_gate=decision_gate,
+        decision_fingerprint=decision_fingerprint,
+        generated_at=generated_at,
+        change_reason=change_reason,
+    )
     await _record_idempotency(
         db, user_id, OP_PLAN_GENERATE, idempotency_key, request_hash,
-        str(version.plan_version_id), now,
+        str(plan_version_id), now,
     )
     await db.commit()
-    return DraftResult(version.plan_version_id, "created")
+    return DraftResult(plan_version_id, "created")
 
 
 async def confirm_and_activate(
@@ -406,6 +441,33 @@ async def cancel(
 # --- Execution records ------------------------------------------------------
 
 
+async def _persist_feedback_core(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    plan_version_id: uuid.UUID,
+    session_id: uuid.UUID,
+    local_date: date,
+    outcome_state: str,
+) -> uuid.UUID:
+    """Transaction-neutral side-effect core of ``record_feedback``.
+
+    Inserts one ``TrainingSessionFeedback`` and ``flush``es; it does NOT acquire
+    the user lock, record idempotency, or commit. Shared by the committing
+    wrapper and the Agent confirmation path (ADR-0003). Returns feedback_id.
+    """
+    feedback = TrainingSessionFeedback(
+        user_id=uuid.UUID(user_id),
+        plan_version_id=plan_version_id,
+        session_id=session_id,
+        local_date=local_date,
+        outcome_state=outcome_state,
+    )
+    db.add(feedback)
+    await db.flush()
+    return feedback.feedback_id
+
+
 async def record_feedback(
     db: AsyncSession,
     user_id: str,
@@ -417,7 +479,11 @@ async def record_feedback(
     idempotency_key: str,
     request_hash: str,
 ) -> FeedbackResult:
-    """Record one day's outcome for one session (idempotent; one per day)."""
+    """Record one day's outcome for one session (idempotent; one per day).
+
+    Thin committing wrapper around ``_persist_feedback_core`` plus the user lock
+    + domain idempotency + the per-(session,day) collision guard.
+    """
     now = _now()
     await acquire_user_transaction_lock(db, user_id)
     action, record = await _check_idempotency(
@@ -442,21 +508,54 @@ async def record_feedback(
             409, "该训练日已记录反馈", "feedback_already_recorded"
         )
 
-    feedback = TrainingSessionFeedback(
-        user_id=uuid.UUID(user_id),
+    feedback_id = await _persist_feedback_core(
+        db,
+        user_id,
         plan_version_id=plan_version_id,
         session_id=session_id,
         local_date=local_date,
         outcome_state=outcome_state,
     )
-    db.add(feedback)
-    await db.flush()
     await _record_idempotency(
         db, user_id, OP_SESSION_FEEDBACK, idempotency_key, request_hash,
-        str(feedback.feedback_id), now,
+        str(feedback_id), now,
     )
     await db.commit()
-    return FeedbackResult(feedback.feedback_id, "recorded")
+    return FeedbackResult(feedback_id, "recorded")
+
+
+async def _persist_substitution_core(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    plan_version_id: uuid.UUID,
+    session_id: uuid.UUID,
+    local_date: date,
+    original_exercise_id: str,
+    replacement_exercise_id: str,
+    relation_reason: str,
+    decision_gate: str,
+) -> uuid.UUID:
+    """Transaction-neutral side-effect core of ``record_substitution``.
+
+    Inserts one ``TrainingSessionSubstitution`` and ``flush``es; it does NOT
+    acquire the user lock, record idempotency, or commit. Shared by the
+    committing wrapper and the Agent confirmation path (ADR-0003). Returns
+    substitution_id.
+    """
+    sub = TrainingSessionSubstitution(
+        user_id=uuid.UUID(user_id),
+        plan_version_id=plan_version_id,
+        session_id=session_id,
+        local_date=local_date,
+        original_exercise_id=original_exercise_id,
+        replacement_exercise_id=replacement_exercise_id,
+        relation_reason=relation_reason,
+        decision_gate=decision_gate,
+    )
+    db.add(sub)
+    await db.flush()
+    return sub.substitution_id
 
 
 async def record_substitution(
@@ -473,7 +572,11 @@ async def record_substitution(
     idempotency_key: str,
     request_hash: str,
 ) -> SubstitutionResult:
-    """Record one same-day substitution delta (idempotent; one per day)."""
+    """Record one same-day substitution delta (idempotent; one per day).
+
+    Thin committing wrapper around ``_persist_substitution_core`` plus the user
+    lock + domain idempotency + the per-(session,day) limit guard.
+    """
     now = _now()
     await acquire_user_transaction_lock(db, user_id)
     action, record = await _check_idempotency(
@@ -497,8 +600,9 @@ async def record_substitution(
             409, "该训练日已替换过动作", "substitution_limit_reached"
         )
 
-    sub = TrainingSessionSubstitution(
-        user_id=uuid.UUID(user_id),
+    substitution_id = await _persist_substitution_core(
+        db,
+        user_id,
         plan_version_id=plan_version_id,
         session_id=session_id,
         local_date=local_date,
@@ -507,14 +611,12 @@ async def record_substitution(
         relation_reason=relation_reason,
         decision_gate=decision_gate,
     )
-    db.add(sub)
-    await db.flush()
     await _record_idempotency(
         db, user_id, OP_SESSION_SUBSTITUTE, idempotency_key, request_hash,
-        str(sub.substitution_id), now,
+        str(substitution_id), now,
     )
     await db.commit()
-    return SubstitutionResult(sub.substitution_id, "recorded")
+    return SubstitutionResult(substitution_id, "recorded")
 
 
 async def _assert_session_owned(
@@ -662,6 +764,9 @@ __all__ = [
     "CancelResult",
     "FeedbackResult",
     "SubstitutionResult",
+    "_persist_draft_core",
+    "_persist_feedback_core",
+    "_persist_substitution_core",
     "create_draft",
     "confirm_and_activate",
     "cancel",

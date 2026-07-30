@@ -77,6 +77,11 @@ ALL_TABLES = {
     "training_prescriptions",
     "training_session_feedback",
     "training_session_substitutions",
+    # Phase 5 Agent MVP (migration 0008).
+    "agent_cloud_consents",
+    "agent_runs",
+    "agent_tool_events",
+    "agent_action_proposals",
 }
 
 # Phase 1 expand 阶段新增的 6 张表。
@@ -96,12 +101,12 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0007_training_plans。"""
+    """Alembic 只有一个 head，且为 0008_agent_mvp。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0007_training_plans", head_lines[0]
+    assert head_lines[0].split()[0] == "0008_agent_mvp", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
@@ -232,6 +237,7 @@ def test_migration_tables_match_base_metadata():
     import app.posture.models  # noqa: F401
     import app.health.models  # noqa: F401
     import app.training.models  # noqa: F401
+    import app.agent.models  # noqa: F401
 
     metadata_tables = set(Base.metadata.tables.keys())
     assert metadata_tables == ALL_TABLES
@@ -254,6 +260,12 @@ def test_alembic_env_imports_health_models():
     """Alembic target metadata must include Phase 2 health models."""
     env_text = (BACKEND_DIR / "alembic" / "env.py").read_text(encoding="utf-8")
     assert "import app.health.models" in env_text
+
+
+def test_alembic_env_imports_agent_models():
+    """Alembic target metadata must include Phase 5 Agent models."""
+    env_text = (BACKEND_DIR / "alembic" / "env.py").read_text(encoding="utf-8")
+    assert "import app.agent.models" in env_text
 
 
 def test_assessment_event_columns_nullable_in_metadata():
@@ -501,6 +513,7 @@ def test_metadata_indexes_match_offline_sql():
     import app.posture.models  # noqa: F401
     import app.health.models  # noqa: F401
     import app.training.models  # noqa: F401
+    import app.agent.models  # noqa: F401
 
     domain_tables = {
         "posture_assessment_events",
@@ -519,6 +532,11 @@ def test_metadata_indexes_match_offline_sql():
         "training_prescriptions",
         "training_session_feedback",
         "training_session_substitutions",
+        # Phase 5 Agent tables (migration 0008).
+        "agent_cloud_consents",
+        "agent_runs",
+        "agent_tool_events",
+        "agent_action_proposals",
     }
 
     # Indexes that exist ONLY in the migration SQL, by design (ADR-0002): the
@@ -994,3 +1012,134 @@ def test_0006_weight_records_index_in_metadata():
     assert table.c["note"].nullable is True
     for col in ("user_id", "recorded_at", "weight_kg", "source"):
         assert table.c[col].nullable is False, f"{col} must be NOT NULL"
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 Agent MVP (migration 0008)
+# ---------------------------------------------------------------------------
+
+
+def _offline_upgrade_0008_sql() -> str:
+    proc = _run_alembic("upgrade", "0007_training_plans:0008_agent_mvp", "--sql")
+    assert proc.returncode == 0, f"alembic upgrade 0007:0008 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def _offline_downgrade_0008_sql() -> str:
+    proc = _run_alembic("downgrade", "0008_agent_mvp:0007_training_plans", "--sql")
+    assert proc.returncode == 0, f"alembic downgrade 0008:0007 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def test_0008_upgrade_creates_four_agent_tables():
+    """0008 upgrade single-head-extends 0007 and creates the four Agent tables
+    with their PK/FK/UNIQUE/CHECK/ownership-index invariants."""
+    sql = _offline_upgrade_0008_sql()
+    for table in (
+        "agent_cloud_consents",
+        "agent_runs",
+        "agent_tool_events",
+        "agent_action_proposals",
+    ):
+        assert f"CREATE TABLE {table}" in sql, f"missing CREATE TABLE {table}"
+
+    # consent: unique (user_id, purpose, sequence_no) + status CHECK + ownership index.
+    consent = sql.split("CREATE TABLE agent_cloud_consents")[1]
+    assert "PRIMARY KEY (consent_id)" in consent
+    assert "FOREIGN KEY(user_id) REFERENCES users (id)" in consent
+    assert "CONSTRAINT uq_agent_cloud_consents_user_purpose_seq UNIQUE" in consent
+    assert "sequence_no" in consent and "provider_id" in consent
+    assert "CHECK (status IN ('granted', 'withdrawn'))" in consent
+    assert "CREATE INDEX ix_agent_cloud_consents_user" in sql
+
+    # runs: unique (user_id, client_turn_id) + ownership + expiry indexes.
+    assert "CONSTRAINT uq_agent_runs_user_turn UNIQUE" in sql
+    assert "CREATE INDEX ix_agent_runs_user" in sql
+    assert "CREATE INDEX ix_agent_runs_expires_at" in sql
+
+    # tool_events: FK to runs with ondelete CASCADE + ownership index.
+    te = sql.split("CREATE TABLE agent_tool_events")[1]
+    assert "FOREIGN KEY(run_id) REFERENCES agent_runs (run_id)" in te
+    assert "ON DELETE CASCADE" in te
+    assert "CREATE INDEX ix_agent_tool_events_run" in sql
+    assert "CREATE INDEX ix_agent_tool_events_user" in sql
+
+    # proposals: status CHECK (closed lifecycle) + nullable arguments_json +
+    # user/status + run + expiry indexes.
+    pp = sql.split("CREATE TABLE agent_action_proposals")[1]
+    assert "arguments_json JSON" in pp  # JSONB renders as JSON in offline SQL
+    assert "arguments_hash" in pp
+    assert "iana_timezone VARCHAR(60) NOT NULL" in pp
+    assert "CONSTRAINT uq_agent_action_proposals_run UNIQUE (run_id)" in pp
+    assert (
+        "CHECK (status IN ('pending', 'executed', 'invalidated', 'expired', 'cancelled'))"
+        in pp
+    )
+    assert "CREATE INDEX ix_agent_action_proposals_user_status" in sql
+    assert "CREATE INDEX ix_agent_action_proposals_run" in sql
+    assert "CREATE INDEX ix_agent_action_proposals_expires_at" in sql
+
+    # No raw-text/context/prompt/provider-payload column names leak in.
+    for forbidden in (
+        "user_message",
+        "assistant_message",
+        "raw_context",
+        "prompt_text",
+        "provider_request",
+        "provider_response",
+        "tool_result_payload",
+    ):
+        assert forbidden not in sql, f"forbidden raw payload column {forbidden}"
+
+
+def test_0008_downgrade_drops_four_agent_tables():
+    """0008 downgrade drops indexes then the four tables in dependency order."""
+    sql = _offline_downgrade_0008_sql()
+    for table in (
+        "agent_action_proposals",
+        "agent_tool_events",
+        "agent_runs",
+        "agent_cloud_consents",
+    ):
+        assert f"DROP TABLE {table}" in sql, f"missing DROP TABLE {table}"
+    # Posture/health/training tables are NOT touched by the Agent downgrade.
+    for untouched in ("training_plan_versions", "health_checkins", "weight_records"):
+        assert f"DROP TABLE {untouched}" not in sql
+
+
+def test_0008_agent_models_metadata_parity():
+    """Agent ORM metadata matches the migration: ownership indexes, named UNIQUE
+    constraints, nullable arguments_json, and the cascade tool_events FK."""
+    from app.db.base import Base
+    import app.agent.models  # noqa: F401
+
+    consents = Base.metadata.tables["agent_cloud_consents"]
+    assert "ix_agent_cloud_consents_user" in {i.name for i in consents.indexes}
+    assert "uq_agent_cloud_consents_user_purpose_seq" in {
+        c.name for c in consents.constraints if c.name
+    }
+    assert consents.c["sequence_no"].nullable is False
+
+    proposals = Base.metadata.tables["agent_action_proposals"]
+    assert proposals.c["arguments_json"].nullable is True
+    assert proposals.c["arguments_hash"].nullable is False
+    assert proposals.c["iana_timezone"].nullable is False
+    assert proposals.c["result_ref"].nullable is True
+    assert "ix_agent_action_proposals_user_status" in {
+        i.name for i in proposals.indexes
+    }
+    assert "uq_agent_action_proposals_run" in {
+        c.name for c in proposals.constraints if c.name
+    }
+
+    events = Base.metadata.tables["agent_tool_events"]
+    # The tool_events -> runs FK is declared ondelete CASCADE.
+    te_fk = next(
+        fk for fk in events.foreign_keys if fk.column.table.name == "agent_runs"
+    )
+    assert te_fk.ondelete == "CASCADE"
+
+    runs = Base.metadata.tables["agent_runs"]
+    assert "uq_agent_runs_user_turn" in {c.name for c in runs.constraints if c.name}
+    assert "ix_agent_runs_expires_at" in {i.name for i in runs.indexes}
+    assert runs.c["expires_at"].nullable is False

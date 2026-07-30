@@ -8,6 +8,7 @@ and the "no recommendation text" invariant.
 
 import pytest
 
+import app.agent.models  # noqa: F401  (Phase 5 spy test needs the Agent tables)
 from app.auth.models import VerificationCode
 from sqlalchemy import select
 from tests.conftest import TestSession
@@ -372,3 +373,73 @@ async def test_trend_emits_no_recommendation_text(client):
         )
     # Schema is exactly records/trend/window/sufficient.
     assert set(body.keys()) == {"records", "trend", "window", "sufficient"}
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 Task 3: chat and button share the transaction-neutral core.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_weight_button_and_agent_share_transaction_neutral_core(monkeypatch):
+    """Both the committing API wrapper and the Agent confirmation executor call
+    the same ``create_weight_record_core`` (ADR-0003; spec Write Confirmation)."""
+    import uuid as _uuid
+    from datetime import datetime, timezone
+
+    import app.health.service as hsvc
+    from app.agent import action_tools as at
+    from app.agent import persistence as ap
+    from app.agent import schemas as S
+    from app.auth.models import User
+    from app.core.config import settings
+    from app.health.schemas import WeightRecordCreate
+
+    monkeypatch.setattr(settings, "AGENT_AUDIT_HMAC_KEY", "spy-key-0123456789abcdef")
+    monkeypatch.setattr(settings, "AGENT_AUDIT_HMAC_KEY_VERSION", "v1")
+
+    calls = []
+    real = hsvc.create_weight_record_core
+
+    async def spy(db, user_id, data):
+        calls.append("core")
+        return await real(db, user_id, data)
+
+    monkeypatch.setattr(hsvc, "create_weight_record_core", spy)
+    # Also patch the symbol the Agent module bound at import time.
+    monkeypatch.setattr(at, "create_weight_record_core", spy, raising=False)
+
+    async with TestSession() as db:
+        user = User(phone="139" + _uuid.uuid4().hex[:8])
+        db.add(user)
+        await db.flush()
+        uid = str(user.id)
+        await ap.grant_consent(
+            db, uid, accepted_provider_id="prov", accepted_disclosure_version="d1",
+            current_provider_id="prov", current_disclosure_version="d1",
+            idempotency_key="ck",
+        )
+        # Button path: the committing wrapper calls the core.
+        await hsvc.create_weight_record(
+            db, uid, WeightRecordCreate(recorded_at=datetime.now(timezone.utc), weight_kg=70.0)
+        )
+        assert calls.count("core") == 1
+
+        # Agent path: build a proposal then confirm; the executor calls the core.
+        args = S.CreateWeightRecordArguments(
+            recorded_at=datetime.now(timezone.utc), weight_kg=71.0
+        )
+        afp = at.compute_arguments_fingerprint(args)
+        prepared = await at.prepare(db, S.CREATE_WEIGHT_RECORD, args, uid, iana_timezone="Asia/Shanghai")
+        cfp = at.compute_context_fingerprint(prepared.context_fingerprint_payload)
+        run = (await ap.record_run(db, uid, client_turn_id="t1", entry_type="general")).run
+        prop = await ap.create_proposal(
+            db, run_id=run.run_id, user_id=uid, tool_name=S.CREATE_WEIGHT_RECORD,
+            arguments_json=args.model_dump(mode="json"), arguments_hash=afp.value,
+            context_fingerprint=cfp.value, fingerprint_key_version=cfp.key_version,
+            iana_timezone="Asia/Shanghai",
+        )
+        await db.commit()
+        res = await ap.confirm_proposal(db, uid, prop.proposal_id, idempotency_key="c1", iana_timezone="Asia/Shanghai")
+        assert res.status == "executed"
+        assert calls.count("core") == 2  # button + agent both used the core

@@ -230,6 +230,103 @@ def test_confirm_response_has_goals_and_risk_version(openapi_schema):
 
 
 # ---------------------------------------------------------------------------
+# Phase 5 Agent authenticated API contracts
+# ---------------------------------------------------------------------------
+
+AGENT_ROUTES = [
+    ("get", "/api/v1/agent/capabilities"),
+    ("post", "/api/v1/agent/consents:grant"),
+    ("post", "/api/v1/agent/consents:withdraw"),
+    ("delete", "/api/v1/agent/data"),
+    ("post", "/api/v1/agent/turns"),
+    ("post", "/api/v1/agent/actions/{proposal_id}:confirm"),
+    ("post", "/api/v1/agent/actions/{proposal_id}:cancel"),
+]
+
+
+@pytest.mark.parametrize("method,path", AGENT_ROUTES)
+def test_agent_routes_are_jwt_only_with_typed_responses(
+    method, path, openapi_schema
+):
+    operation = openapi_schema["paths"][path][method]
+    assert operation.get("security"), f"{method.upper()} {path} is not JWT-only"
+    schema = operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+    resolved = _resolve_ref(schema, openapi_schema)
+    assert resolved.get("properties"), (
+        f"{method.upper()} {path} has no typed response properties"
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/agent/consents:grant",
+        "/api/v1/agent/consents:withdraw",
+        "/api/v1/agent/turns",
+        "/api/v1/agent/actions/{proposal_id}:confirm",
+    ],
+)
+def test_agent_request_models_are_strict(path, openapi_schema):
+    operation = openapi_schema["paths"][path]["post"]
+    schema = operation["requestBody"]["content"]["application/json"]["schema"]
+    resolved = _resolve_ref(schema, openapi_schema)
+    assert resolved.get("additionalProperties") is False
+
+    prohibited = {
+        "user_id",
+        "actor",
+        "consent",
+        "consent_status",
+        "allowed_tools",
+        "risk_tier",
+        "policy_version",
+        "context_fingerprint",
+        "server_time",
+    }
+    assert prohibited.isdisjoint(resolved.get("properties", {}))
+
+
+def test_agent_turn_openapi_requires_timezone_and_has_typed_422(openapi_schema):
+    operation = openapi_schema["paths"]["/api/v1/agent/turns"]["post"]
+    request_schema = _resolve_ref(
+        operation["requestBody"]["content"]["application/json"]["schema"],
+        openapi_schema,
+    )
+    assert "iana_timezone" in request_schema["required"]
+    assert request_schema["properties"]["iana_timezone"]["minLength"] == 1
+
+    failure_schema = _resolve_ref(
+        operation["responses"]["422"]["content"]["application/json"]["schema"],
+        openapi_schema,
+    )
+    assert "result_code" in failure_schema["properties"]
+    assert "status" in failure_schema["properties"]
+
+
+def test_agent_public_schemas_do_not_expose_internal_payloads(openapi_schema):
+    prohibited = {
+        "user_message",
+        "assistant_message",
+        "prompt",
+        "provider_response",
+        "raw_context",
+        "arguments_json",
+        "consent_record",
+        "api_key",
+    }
+    for name in (
+        "AgentCapabilitiesResponse",
+        "AgentTurnResponse",
+        "AgentActionResponse",
+        "AgentDataDeletionResponse",
+    ):
+        schema = openapi_schema["components"]["schemas"][name]
+        assert prohibited.isdisjoint(schema.get("properties", {})), name
+
+
+# ---------------------------------------------------------------------------
 # Phase 2 Task 2: health profile OpenAPI contracts
 # ---------------------------------------------------------------------------
 

@@ -13,6 +13,12 @@ targets are appended here by the same task that creates each test file (Tasks
 that do not yet exist. ``full`` always runs the COMPLETE backend suite, so every
 Phase 4 test is covered regardless of the fast list.
 
+Phase 5 (Agent MVP) appends its backend targets the same way. Batch A / Task 1
+adds the read-only Agent boundary tests (strict schemas, keyed fingerprints,
+deterministic safety-text routing, minimal context resolution, static read Tool
+registry, and read adapters). Later Phase 5 batches append their own test files
+as they land; ``full`` still runs the complete suite.
+
 Design contract (docs/product/roadmap.md section 13.1 and the Phase 3/4 plans):
 
 - ``fast`` is the fast feedback layer: deterministic lint + targeted Phase 3
@@ -76,6 +82,26 @@ FAST_TEST_TARGETS = [
     "tests/test_training_generator.py",
     "tests/test_training_api.py",
     "tests/test_phase4_e2e.py",
+    # Phase 5 Batch A / Task 1: read-only Agent context + tool boundary.
+    "tests/test_agent_schemas.py",
+    "tests/test_agent_context.py",
+    "tests/test_agent_tool_registry.py",
+    "tests/test_agent_read_tools.py",
+    # Phase 5 Batch B / Task 2: consent / audit / proposal persistence + migration.
+    "tests/test_agent_privacy.py",
+    "tests/test_agent_persistence.py",
+    "tests/test_agent_migrations.py",
+    # Phase 5 Batch B / Task 3: confirmed write adapters + confirmation.
+    "tests/test_agent_action_tools.py",
+    "tests/test_agent_confirmation.py",
+    # Phase 5 Batch C / Task 4: provider/orchestrator/API/adversarial boundary.
+    "tests/test_agent_provider.py",
+    "tests/test_agent_orchestrator.py",
+    "tests/test_agent_api.py",
+    "tests/test_agent_adversarial.py",
+    # Phase 5 Batch D / Task 6: isolated synthetic end-to-end acceptance.
+    "tests/test_phase5_e2e.py",
+    "tests/test_openapi_contracts.py",
 ]
 
 
