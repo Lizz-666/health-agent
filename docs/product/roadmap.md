@@ -326,8 +326,11 @@ flowchart TB
 
 ## 9. 阶段 5：Agent MVP
 
-> 状态（2026-07-29）：Task 0 已在精确 SHA `f6c2eae` 通过 Gate 0 独立复审；
-> 当前仅授权 Batch A / Task 1，后续批次仍受 Gate 1-4 约束。
+> 状态（2026-07-30）：**阶段 5 已完成并通过 Gate 4 独立验收**。
+> 接受实现 SHA `517d548`；本地严格 Full `1387 passed`、PostgreSQL
+> `20/20`、Flutter `361 passed`，exact-SHA CI run `30517131521` 的
+> Fast/Flutter/Full 全通过，Android 合成 enabled/unconsented/disabled
+> 流程通过。证据见 `docs/reports/phase5-codex-exit-audit-2026-07-30.md`。
 > 当前规格：`docs/specs/agent/2026-07-28-agent-mvp.md`。
 > 当前计划：`docs/plans/agent/2026-07-28-agent-mvp.md`。
 
@@ -378,6 +381,10 @@ flowchart TB
 - 对话与按钮生成的计划使用相同服务和校验器
 - 模型失败不会被解释为正常、健康或已成功执行
 - 未取得当前云模型处理同意时不会调用外部模型，撤回或删除后不保留完整聊天或待执行提案
+
+**阶段 5 已完成（2026-07-30）。** 该结论仅适用于个人开发版和合成
+验收数据；live provider 真实健康数据处理、公开发布合规、持久调度清理和
+平台级完整账号删除仍是退出审计中明确记录的后续门，不被本完成状态覆盖。
 
 ## 10. 阶段 6：饮食推荐 MVP
 
