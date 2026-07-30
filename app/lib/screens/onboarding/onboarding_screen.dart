@@ -33,12 +33,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
     final ok = await ref.read(userProvider.notifier).updateProfile(
       height: _height, weight: _weight, age: _age, gender: _gender);
-    if (ok && mounted) context.go('/');
+    if (ok && mounted) context.go('/today');
   }
 
   Future<void> _skip() async {
     ref.read(authProvider.notifier).clearisNewUser();
-    if (mounted) context.go('/');
+    if (mounted) context.go('/today');
   }
 
   @override

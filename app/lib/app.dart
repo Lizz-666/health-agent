@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'core/theme.dart';
+import 'models/agent.dart';
 import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
+import 'screens/agent/agent_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/home/home_screen.dart';
@@ -93,26 +95,36 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
+      GoRoute(path: '/', redirect: (_, _) => '/posture'),
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) =>
             AppShell(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(
             routes: [
-              GoRoute(
-                path: '/today',
-                builder: (_, _) => const TodayScreen(),
-              ),
+              GoRoute(path: '/today', builder: (_, _) => const TodayScreen()),
             ],
           ),
           StatefulShellBranch(
-            routes: [GoRoute(path: '/', builder: (_, _) => const HomeScreen())],
+            routes: [
+              GoRoute(path: '/plan', builder: (_, _) => const PlanScreen()),
+            ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/plan',
-                builder: (_, _) => const PlanScreen(),
+                path: '/agent',
+                builder: (_, state) {
+                  AgentRouteContext? routeContext;
+                  try {
+                    routeContext = AgentRouteContext.fromQuery(
+                      state.uri.queryParameters,
+                    );
+                  } on FormatException {
+                    routeContext = null;
+                  }
+                  return AgentScreen(routeContext: routeContext);
+                },
               ),
             ],
           ),
@@ -144,12 +156,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      GoRoute(path: '/posture', builder: (_, _) => const HomeScreen()),
       // History remains reachable (moved out of the bottom nav to make room
       // for the Phase 4 计划 tab).
-      GoRoute(
-        path: '/history',
-        builder: (_, _) => const HistoryScreen(),
-      ),
+      GoRoute(path: '/history', builder: (_, _) => const HistoryScreen()),
       GoRoute(
         path: '/issues/:category',
         builder: (_, state) =>
@@ -228,14 +238,14 @@ class AppShell extends StatelessWidget {
             label: '今日',
           ),
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: '首页',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.fitness_center_outlined),
             selectedIcon: Icon(Icons.fitness_center),
             label: '计划',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.auto_awesome_outlined),
+            selectedIcon: Icon(Icons.auto_awesome),
+            label: 'Agent',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outlined),

@@ -49,7 +49,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (state.isNewUser) {
         context.go('/onboarding');
       } else {
-        context.go('/');
+        context.go('/today');
       }
     }
   }
@@ -63,7 +63,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (state.isNewUser) {
         context.go('/onboarding');
       } else {
-        context.go('/');
+        context.go('/today');
       }
     }
   }

@@ -99,6 +99,8 @@ FAST_TEST_TARGETS = [
     "tests/test_agent_orchestrator.py",
     "tests/test_agent_api.py",
     "tests/test_agent_adversarial.py",
+    # Phase 5 Batch D / Task 6: isolated synthetic end-to-end acceptance.
+    "tests/test_phase5_e2e.py",
     "tests/test_openapi_contracts.py",
 ]
 

@@ -1,4 +1,4 @@
-﻿// app/lib/screens/plan/plan_screen.dart
+// app/lib/screens/plan/plan_screen.dart
 //
 // Phase 4 plan + daily execution flow (Task 6): goal/schedule selection ->
 // draft review -> explicit confirm -> active plan -> today's session ->
@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/idempotency_key.dart';
 import '../../models/plan.dart';
 import '../../providers/assessment_provider.dart' show LoadStatus;
@@ -36,6 +37,19 @@ String _outcomeLabel(OutcomeState s) {
     case OutcomeState.discomfort:
       return '身体不适';
   }
+}
+
+void _openAgent(
+  BuildContext context, {
+  required String entryType,
+  required String entityId,
+}) {
+  context.go(
+    Uri(
+      path: '/agent',
+      queryParameters: {'entry_type': entryType, 'entity_id': entityId},
+    ).toString(),
+  );
 }
 
 Widget _exerciseIllustration(PlanExercise exercise, {double size = 72}) {
@@ -168,33 +182,41 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   }
 
   Widget _profileRequired() => const _StatusCard(
-        icon: Icons.assignment_ind_outlined,
-        title: '请先完善健康档案',
-        detail: '训练目标、频率、时长和器材必须来自当前健康档案，不能使用页面默认值代替。',
-      );
+    icon: Icons.assignment_ind_outlined,
+    title: '请先完善健康档案',
+    detail: '训练目标、频率、时长和器材必须来自当前健康档案，不能使用页面默认值代替。',
+  );
 
   Future<void> _generate() async {
-    await ref.read(planProvider.notifier).generateDraft(DraftInput(
-          fitnessGoal: _goal,
-          weeklyFrequency: _frequency,
-          sessionDurationMinutes: _duration,
-          equipmentBodyweight: _bodyweight,
-          equipmentResistanceBand: _resistanceBand,
-          ianaTimezone: _kDefaultTimezone,
-          idempotencyKey: newIdempotencyKey(),
-        ));
+    await ref
+        .read(planProvider.notifier)
+        .generateDraft(
+          DraftInput(
+            fitnessGoal: _goal,
+            weeklyFrequency: _frequency,
+            sessionDurationMinutes: _duration,
+            equipmentBodyweight: _bodyweight,
+            equipmentResistanceBand: _resistanceBand,
+            ianaTimezone: _kDefaultTimezone,
+            idempotencyKey: newIdempotencyKey(),
+          ),
+        );
   }
 
   Future<void> _confirm() async {
-    final ok = await ref.read(planProvider.notifier).confirm(ConfirmInput(
-          fitnessGoal: _goal,
-          weeklyFrequency: _frequency,
-          sessionDurationMinutes: _duration,
-          equipmentBodyweight: _bodyweight,
-          equipmentResistanceBand: _resistanceBand,
-          ianaTimezone: _kDefaultTimezone,
-          idempotencyKey: newIdempotencyKey(),
-        ));
+    final ok = await ref
+        .read(planProvider.notifier)
+        .confirm(
+          ConfirmInput(
+            fitnessGoal: _goal,
+            weeklyFrequency: _frequency,
+            sessionDurationMinutes: _duration,
+            equipmentBodyweight: _bodyweight,
+            equipmentResistanceBand: _resistanceBand,
+            ianaTimezone: _kDefaultTimezone,
+            idempotencyKey: newIdempotencyKey(),
+          ),
+        );
     if (ok && mounted) {
       ref.read(planProvider.notifier).fetchToday(_kDefaultTimezone);
     }
@@ -302,14 +324,17 @@ class _DraftReview extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('计划草案 · ${_kGoalLabels[draft.requestedGoal] ?? draft.requestedGoal} · '
-            '${draft.weeklyFrequency}次/周 · ${draft.sessionDurationMinutes}分钟'),
+        Text(
+          '计划草案 · ${_kGoalLabels[draft.requestedGoal] ?? draft.requestedGoal} · '
+          '${draft.weeklyFrequency}次/周 · ${draft.sessionDurationMinutes}分钟',
+        ),
         const SizedBox(height: 8),
         for (final session in draft.sessions)
           Card(
             child: ListTile(
               title: Text(
-                  '第${session.weekIndex}周 · 周${session.dayOfWeek} · 场次${session.sessionOrder}'),
+                '第${session.weekIndex}周 · 周${session.dayOfWeek} · 场次${session.sessionOrder}',
+              ),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -378,9 +403,29 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('生效计划 · ${_kGoalLabels[active.requestedGoal] ?? active.requestedGoal}'),
-        Text('版本 ${active.changeReason} · 决策 ${active.decisionGate}',
-            style: const TextStyle(fontSize: 12)),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '生效计划 · ${_kGoalLabels[active.requestedGoal] ?? active.requestedGoal}',
+              ),
+            ),
+            TextButton.icon(
+              key: const Key('agent-plan-entry'),
+              onPressed: () => _openAgent(
+                context,
+                entryType: 'training_plan',
+                entityId: active.planVersionId,
+              ),
+              icon: const Icon(Icons.auto_awesome_outlined),
+              label: const Text('问 Agent'),
+            ),
+          ],
+        ),
+        Text(
+          '版本 ${active.changeReason} · 决策 ${active.decisionGate}',
+          style: const TextStyle(fontSize: 12),
+        ),
         const Divider(),
         _todaySection(plan),
       ],
@@ -414,13 +459,13 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
     final today = plan.today!;
     switch (today.state) {
       case TodayState.noActivePlan:
-        return const _StatusCard(
-            icon: Icons.event_busy, title: '没有生效的训练计划');
+        return const _StatusCard(icon: Icons.event_busy, title: '没有生效的训练计划');
       case TodayState.blocked:
         return _StatusCard(
           icon: Icons.block,
           title: '当前状态暂停训练',
-          detail: '检测到安全风险信号（${today.decisionGate ?? "blocked"}），已停止训练；不会显示为成功。',
+          detail:
+              '检测到安全风险信号（${today.decisionGate ?? "blocked"}），已停止训练；不会显示为成功。',
         );
       case TodayState.restDay:
         return _StatusCard(
@@ -440,10 +485,14 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
           feedback: today.feedbackOutcomeState,
           substitutionApplied: today.substitutionApplied,
           onFeedback: (OutcomeState outcome) async {
-            await ref.read(planProvider.notifier).recordFeedback(
+            await ref
+                .read(planProvider.notifier)
+                .recordFeedback(
                   today.session!.sessionId,
                   FeedbackInput(
-                      outcomeState: outcome, idempotencyKey: newIdempotencyKey()),
+                    outcomeState: outcome,
+                    idempotencyKey: newIdempotencyKey(),
+                  ),
                   _kDefaultTimezone,
                 );
             if (mounted) {
@@ -451,7 +500,9 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
             }
           },
           onSubstitute: (original, replacement) async {
-            await ref.read(planProvider.notifier).recordSubstitution(
+            await ref
+                .read(planProvider.notifier)
+                .recordSubstitution(
                   today.session!.sessionId,
                   SubstitutionInput(
                     originalExerciseId: original,
@@ -488,7 +539,25 @@ class _SessionSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('今日训练 · 第${session.weekIndex}周 周${session.dayOfWeek}'),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '今日训练 · 第${session.weekIndex}周 周${session.dayOfWeek}',
+              ),
+            ),
+            TextButton.icon(
+              key: const Key('agent-session-entry'),
+              onPressed: () => _openAgent(
+                context,
+                entryType: 'training_session',
+                entityId: session.sessionId,
+              ),
+              icon: const Icon(Icons.auto_awesome_outlined),
+              label: const Text('问 Agent'),
+            ),
+          ],
+        ),
         for (final p in session.prescriptions)
           Card(
             child: Padding(
@@ -496,16 +565,35 @@ class _SessionSection extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(p.exercise?.nameZh ?? p.exerciseId,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    p.exercise?.nameZh ?? p.exerciseId,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   if (p.exercise != null) ...[
                     const SizedBox(height: 8),
-                    Center(child: _exerciseIllustration(p.exercise!, size: 140)),
+                    Center(
+                      child: _exerciseIllustration(p.exercise!, size: 140),
+                    ),
                   ],
-                  Text('${p.sets}组'
-                      '${p.reps != null ? " × ${p.reps}次" : ""}'
-                      '${p.durationSeconds != null ? " · ${p.durationSeconds}秒" : ""}'
-                      ' · 休息${p.restSeconds}秒'),
+                  Text(
+                    '${p.sets}组'
+                    '${p.reps != null ? " × ${p.reps}次" : ""}'
+                    '${p.durationSeconds != null ? " · ${p.durationSeconds}秒" : ""}'
+                    ' · 休息${p.restSeconds}秒',
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: Key('agent-exercise-${p.exerciseId}'),
+                      onPressed: () => _openAgent(
+                        context,
+                        entryType: 'training_exercise',
+                        entityId: p.exerciseId,
+                      ),
+                      icon: const Icon(Icons.auto_awesome_outlined),
+                      label: const Text('让 Agent 解释'),
+                    ),
+                  ),
                   if (p.exercise != null) ...[
                     const SizedBox(height: 4),
                     for (final step in p.exercise!.instructionSteps.take(4))
@@ -514,12 +602,12 @@ class _SessionSection extends StatelessWidget {
                         !substitutionApplied &&
                         feedback == null) ...[
                       const SizedBox(height: 8),
-                      const Text('可选替代动作',
-                          style: TextStyle(fontSize: 12)),
+                      const Text('可选替代动作', style: TextStyle(fontSize: 12)),
                       for (final replacement in p.exercise!.substitutionIds)
                         TextButton(
                           key: Key('substitute-${p.exerciseId}-$replacement'),
-                          onPressed: () => onSubstitute(p.exerciseId, replacement),
+                          onPressed: () =>
+                              onSubstitute(p.exerciseId, replacement),
                           child: Text('替换为 $replacement'),
                         ),
                     ],
@@ -529,9 +617,7 @@ class _SessionSection extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 12),
-        Text(feedback == null
-            ? '今日完成情况'
-            : '已记录：${_outcomeLabel(feedback!)}'),
+        Text(feedback == null ? '今日完成情况' : '已记录：${_outcomeLabel(feedback!)}'),
         Wrap(
           spacing: 8,
           children: [
@@ -575,9 +661,11 @@ class _StatusCard extends StatelessWidget {
             Text(title, style: Theme.of(context).textTheme.titleMedium),
             if (detail != null) ...[
               const SizedBox(height: 8),
-              Text(detail!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13)),
+              Text(
+                detail!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13),
+              ),
             ],
             if (action != null && actionLabel != null) ...[
               const SizedBox(height: 16),
