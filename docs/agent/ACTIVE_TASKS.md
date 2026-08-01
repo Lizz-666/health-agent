@@ -5,7 +5,9 @@
 
 ## Current Initiative
 
-- 阶段：Phase 5 Agent MVP 已在实现 SHA `517d548` 通过 Gate 4 和最终独立验收，状态 `verified`；下一步从该关闭基线规划 Phase 6 Gate 0，尚未开始 Phase 6 代码。
+- 阶段：Phase 5 Agent MVP 已在实现 SHA `517d548` 通过 Gate 4，并在关闭 SHA `5b268445faab0578ace23b9ecd9757449155a44f` 通过最终 Fast/Flutter/Full CI run `30517649834`，状态 `verified`。Phase 6 Task 0 正在独立规格 worktree 中进行，尚未开始 Phase 6 运行时代码。
+- Phase 6 Gate 0 基线为 Phase 5 关闭 SHA `5b268445faab0578ace23b9ecd9757449155a44f`；当前规格、实施计划与 ADR 位于 `docs/specs/nutrition/2026-07-30-nutrition-recommendation-mvp.md`、`docs/plans/nutrition/2026-07-30-nutrition-recommendation-mvp.md`、ADR-0005/0006。
+- Phase 6 采用 Codex 单写入者顺序模式。营养公式、BMI/受限范围、过敏硬排除、食物/图片许可、迁移、Agent 权限和最终 Android E2E 均由 Codex 实现并在 Gate 1-4 做冷启动 findings-first 复审；不把这些高风险契约委派给外部实现 Agent。
 - Phase 4 已通过 Codex 最终独立验收，状态 `verified`；PR #2 保持 draft、尚未合并，因此不记为 `merged`。
 - Phase 5 协作章程：`docs/agent/PHASE5_COLLABORATION_CHARTER.md`。
 - Phase 5 首轮 Gate 0 审查在 `8ac8858` 报告 2 P2/4 P3；修复后的 `f6c2eae` 独立复审为 PASS、P0/P1/P2/P3 全零。记录见 `docs/reports/phase5-gate0-review-2026-07-29.md`。
@@ -41,18 +43,22 @@
 | Phase 5 Tasks 2-3 | OpenCode primary implementation and CI; Codex Gate 2 review/fixes | same implementation branch/worktree | accepted Gate 1 SHA `3df574b` plus Batch B handoff metadata | `committed` | Gate 2 接受实现 `57facf2`；consent/audit/proposal persistence、migration、privacy gate、transaction-neutral domain operations 和 confirmed writes 已由 Codex 独立修复、复核、提交并通过 exact-SHA Fast/Flutter/Full CI。 |
 | Phase 5 Task 4 | Codex implementation and independent cold review | same implementation branch/worktree after Gate 2 coordinator handoff | Gate 2 coordinator handoff `cb9b4b1` | `committed` | Gate 3 接受 `9af9bdc`；本地 Full 1383/1383、PostgreSQL 20/20，exact-SHA CI Fast/Flutter/Full 全通过。 |
 | Phase 5 Tasks 5-7 | Codex implementation, cold review, CI and Gate 4 acceptance | same implementation branch/worktree after `9af9bdc` | `9af9bdc` | `committed` | Gate 4 接受 `517d548`；Flutter Agent、E2E、Android enabled/unconsented/disabled 与退出审计完成。本地 Full 1387/1387、Flutter 361；CI `30517131521` 全通过。Phase 5 状态 `verified`，PR #3 保持 draft/unmerged。 |
+| Phase 6 Task 0 | Codex specification, source/license research, and cold review | `codex/phase6-spec-plan` / `health-worktrees/phase6-spec-plan` | `5b268445faab0578ace23b9ecd9757449155a44f` | `in_progress` | 只允许规格、计划、ADR、来源账本和 Gate 0 审查报告；不写运行时代码。Gate 0 必须收敛公式/不确定性、受限模式、过敏词表、FDC/Wikimedia 许可、不可变推荐版本和 Tasks 1-6 契约。 |
+| Phase 6 Tasks 1-6 | Codex sole implementation writer, cold reviewer, CI operator, and final acceptor | implementation branch/worktree to be created only from accepted Gate 0 SHA | accepted Gate 0 SHA (pending) | `planned` | Gate 1：数据/媒体与纯安全计算；Gate 2：生成器/迁移/API；Gate 3：Agent/Flutter；Gate 4：E2E/Android/退出审计。禁止真实数据、live AI、饮食记录/识餐/条码/摄入统计。 |
 
 ## Integration Order
 
 1. OpenCode 已完成只读预审和 Gate 0 审查；Codex 收敛 finding 后，独立复审在 `f6c2eae` 通过。
 2. Codex 从 Gate 0 关闭提交创建唯一实现分支/worktree；Batch A 已在 `3df574b` 通过 Gate 1，Batch B 已在 `57facf2` 通过 Gate 2。
 3. Batches A-B 由 OpenCode 完成并经 Codex 验收；Batches C-D 由 Codex 直接实现、冷审、验证和操作 CI，Phase 5 已关闭。
-4. Phase 6 必须先从 Phase 5 关闭提交建立独立规格/计划分支，完成营养公式、安全受限模式和来源/许可 Gate 0，再创建实现 worktree。
-5. Phase 3、Phase 4、Phase 5 后续进入主线时仍按依赖顺序；rebase、冲突修复、迁移/schema/policy 变化或实质修改后，相关证据失效并重跑。
+4. Phase 6 已从 Phase 5 关闭提交 `5b26844` 建立独立规格/计划分支；Task 0 只形成营养公式、安全受限模式、来源/许可、持久化和实施契约。Gate 0 冷审通过并提交前不得创建实现分支。
+5. Gate 0 接受后，Phase 6 Tasks 1-6 在单一 Codex 实现 worktree 顺序推进，并在 Gate 1-4 绑定 exact-SHA 本地/CI 证据；任一迁移/schema/policy/许可变更使相关旧证据失效。
+6. Phase 3、Phase 4、Phase 5 后续进入主线时仍按依赖顺序；rebase、冲突修复、迁移/schema/policy 变化或实质修改后，相关证据失效并重跑。
 
 ## Worktree State
 
 - `health` 根 worktree：当前 `codex/phase3-spec-plan`，用于协调基线和 Phase 3 draft PR。未跟踪 `.opencode/package-lock.json` 与当前工作无关，保持未暂存、未提交。
+- Phase 6 规格 worktree 为 `health-worktrees/phase6-spec-plan`，分支 `codex/phase6-spec-plan`，从 `5b26844` 创建；当前只允许 Task 0 文档。实现 worktree 尚未创建。
 - Phase 5 规划 worktree 为 `health-worktrees/phase5-spec-plan`，分支 `codex/phase5-spec-plan`；保留用于 Codex 规格、Gate 和任务提示词工作。
 - Phase 5 唯一实现 worktree 为 `health-worktrees/phase5-opencode-implementation`，分支 `codex/phase5-opencode-implementation`；实现停在 Gate 4 接受提交 `517d548`，仅剩本退出文档提交，PR #3 未合并。
 - Phase 4 OpenCode worktree 为 `health-worktrees/phase4-opencode-implementation`，停在原始交接 `2a409e8`；Codex 最终审查 worktree 为 `health-worktrees/phase4-codex-review`，分支 `codex/phase4-final-review`，停在 `e560552`。
@@ -71,4 +77,5 @@
 - Phase 5 Gate 2：`docs/reports/phase5-gate2-review-2026-07-29.md`，接受实现 `57facf2`。
 - Phase 5 Gate 3：接受实现 `9af9bdc`，CI run `30511741109`。
 - Phase 5 退出：`docs/reports/phase5-codex-exit-audit-2026-07-30.md`，接受实现 `517d548`，CI run `30517131521`。
+- Phase 5 最终关闭：文档 SHA `5b26844`，CI run `30517649834` 的 Fast/Flutter/Full 全通过。
 - Phase 2 任务明细保留在 Git 历史和对应计划中，不在当前活动账本重复维护。
