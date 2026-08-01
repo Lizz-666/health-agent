@@ -54,6 +54,15 @@ def test_every_source_subset_checksum_and_license_is_auditable():
         assert source.url.startswith("https://fdc.nal.usda.gov/")
 
 
+def test_source_subset_bytes_are_cross_platform_reproducible():
+    attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+    manifest = load_source_manifest(DATA / "source_manifest.v1.json")
+    for source in manifest.sources:
+        relative_path = f"backend/app/nutrition/data/{source.local_subset_file}"
+        assert f"{relative_path} text eol=lf" in attributes
+        assert b"\r\n" not in (DATA / source.local_subset_file).read_bytes()
+
+
 def test_media_inventory_is_local_reviewed_and_exactly_hashed():
     manifest = load_media_manifest(DATA / "media_manifest.v1.json")
     assert sum(item.kind == "ingredient" for item in manifest.media) >= 12

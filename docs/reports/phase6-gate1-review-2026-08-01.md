@@ -54,6 +54,9 @@ write tools, or Flutter nutrition workflow from later tasks.
    parses JPEG dimensions with the standard library; every checkout explicitly
    selects the PR head (with push fallback), and summaries record both event and
    checked-out SHAs.
+9. The second CI candidate exposed platform-dependent CRLF conversion in the
+   checksum-pinned FDC subsets. Both files now have explicit `text eol=lf`
+   attributes, LF byte checksums, and a regression test that rejects CRLF bytes.
 
 ## Data And License Evidence
 
