@@ -27,6 +27,7 @@ import app.health.models  # noqa: F401
 import app.posture.models  # noqa: F401
 import app.training.models  # noqa: F401  Phase 4 plan persistence (migration 0007)
 import app.agent.models  # noqa: F401  Phase 5 Agent MVP (migration 0008)
+import app.nutrition.models  # noqa: F401  Phase 6 nutrition recommendations (0010)
 
 # Alembic Config 对象，提供对 alembic.ini 的访问。
 config = context.config

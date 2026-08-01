@@ -6,6 +6,7 @@
     "avoid_pork": ["pork_tenderloin"],
     "avoid_beef": ["beef_tenderloin"]
   },
+  "whole_grain_food_ids": ["rice_brown", "oats_cooked"],
   "meal_share_pct": {
     "breakfast": [25, 30],
     "lunch": [30, 40],

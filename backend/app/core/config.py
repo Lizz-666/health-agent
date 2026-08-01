@@ -75,5 +75,9 @@ class Settings(BaseSettings):
     AGENT_PROVIDER_READ_TIMEOUT_SECONDS: float = 20.0
     AGENT_PROVIDER_MAX_RESPONSE_BYTES: int = 65536
 
+    # Phase 6 nutrition recommendation runtime. Default-off while the feature
+    # is under staged review. Deletion remains available even when disabled.
+    NUTRITION_RUNTIME_ENABLED: bool = False
+
 
 settings = Settings()

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.auth.models import User as UserModel
 from app.user.schemas import UpdateProfileRequest, UserProfileResponse
 from app.core.exceptions import NotFound
+from app.posture.user_lock import acquire_user_transaction_lock
 
 
 def _to_profile(user: UserModel) -> UserProfileResponse:
@@ -30,6 +31,7 @@ async def get_profile(db: AsyncSession, user_id: str) -> Optional[UserProfileRes
 
 
 async def update_profile(db: AsyncSession, user_id: str, request: UpdateProfileRequest) -> UserProfileResponse:
+    await acquire_user_transaction_lock(db, user_id)
     result = await db.execute(select(UserModel).where(UserModel.id == UUID(user_id)))
     user = result.scalar_one_or_none()
     if user is None:

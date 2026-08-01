@@ -145,6 +145,7 @@ async def upsert_profile_result(
     the existing row's editable fields are replaced and ``version`` is
     incremented deterministically; on first save ``version`` starts at 1.
     """
+    await acquire_user_transaction_lock(db, user_id)
     user_uuid = _to_uuid(user_id)
     row = await _fetch(db, user_id)
 
@@ -174,6 +175,7 @@ async def upsert_profile_result(
 async def delete_profile(db: AsyncSession, user_id: str) -> None:
     """Remove the caller's profile if present. Idempotent: a missing profile is
     a no-op (the post-delete state, no profile present, is what matters)."""
+    await acquire_user_transaction_lock(db, user_id)
     row = await _fetch(db, user_id)
     if row is not None:
         await db.delete(row)
@@ -368,6 +370,7 @@ async def delete_checkin(db: AsyncSession, user_id: str, checkin_id: UUID) -> No
     existence is leaked across users. A missing id is also a 404. ``checkin_id``
     is validated as a UUID by FastAPI before reaching the service.
     """
+    await acquire_user_transaction_lock(db, user_id)
     user_uuid = _to_uuid(user_id)
     result = await db.execute(
         select(DailyCheckIn).where(
@@ -465,6 +468,7 @@ async def create_weight_record(
     Thin committing wrapper around ``create_weight_record_core``; existing
     button/API behaviour and signature are unchanged.
     """
+    await acquire_user_transaction_lock(db, user_id)
     response = await create_weight_record_core(db, user_id, data)
     await db.commit()
     return response
@@ -533,6 +537,7 @@ async def update_weight_record(
     Ownership-scoped: a record belonging to another user (or a missing id)
     surfaces as a deterministic 404.
     """
+    await acquire_user_transaction_lock(db, user_id)
     row = await _fetch_weight(db, user_id, record_id)
     if row is None:
         raise NotFound("体重记录不存在")
@@ -549,6 +554,7 @@ async def delete_weight_record(
 ) -> None:
     """Delete one caller-owned weight record. Ownership-scoped: not-owned or
     missing id surfaces as a deterministic 404."""
+    await acquire_user_transaction_lock(db, user_id)
     row = await _fetch_weight(db, user_id, record_id)
     if row is None:
         raise NotFound("体重记录不存在")

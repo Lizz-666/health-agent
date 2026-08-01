@@ -82,6 +82,8 @@ ALL_TABLES = {
     "agent_runs",
     "agent_tool_events",
     "agent_action_proposals",
+    # Phase 6 nutrition recommendation versions (migration 0010).
+    "nutrition_recommendations",
 }
 
 # Phase 1 expand 阶段新增的 6 张表。
@@ -101,12 +103,12 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0008_agent_mvp。"""
+    """Alembic 只有一个 head，且为 0010_nutrition_recommendations。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0009_nutrition_profile_codes", head_lines[0]
+    assert head_lines[0].split()[0] == "0010_nutrition_recommendations", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
@@ -238,6 +240,7 @@ def test_migration_tables_match_base_metadata():
     import app.health.models  # noqa: F401
     import app.training.models  # noqa: F401
     import app.agent.models  # noqa: F401
+    import app.nutrition.models  # noqa: F401
 
     metadata_tables = set(Base.metadata.tables.keys())
     assert metadata_tables == ALL_TABLES
@@ -537,6 +540,8 @@ def test_metadata_indexes_match_offline_sql():
         "agent_runs",
         "agent_tool_events",
         "agent_action_proposals",
+        # Phase 6 nutrition recommendation versions (migration 0010).
+        "nutrition_recommendations",
     }
 
     # Indexes that exist ONLY in the migration SQL, by design (ADR-0002): the

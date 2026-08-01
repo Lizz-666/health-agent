@@ -23,11 +23,19 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.add_column(
         "health_profiles",
-        sa.Column("food_allergen_codes", postgresql.JSONB(), nullable=True),
+        sa.Column(
+            "food_allergen_codes",
+            postgresql.JSONB().with_variant(sa.JSON(), "sqlite"),
+            nullable=True,
+        ),
     )
     op.add_column(
         "health_profiles",
-        sa.Column("excluded_food_codes", postgresql.JSONB(), nullable=True),
+        sa.Column(
+            "excluded_food_codes",
+            postgresql.JSONB().with_variant(sa.JSON(), "sqlite"),
+            nullable=True,
+        ),
     )
 
 

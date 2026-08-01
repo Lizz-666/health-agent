@@ -13,6 +13,7 @@ from app.agent.schemas import AgentTurnResponse
 from app.auth.router import router as auth_router
 from app.core.exceptions import AppException
 from app.health.router import router as health_router
+from app.nutrition.router import router as nutrition_router
 from app.posture.router import router as posture_router
 from app.training.router import router as training_router
 from app.upload.router import router as upload_router
@@ -120,6 +121,7 @@ app.include_router(posture_router)
 app.include_router(upload_router)
 app.include_router(health_router)
 app.include_router(training_router)
+app.include_router(nutrition_router)
 app.include_router(agent_router)
 
 

@@ -112,6 +112,13 @@ FAST_TEST_TARGETS = [
     "tests/test_nutrition_validator.py",
     "tests/test_nutrition_context.py",
     "tests/test_nutrition_profile_migrations.py",
+    # Phase 6 Gate 2: deterministic recommendation lifecycle and JWT API.
+    "tests/test_nutrition_generator.py",
+    "tests/test_nutrition_properties.py",
+    "tests/test_nutrition_persistence.py",
+    "tests/test_nutrition_migrations.py",
+    "tests/test_nutrition_service.py",
+    "tests/test_nutrition_api.py",
     "tests/test_health_profile.py",
     "tests/test_health_profile_api.py",
 ]

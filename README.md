@@ -143,6 +143,9 @@ GitHub Actions：
 
 启动后端后访问 `http://127.0.0.1:8000/docs` 查看 OpenAPI 文档。
 
+营养建议 API 由后端 `NUTRITION_RUNTIME_ENABLED` 开关控制，默认关闭。只有在迁移、
+发布审计和客户端流程均通过验收后才应启用；关闭时，营养数据删除接口仍保持可用。
+
 ## Flutter 客户端
 
 ```bash

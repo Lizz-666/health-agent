@@ -132,6 +132,14 @@ def audit_release(data_dir: str | Path, app_dir: str | Path) -> None:
     for food_ids in policy.exclusion_food_ids.values():
         if not food_ids or not set(food_ids) <= catalog_ids:
             raise NutritionDataError("exclusion policy has unknown or empty food ids")
+    if not set(policy.whole_grain_food_ids) <= catalog_ids:
+        raise NutritionDataError("whole grain policy has unknown food ids")
+    if any(
+        food.category.value != "grain"
+        for food in catalog.foods
+        if food.food_id in policy.whole_grain_food_ids
+    ):
+        raise NutritionDataError("whole grain policy references a non-grain food")
     media_by_asset = {item.asset_key: item for item in media.media}
     ingredient_count = 0
     for food in catalog.foods:

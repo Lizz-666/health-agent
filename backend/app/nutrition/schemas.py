@@ -180,6 +180,7 @@ class NutritionPolicy(StrictModel):
     supported_catalog_version: str
     allergen_codes: List[AllergenCode]
     exclusion_food_ids: Dict[ExcludedFoodCode, List[str]]
+    whole_grain_food_ids: List[str] = Field(..., min_length=1)
     meal_share_pct: Dict[str, List[int]]
     food_group_daily_ranges: Dict[str, List[int]]
     education_only_groups: List[str]
@@ -192,6 +193,8 @@ class NutritionPolicy(StrictModel):
             raise ValueError("policy must contain the complete exclusion vocabulary")
         if any(len(ids) != len(set(ids)) for ids in self.exclusion_food_ids.values()):
             raise ValueError("exclusion food ids must be unique")
+        if len(self.whole_grain_food_ids) != len(set(self.whole_grain_food_ids)):
+            raise ValueError("whole grain food ids must be unique")
         if set(self.meal_share_pct) != {"breakfast", "lunch", "dinner"}:
             raise ValueError("policy must define exactly three meal shares")
         for bounds in self.meal_share_pct.values():
@@ -295,3 +298,168 @@ class ValidationIssue(StrictModel):
 class ValidationResult(StrictModel):
     valid: bool
     issues: List[ValidationIssue]
+
+
+class RecommendationStatus(str, Enum):
+    draft = "draft"
+    active = "active"
+    superseded = "superseded"
+
+
+class MealName(str, Enum):
+    breakfast = "breakfast"
+    lunch = "lunch"
+    dinner = "dinner"
+
+
+class NutritionTargetRanges(StrictModel):
+    """Rounded display ranges only; no unsupported exact energy estimate."""
+
+    energy_low_kcal: int = Field(..., multiple_of=100)
+    energy_high_kcal: int = Field(..., multiple_of=100)
+    protein_g_min: int
+    protein_g_max: int
+    protein_energy_pct_min: int
+    protein_energy_pct_max: int
+    carbohydrate_energy_pct_min: int
+    carbohydrate_energy_pct_max: int
+    fat_energy_pct_min: int
+    fat_energy_pct_max: int
+    fibre_g_min: int
+    fibre_g_max: int
+    drinking_water_ml_min: int
+    drinking_water_ml_max: int
+    total_water_ml_min: int
+    total_water_ml_max: int
+    uncertainty_code: str
+    limitation_codes: List[str]
+
+
+class FoodAlternative(StrictModel):
+    food_id: str = Field(..., pattern=r"^[a-z0-9_]{3,60}$")
+    gram_min: int = Field(..., ge=1, le=1000)
+    gram_max: int = Field(..., ge=1, le=1000)
+    household_portion: PortionProjection
+    allergen_codes: List[AllergenCode]
+    image_key: Optional[str] = None
+
+    @model_validator(mode="after")
+    def valid_range(self):
+        if self.gram_min > self.gram_max:
+            raise ValueError("alternative gram minimum exceeds maximum")
+        return self
+
+
+class MealFoodItem(StrictModel):
+    food_id: str = Field(..., pattern=r"^[a-z0-9_]{3,60}$")
+    gram_min: int = Field(..., ge=1, le=1000)
+    gram_max: int = Field(..., ge=1, le=1000)
+    guideline_equivalent_g: int = Field(..., ge=1, le=1000)
+    household_portion: PortionProjection
+    preparation_code: str = Field(..., min_length=1, max_length=50)
+    allergen_codes: List[AllergenCode]
+    image_key: Optional[str] = None
+    alternatives: List[FoodAlternative] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def valid_item(self):
+        if self.gram_min > self.gram_max:
+            raise ValueError("food gram minimum exceeds maximum")
+        alternative_ids = [item.food_id for item in self.alternatives]
+        if self.food_id in alternative_ids or len(alternative_ids) != len(set(alternative_ids)):
+            raise ValueError("alternatives must be unique and exclude the selected food")
+        return self
+
+
+class MealTemplate(StrictModel):
+    meal: MealName
+    rationale_codes: List[str] = Field(..., min_length=1)
+    items: List[MealFoodItem] = Field(..., min_length=1)
+
+    @field_validator("rationale_codes")
+    @classmethod
+    def rationale_is_stable_codes(cls, value: List[str]) -> List[str]:
+        if len(value) != len(set(value)) or any(
+            not code or len(code) > 60 or not code.replace("_", "").isalnum()
+            for code in value
+        ):
+            raise ValueError("rationale must contain unique stable codes")
+        return value
+
+
+class DailyFoodGroupSummary(StrictModel):
+    grains: int = Field(..., ge=0)
+    whole_grains_mixed_beans: int = Field(..., ge=0)
+    tubers: int = Field(..., ge=0)
+    vegetables: int = Field(..., ge=0)
+    fruit: int = Field(..., ge=0)
+    animal_foods: int = Field(..., ge=0)
+    dairy_ml: int = Field(..., ge=0)
+    soy_nuts: int = Field(..., ge=0)
+
+
+class DayMealRecommendation(StrictModel):
+    day_kind: DayKind
+    rationale_codes: List[str] = Field(..., min_length=1)
+    meals: List[MealTemplate] = Field(..., min_length=3, max_length=3)
+    food_group_summary: DailyFoodGroupSummary
+
+    @field_validator("rationale_codes")
+    @classmethod
+    def rationale_is_stable_codes(cls, value: List[str]) -> List[str]:
+        return MealTemplate.rationale_is_stable_codes(value)
+
+    @model_validator(mode="after")
+    def exactly_three_named_meals(self):
+        if {meal.meal for meal in self.meals} != set(MealName):
+            raise ValueError("day variant must contain breakfast, lunch and dinner")
+        return self
+
+
+class ReplacementDiff(StrictModel):
+    day_kind: DayKind
+    meal: MealName
+    item_index: int = Field(..., ge=0)
+    from_food_id: str = Field(..., pattern=r"^[a-z0-9_]{3,60}$")
+    to_food_id: str = Field(..., pattern=r"^[a-z0-9_]{3,60}$")
+    from_gram_min: int = Field(..., ge=1)
+    from_gram_max: int = Field(..., ge=1)
+    to_gram_min: int = Field(..., ge=1)
+    to_gram_max: int = Field(..., ge=1)
+    validation_codes: List[str] = Field(..., min_length=1)
+
+    @field_validator("validation_codes")
+    @classmethod
+    def validation_is_stable_codes(cls, value: List[str]) -> List[str]:
+        return MealTemplate.rationale_is_stable_codes(value)
+
+
+class RecommendationPayload(StrictModel):
+    schema_version: str = "v1"
+    requested_goal: str = Field(..., pattern=r"^(posture_improvement|fat_loss|basic_strength)$")
+    decision_gate: GateStatus
+    source_context_fingerprint: str = Field(..., pattern=r"^[0-9a-f]{64}$")
+    versions: NutritionVersions
+    targets: NutritionTargetRanges
+    variants: List[DayMealRecommendation] = Field(..., min_length=2, max_length=2)
+    guideline_source_codes: List[str] = Field(..., min_length=1)
+    uncertainty_codes: List[str] = Field(..., min_length=1)
+    cross_contact_warning_code: str = Field(..., pattern=r"^[a-z0-9_]{3,80}$")
+    replacement_diff: Optional[ReplacementDiff] = None
+
+    @field_validator("guideline_source_codes", "uncertainty_codes")
+    @classmethod
+    def metadata_is_stable_codes(cls, value: List[str]) -> List[str]:
+        return MealTemplate.rationale_is_stable_codes(value)
+
+    @model_validator(mode="after")
+    def complete_variants(self):
+        if {variant.day_kind for variant in self.variants} != set(DayKind):
+            raise ValueError("recommendation must contain training and rest variants")
+        return self
+
+
+class RecommendationContextPins(StrictModel):
+    profile_version: int = Field(..., ge=1)
+    training_plan_version_id: str = Field(..., min_length=1, max_length=64)
+    checkin_token: str = Field(..., pattern=r"^[0-9a-f]{64}$")
