@@ -213,6 +213,10 @@ jobs:
           echo "PostgreSQL did not become ready" >&2
           exit 1
       - name: Full verify (lint + complete tests + PostgreSQL 16 + git diff)
+        env:
+          # Authenticate action-pin checks so Full's zero-skip contract is not
+          # affected by the shared unauthenticated GitHub API rate limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/verify.py full
       - name: Upload summary artifact
         if: always()
