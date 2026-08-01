@@ -63,6 +63,8 @@ class HealthProfile(Base):
     risk_screen: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     allergies: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
     diet_exclusions: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    food_allergen_codes: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    excluded_food_codes: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
 
     # Monotonically incremented on each update; used by future recommendation
     # requests to detect stale profile snapshots (spec Domain Model `version`).

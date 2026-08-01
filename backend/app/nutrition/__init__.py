@@ -1,0 +1,1 @@
+"""Deterministic nutrition recommendation domain."""

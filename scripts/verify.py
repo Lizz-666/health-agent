@@ -102,6 +102,18 @@ FAST_TEST_TARGETS = [
     # Phase 5 Batch D / Task 6: isolated synthetic end-to-end acceptance.
     "tests/test_phase5_e2e.py",
     "tests/test_openapi_contracts.py",
+    # Phase 6 Gate 1: curated data, pure safety/calculation, and profile codes.
+    "tests/test_nutrition_knowledge.py",
+    "tests/test_nutrition_importers.py",
+    "tests/test_nutrition_licenses.py",
+    "tests/test_nutrition_calculator.py",
+    "tests/test_nutrition_portions.py",
+    "tests/test_nutrition_safety.py",
+    "tests/test_nutrition_validator.py",
+    "tests/test_nutrition_context.py",
+    "tests/test_nutrition_profile_migrations.py",
+    "tests/test_health_profile.py",
+    "tests/test_health_profile_api.py",
 ]
 
 

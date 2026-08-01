@@ -49,6 +49,61 @@ def _complete_profile(**overrides) -> dict:
     return payload
 
 
+@pytest.mark.asyncio
+async def test_structured_nutrition_codes_preserve_null_vs_answered_none(client):
+    token = await _login_user(client, "13900000041")
+    headers = _auth_header(token)
+    first = await client.put(PROFILE, json=_complete_profile(), headers=headers)
+    assert first.status_code == 200
+    assert first.json()["profile"]["food_allergen_codes"] is None
+    assert first.json()["profile"]["excluded_food_codes"] is None
+    second = await client.put(
+        PROFILE,
+        json=_complete_profile(food_allergen_codes=[], excluded_food_codes=[]),
+        headers=headers,
+    )
+    assert second.status_code == 200
+    assert second.json()["profile"]["food_allergen_codes"] == []
+    assert second.json()["profile"]["excluded_food_codes"] == []
+
+
+@pytest.mark.asyncio
+async def test_structured_nutrition_codes_round_trip_and_reject_unknown(client):
+    token = await _login_user(client, "13900000042")
+    headers = _auth_header(token)
+    response = await client.put(
+        PROFILE,
+        json=_complete_profile(
+            food_allergen_codes=["egg", "milk"],
+            excluded_food_codes=["avoid_pork"],
+        ),
+        headers=headers,
+    )
+    assert response.status_code == 200
+    profile = response.json()["profile"]
+    assert profile["food_allergen_codes"] == ["egg", "milk"]
+    assert profile["excluded_food_codes"] == ["avoid_pork"]
+    bad_allergen = await client.put(
+        PROFILE,
+        json=_complete_profile(food_allergen_codes=["shellfish_free"]),
+        headers=headers,
+    )
+    assert bad_allergen.status_code == 422
+    bad_exclusion = await client.put(
+        PROFILE,
+        json=_complete_profile(excluded_food_codes=["anything_user_typed"]),
+        headers=headers,
+    )
+    assert bad_exclusion.status_code == 422
+
+    duplicate = await client.put(
+        PROFILE,
+        json=_complete_profile(food_allergen_codes=["egg", "egg"]),
+        headers=headers,
+    )
+    assert duplicate.status_code == 422
+
+
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------

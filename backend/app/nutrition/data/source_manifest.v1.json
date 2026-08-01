@@ -1,0 +1,39 @@
+{
+  "manifest_version": "v1",
+  "sources": [
+    {
+      "license": "Public Domain",
+      "local_subset_file": "fdc_foundation_subset.v1.json",
+      "name": "USDA FoodData Central Foundation Foods",
+      "normalization_version": "nutrition-import-v1",
+      "pinned_version": "04/2026 JSON; archive sha256 186e988ec542e913f51ef62b86a47758e8cdd0d1dc3889e7b055581f3c09c77a",
+      "raw_sha256": "06394e5602b33b1a7769b45851abd55ddaeb926e5b7c0c7fb77ca2d52ffd6b47",
+      "removal_procedure": "Remove affected food IDs, regenerate the catalog, run the release audit, and publish a new catalog version.",
+      "retrieved_at": "2026-08-01T09:00:00Z",
+      "review_status": "approved",
+      "reviewer_role": "nutrition_data_reviewer",
+      "selected_fields": ["fdcId", "dataType", "description", "publicationDate", "foodNutrients"],
+      "source_id": "fdc-foundation-2026-04",
+      "source_type": "fdc_foundation",
+      "update_procedure": "Download the pinned official archive, verify its archive checksum, extract only reviewed IDs, review the source diff, then run import_nutrition_data.py.",
+      "url": "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_json_2026-04-30.zip"
+    },
+    {
+      "license": "Public Domain",
+      "local_subset_file": "fdc_sr_legacy_subset.v1.json",
+      "name": "USDA FoodData Central SR Legacy",
+      "normalization_version": "nutrition-import-v1",
+      "pinned_version": "04/2018 final JSON; archive sha256 0fe8ae486a2c8eb42cb96413f058deb51863a46c8fb8ee8b4b1fb45006dd338ef",
+      "raw_sha256": "0e40edfb5cfd7c521e27ce350eee4b260f2fff1edae5f2562f1db851b3607f31",
+      "removal_procedure": "Remove affected food IDs, regenerate the catalog, run the release audit, and publish a new catalog version.",
+      "retrieved_at": "2026-08-01T09:05:00Z",
+      "review_status": "approved",
+      "reviewer_role": "nutrition_data_reviewer",
+      "selected_fields": ["fdcId", "dataType", "description", "publicationDate", "foodNutrients"],
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_type": "fdc_sr_legacy",
+      "update_procedure": "Re-download the final official SR Legacy archive, verify its archive checksum, extract only reviewed IDs, review the source diff, then run import_nutrition_data.py.",
+      "url": "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_json_2018-04.zip"
+    }
+  ]
+}

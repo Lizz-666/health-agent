@@ -106,7 +106,7 @@ def test_single_head():
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0008_agent_mvp", head_lines[0]
+    assert head_lines[0].split()[0] == "0009_nutrition_profile_codes", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():

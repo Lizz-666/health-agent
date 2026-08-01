@@ -44,7 +44,7 @@
 | Phase 5 Task 4 | Codex implementation and independent cold review | same implementation branch/worktree after Gate 2 coordinator handoff | Gate 2 coordinator handoff `cb9b4b1` | `committed` | Gate 3 接受 `9af9bdc`；本地 Full 1383/1383、PostgreSQL 20/20，exact-SHA CI Fast/Flutter/Full 全通过。 |
 | Phase 5 Tasks 5-7 | Codex implementation, cold review, CI and Gate 4 acceptance | same implementation branch/worktree after `9af9bdc` | `9af9bdc` | `committed` | Gate 4 接受 `517d548`；Flutter Agent、E2E、Android enabled/unconsented/disabled 与退出审计完成。本地 Full 1387/1387、Flutter 361；CI `30517131521` 全通过。Phase 5 状态 `verified`，PR #3 保持 draft/unmerged。 |
 | Phase 6 Task 0 | Codex specification, source/license research, and cold review | `codex/phase6-spec-plan` / `health-worktrees/phase6-spec-plan` | `5b268445faab0578ace23b9ecd9757449155a44f` | `verified` | 契约候选 `0109f96` 与 closure `8ef22b4`；P0/P1/P2 为零，closure exact-SHA CI run `30696742677` 的 Fast/Flutter/Full 全通过。 |
-| Phase 6 Tasks 1-6 | Codex sole implementation writer, cold reviewer, CI operator, and final acceptor | `codex/phase6-implementation` / `health-worktrees/phase6-implementation` | `8ef22b4a9a1056ce94570b0c95483a124574243c` | `in_progress` | 当前 Gate 1 仅执行 Tasks 1-2：数据/媒体、结构化营养档案 migration `0009`、纯安全计算和验证。后续 Gate 2-4 串行推进。禁止真实数据、live AI、饮食记录/识餐/条码/摄入统计。 |
+| Phase 6 Tasks 1-6 | Codex sole implementation writer, cold reviewer, CI operator, and final acceptor | `codex/phase6-implementation` / `health-worktrees/phase6-implementation` | `8ef22b4a9a1056ce94570b0c95483a124574243c` | `review` | Gate 1 Tasks 1-2 已完成冷审和本地验证：Fast 831 passed；严格 Full 1494 passed/0 skipped、PostgreSQL 20/20；Flutter analyze clean、361 tests。候选仍待 exact-SHA CI，不提前标记 verified。后续 Gate 2-4 串行推进。 |
 
 ## Integration Order
 

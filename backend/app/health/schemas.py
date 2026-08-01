@@ -17,7 +17,7 @@ from enum import Enum
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +56,22 @@ class YesNoUnknown(str, Enum):
     yes = "yes"
     no = "no"
     unknown = "unknown"
+
+
+class FoodAllergenCode(str, Enum):
+    gluten_cereal = "gluten_cereal"
+    crustacean = "crustacean"
+    fish = "fish"
+    egg = "egg"
+    peanut = "peanut"
+    soy = "soy"
+    milk = "milk"
+    tree_nut = "tree_nut"
+
+
+class ExcludedFoodCode(str, Enum):
+    avoid_pork = "avoid_pork"
+    avoid_beef = "avoid_beef"
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +165,17 @@ class HealthProfileData(BaseModel):
     risk_screen: Optional[RiskScreen] = None
     allergies: Optional[List[Allergy]] = None
     diet_exclusions: Optional[List[DietExclusion]] = None
+    # Nutrition MVP structured answers. ``None`` means not answered; ``[]``
+    # means the user explicitly answered that there are none.
+    food_allergen_codes: Optional[List[FoodAllergenCode]] = None
+    excluded_food_codes: Optional[List[ExcludedFoodCode]] = None
+
+    @field_validator("food_allergen_codes", "excluded_food_codes")
+    @classmethod
+    def structured_codes_are_unique(cls, value):
+        if value is not None and len(value) != len(set(value)):
+            raise ValueError("structured nutrition codes must be unique")
+        return value
 
     version: int = Field(1, ge=1)
     updated_at: Optional[datetime] = None
@@ -185,6 +212,15 @@ class HealthProfileUpdate(BaseModel):
     risk_screen: Optional[RiskScreen] = None
     allergies: Optional[List[Allergy]] = None
     diet_exclusions: Optional[List[DietExclusion]] = None
+    food_allergen_codes: Optional[List[FoodAllergenCode]] = None
+    excluded_food_codes: Optional[List[ExcludedFoodCode]] = None
+
+    @field_validator("food_allergen_codes", "excluded_food_codes")
+    @classmethod
+    def structured_codes_are_unique(cls, value):
+        if value is not None and len(value) != len(set(value)):
+            raise ValueError("structured nutrition codes must be unique")
+        return value
 
 
 class HealthProfileResponse(HealthProfileData):

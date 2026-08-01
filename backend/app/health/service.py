@@ -83,6 +83,8 @@ def _response_from_row(row: HealthProfile) -> HealthProfileResponse:
         risk_screen=row.risk_screen,
         allergies=row.allergies,
         diet_exclusions=row.diet_exclusions,
+        food_allergen_codes=row.food_allergen_codes,
+        excluded_food_codes=row.excluded_food_codes,
         version=row.version,
         updated_at=row.updated_at,
         created_at=row.created_at,
@@ -489,6 +491,25 @@ async def list_weight_records(
     stmt = stmt.order_by(WeightRecord.recorded_at.desc(), WeightRecord.id.desc())
     result = await db.execute(stmt)
     return [_weight_response(row) for row in result.scalars().all()]
+
+
+async def get_latest_manual_weight_at(
+    db: AsyncSession, user_id: str, evaluated_at: datetime
+) -> Optional[WeightRecordResponse]:
+    """Return the latest caller-owned, non-future manual weight record."""
+    user_uuid = _to_uuid(user_id)
+    result = await db.execute(
+        select(WeightRecord)
+        .where(
+            WeightRecord.user_id == user_uuid,
+            WeightRecord.source == WEIGHT_SOURCE_MANUAL,
+            WeightRecord.recorded_at <= evaluated_at,
+        )
+        .order_by(WeightRecord.recorded_at.desc(), WeightRecord.id.desc())
+        .limit(1)
+    )
+    row = result.scalar_one_or_none()
+    return _weight_response(row) if row is not None else None
 
 
 async def _fetch_weight(
