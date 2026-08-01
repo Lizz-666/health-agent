@@ -1,8 +1,9 @@
 # Phase 6 Nutrition Recommendation MVP Implementation Plan
 
-> Status: proposed for Gate 0 review, 2026-07-30. Runtime implementation is not
-> authorized until this plan, the specification, and ADR-0005/0006 pass a cold
-> findings-first review.
+> Status: accepted at Gate 0 on 2026-08-01. Contract candidate `0109f96` passed
+> the cold findings-first review, local Fast, and exact-SHA GitHub
+> Fast/Flutter/Full CI run `30696443907`. Runtime implementation starts only
+> after the metadata closure commit also passes exact-SHA CI.
 
 **Goal:** Deliver deterministic, allergy-aware training/rest meal
 recommendations for the supported healthy-adult scope without creating an

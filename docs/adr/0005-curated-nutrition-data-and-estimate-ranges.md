@@ -2,7 +2,8 @@
 
 ## Status
 
-Proposed for Phase 6 Gate 0 review (2026-07-30).
+Accepted at Phase 6 Gate 0 (2026-08-01). Contract candidate `0109f96` passed
+exact-SHA GitHub Fast/Flutter/Full CI run `30696443907`.
 
 ## Context
 

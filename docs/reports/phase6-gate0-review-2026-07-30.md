@@ -8,10 +8,10 @@
 
 ## Decision
 
-**PASS for the Gate 0 candidate tree.** Open P0/P1/P2 findings: zero. Final Gate
-0 acceptance remains pending a committed exact SHA and green Fast/Flutter/Full
-CI on that SHA. Runtime implementation must start from the later recorded Gate
-0 closure SHA, not from this pre-commit worktree state.
+**PASS.** Open P0/P1/P2 findings: zero. Contract candidate
+`0109f96e51ae600365d0de0cdba9b12292d22ae8` passed local Fast and exact-SHA
+GitHub Fast/Flutter/Full CI run `30696443907`. Runtime implementation must start
+from the subsequent metadata closure SHA only after that SHA's own CI is green.
 
 ## Findings Closed
 
@@ -116,6 +116,10 @@ CI on that SHA. Runtime implementation must start from the later recorded Gate
 - `git status --short --branch`: only the five allowed Gate 0 document groups
   are modified/untracked.
 - `git diff --check`: exit 0; only the standard Windows LF/CRLF warning appeared.
+- `python scripts/verify.py fast` on candidate `0109f96`: PASS; ruff clean,
+  backend `653 passed / 0 failed / 7 skipped`, candidate diff clean.
+- GitHub CI run `30696443907` on exact candidate `0109f96`: Fast, Flutter, and
+  Full PostgreSQL all passed.
 - Contract searches found no remaining PAL `1.5`, old Tool name, header
   idempotency contract, old migration assignment, or nearest-meal claim.
 - Six exact DRI image URLs: HTTP 200.
@@ -126,8 +130,7 @@ CI on that SHA. Runtime implementation must start from the later recorded Gate
 
 ## Gate Conditions
 
-Gate 0 may close only after the candidate is committed, the report and task
-ledger record that SHA, exact-SHA CI is green, and a final diff/status check
-shows no runtime or unrelated files. ADR-0005/0006 then become accepted for
-Phase 6 implementation; later source, policy, migration, or contract changes
-invalidate this review and require a new gate review.
+The contract candidate conditions are satisfied. Gate 0 closes after this
+metadata-only acceptance commit passes exact-SHA CI and a final status check
+shows no runtime or unrelated files. Later source, policy, migration, or
+contract changes invalidate this review and require a new gate review.

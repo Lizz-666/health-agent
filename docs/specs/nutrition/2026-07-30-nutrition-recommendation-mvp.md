@@ -1,6 +1,8 @@
 # Phase 6 Nutrition Recommendation MVP
 
-> Status: proposed for Gate 0 review, 2026-07-30. This specification defines a
+> Status: accepted at Phase 6 Gate 0 on 2026-08-01. Contract candidate
+> `0109f96e51ae600365d0de0cdba9b12292d22ae8` passed local Fast and exact-SHA
+> GitHub Fast/Flutter/Full CI run `30696443907`. This specification defines a
 > personal-development wellness feature for synthetic-data validation. It does
 > not authorize disease treatment diets, public deployment, or use of real
 > health data in development tools.
