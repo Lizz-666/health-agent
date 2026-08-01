@@ -28,7 +28,9 @@ from app.nutrition.knowledge import (
 from app.nutrition.models import NutritionRecommendation
 from app.nutrition.safety import classify_nutrition
 from app.nutrition.schemas import (
+    DayKind,
     GateStatus,
+    MealName,
     NutritionContext,
     NutritionDecision,
     NutritionTargetRanges,
@@ -64,6 +66,21 @@ class CurrentNutritionState:
     decision: NutritionDecision
     allergen_codes: set[str]
     excluded_food_ids: set[str]
+
+
+@dataclass(frozen=True)
+class PreparedNutritionDraft:
+    payload: RecommendationPayload
+    pins: RecommendationContextPins
+    state: CurrentNutritionState
+
+
+@dataclass(frozen=True)
+class PreparedNutritionReplacement:
+    payload: RecommendationPayload
+    pins: RecommendationContextPins
+    state: CurrentNutritionState
+    source: NutritionRecommendation
 
 
 def _resources():
@@ -262,6 +279,153 @@ def get_food(food_id: str):
     return food
 
 
+async def read_agent_targets(
+    db: AsyncSession, user_id: str, iana_timezone: str
+) -> tuple[CurrentNutritionState, NutritionTargetRanges | None]:
+    """Return the deterministic gate and, only when eligible, rounded targets."""
+    require_runtime_enabled()
+    state = await _current_state(db, user_id, iana_timezone)
+    if state.decision.gate not in {
+        GateStatus.eligible,
+        GateStatus.eligible_conservative,
+    }:
+        return state, None
+    target = _targets(state)
+    return state, NutritionTargetRanges.model_validate(
+        target.model_dump(exclude={"reference_center_kcal"})
+    )
+
+
+def read_agent_portion_ranges() -> tuple[dict[str, list[int]], dict[str, list[int]]]:
+    """Return versioned policy ranges without model-side arithmetic."""
+    require_runtime_enabled()
+    _catalog, policy, _media, _sources = _resources()
+    food_groups = {
+        code: [bounds[0], bounds[1]]
+        for code, bounds in policy.food_group_daily_ranges.items()
+    }
+    meal_shares = {
+        code: [bounds[0], bounds[1]]
+        for code, bounds in policy.meal_share_pct.items()
+    }
+    return food_groups, meal_shares
+
+
+async def prepare_draft_domain(
+    db: AsyncSession, user_id: str, iana_timezone: str
+) -> PreparedNutritionDraft:
+    """Build and independently validate a draft without persisting it."""
+    require_runtime_enabled()
+    state = await _current_state(db, user_id, iana_timezone)
+    target = _targets(state)
+    catalog, policy, media, _sources = _resources()
+    try:
+        payload = generate_recommendation(
+            catalog=catalog,
+            policy=policy,
+            media_manifest=media,
+            decision=state.decision,
+            targets=target,
+            versions=versions(),
+            requested_goal=state.context.active_plan_goal or "",
+            allergen_codes=state.allergen_codes,
+            excluded_food_ids=state.excluded_food_ids,
+        )
+    except NutritionGenerationError as exc:
+        raise AppException(409, "无法生成安全候选", exc.code) from exc
+    _validate(payload, state)
+    return PreparedNutritionDraft(payload, _pins(state), state)
+
+
+async def resolve_agent_recommendation(
+    db: AsyncSession,
+    user_id: str,
+    iana_timezone: str,
+    recommendation_id: str | None = None,
+) -> tuple[CurrentNutritionState, NutritionRecommendation | None]:
+    """Resolve only the current owned active/draft row for Agent reads."""
+    state, row = await resolve_agent_context(
+        db, user_id, iana_timezone, recommendation_id
+    )
+    _raise_for_gate(state.decision)
+    if row is not None:
+        _assert_row_current(row, state)
+    return state, row
+
+
+async def resolve_agent_context(
+    db: AsyncSession,
+    user_id: str,
+    iana_timezone: str,
+    recommendation_id: str | None = None,
+) -> tuple[CurrentNutritionState, NutritionRecommendation | None]:
+    """Resolve the current owned row plus gate codes without bypassing safety."""
+    require_runtime_enabled()
+    active = await persistence.get_active(db, user_id)
+    draft = await persistence.get_current_draft(db, user_id)
+    current = [row for row in (active, draft) if row is not None]
+    row = active or draft
+    if recommendation_id is not None:
+        row = next(
+            (
+                item
+                for item in current
+                if str(item.recommendation_id) == recommendation_id
+            ),
+            None,
+        )
+        if row is None:
+            raise AppException(
+                404,
+                "推荐不存在",
+                "not_owner_or_missing_recommendation",
+            )
+    state = await _current_state(db, user_id, iana_timezone)
+    if row is not None and state.decision.gate in {
+        GateStatus.eligible,
+        GateStatus.eligible_conservative,
+    }:
+        _assert_row_current(row, state)
+    return state, row
+
+
+async def prepare_replacement_domain(
+    db: AsyncSession,
+    user_id: str,
+    iana_timezone: str,
+    *,
+    day_kind: DayKind,
+    meal: MealName,
+    item_index: int,
+    from_food_id: str,
+    to_food_id: str,
+) -> PreparedNutritionReplacement:
+    """Build and independently validate a current-active replacement."""
+    state, row = await resolve_agent_recommendation(
+        db, user_id, iana_timezone
+    )
+    if row is None or row.status != "active":
+        raise AppException(409, "当前没有可替换的生效推荐", "invalid_recommendation_state")
+    catalog, policy, _media, _sources = _resources()
+    try:
+        payload = preview_replacement(
+            RecommendationPayload.model_validate(row.payload),
+            catalog=catalog,
+            policy=policy,
+            day_kind=day_kind,
+            meal=meal,
+            item_index=item_index,
+            from_food_id=from_food_id,
+            to_food_id=to_food_id,
+            allergen_codes=state.allergen_codes,
+            excluded_food_ids=state.excluded_food_ids,
+        )
+    except NutritionGenerationError as exc:
+        raise AppException(409, "替换不可用", exc.code) from exc
+    _validate(payload, state)
+    return PreparedNutritionReplacement(payload, _pins(state), state, row)
+
+
 async def generate_draft(
     db: AsyncSession, user_id: str, request: DraftRequest
 ) -> RecommendationStateResponse:
@@ -283,29 +447,14 @@ async def generate_draft(
             recommendation=_view(replay),
             operation_status="replayed",
         )
-    state = await _current_state(db, user_id, request.iana_timezone)
-    target = _targets(state)
-    catalog, policy, media, _sources = _resources()
-    try:
-        payload = generate_recommendation(
-            catalog=catalog,
-            policy=policy,
-            media_manifest=media,
-            decision=state.decision,
-            targets=target,
-            versions=versions(),
-            requested_goal=state.context.active_plan_goal or "",
-            allergen_codes=state.allergen_codes,
-            excluded_food_ids=state.excluded_food_ids,
-        )
-    except NutritionGenerationError as exc:
-        raise AppException(409, "无法生成安全候选", exc.code) from exc
-    _validate(payload, state)
+    prepared = await prepare_draft_domain(
+        db, user_id, request.iana_timezone
+    )
     result = await persistence.create_draft(
         db,
         user_id,
-        payload=payload,
-        pins=_pins(state),
+        payload=prepared.payload,
+        pins=prepared.pins,
         idempotency_key=request.idempotency_key,
         request_hash=request_hash,
         lock=False,
@@ -539,6 +688,12 @@ __all__ = [
     "targets",
     "list_foods",
     "get_food",
+    "read_agent_targets",
+    "read_agent_portion_ranges",
+    "prepare_draft_domain",
+    "resolve_agent_recommendation",
+    "resolve_agent_context",
+    "prepare_replacement_domain",
     "generate_draft",
     "get_draft",
     "get_active",

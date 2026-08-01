@@ -1,6 +1,6 @@
 """Phase 5 Agent confirmed write adapters (Task 3).
 
-A server-side CLOSED registry for the five allowed write actions. It is
+A server-side CLOSED registry for the reviewed write actions. It is
 deliberately separate from the provider-exposed read registry: write Tool names
 are never offered to the model, and the model is never given confirm/cancel/
 consent/delete authority (spec Tool Registry And Permission Matrix; ADR-0003).
@@ -40,6 +40,8 @@ from app.health.service import (
     get_profile_result,
     upsert_today_core,
 )
+from app.nutrition import persistence as nutrition_persistence
+from app.nutrition import service as nutrition_service
 from app.training import persistence as P
 from app.training import service as training_service
 from app.training.context import derive_local_date, validate_iana_timezone
@@ -49,6 +51,8 @@ _DOMAIN_OP = {
     S.GENERATE_TRAINING_PLAN_DRAFT: P.OP_PLAN_GENERATE,
     S.SUBSTITUTE_TODAY_EXERCISE: P.OP_SESSION_SUBSTITUTE,
     S.RECORD_TRAINING_FEEDBACK: P.OP_SESSION_FEEDBACK,
+    S.GENERATE_MEAL_PLAN_DRAFT: nutrition_persistence.OP_DRAFT_GENERATE,
+    S.REPLACE_FOOD: nutrition_persistence.OP_REPLACEMENT_CONFIRM,
 }
 
 SAFETY_SIGNAL_ROUTE_CODE = "agent_safety_signal_route_required"
@@ -155,6 +159,21 @@ def build_diff(name: str, arguments: S.WriteActionArguments, *, session_id: Opti
         return S.RecordTrainingFeedbackDiff(
             action=name, summary_code="agent_feedback_diff",
             session_id=session_id, outcome_state=arguments.outcome_state,
+        )
+    if name == S.GENERATE_MEAL_PLAN_DRAFT:
+        return S.GenerateMealPlanDraftDiff(
+            action=name,
+            summary_code="agent_nutrition_draft_diff",
+        )
+    if name == S.REPLACE_FOOD:
+        return S.ReplaceFoodDiff(
+            action=name,
+            summary_code="agent_nutrition_replacement_diff",
+            day_kind=arguments.day_kind,
+            meal=arguments.meal,
+            item_index=arguments.item_index,
+            from_food_id=arguments.from_food_id,
+            to_food_id=arguments.to_food_id,
         )
     raise AgentError(ResultCode.TOOL_NOT_ALLOWED)
 
@@ -418,12 +437,135 @@ async def _prepare_substitute_today_exercise(
     )
 
 
+def _raise_mapped_nutrition_error(exc: AppException) -> None:
+    mapping = {
+        "nutrition_runtime_disabled": ResultCode.NUTRITION_DISABLED,
+        "nutrition_red_flag": ResultCode.NUTRITION_BLOCKED,
+        "nutrition_restricted": ResultCode.NUTRITION_BLOCKED,
+        "nutrition_limited_education": ResultCode.NUTRITION_BLOCKED,
+        "nutrition_clarification_required": ResultCode.NUTRITION_INCOMPLETE,
+        "no_safe_candidate": ResultCode.NUTRITION_NO_SAFE_CANDIDATE,
+        "invalid_replacement": ResultCode.NUTRITION_INVALID_REPLACEMENT,
+        "invalid_recommendation_state": ResultCode.NUTRITION_INVALID_REPLACEMENT,
+        "stale_context": ResultCode.CONTEXT_STALE,
+        "recommendation_validation_failed": ResultCode.NUTRITION_BLOCKED,
+    }
+    code = mapping.get(exc.code, ResultCode.TOOL_FAILED)
+    raise AppException(exc.status_code, "营养操作未通过校验", code) from exc
+
+
+async def _prepare_generate_meal_plan_draft(
+    db: AsyncSession,
+    user_id: str,
+    _args: S.GenerateMealPlanDraftArguments,
+    iana_timezone: str,
+    now: datetime,
+) -> PreparedAction:
+    try:
+        candidate = await nutrition_service.prepare_draft_domain(
+            db, user_id, iana_timezone
+        )
+    except AppException as exc:
+        _raise_mapped_nutrition_error(exc)
+    payload = {
+        "action": S.GENERATE_MEAL_PLAN_DRAFT,
+        "source_context_fingerprint": candidate.payload.source_context_fingerprint,
+        "profile_version": candidate.pins.profile_version,
+        "training_plan_version_id": candidate.pins.training_plan_version_id,
+        "checkin_token": candidate.pins.checkin_token,
+        "versions": candidate.payload.versions.model_dump(mode="json"),
+    }
+    request_hash = nutrition_persistence.hash_request(payload)
+
+    async def _execute_async() -> ExecutionResult:
+        result = await nutrition_persistence.create_draft_core(
+            db,
+            user_id,
+            payload=candidate.payload,
+            pins=candidate.pins,
+            now=now,
+        )
+        ref = str(result.recommendation_id)
+        return ExecutionResult(result_ref=ref, domain_result_ref=ref)
+
+    return PreparedAction(
+        context_fingerprint_payload=payload,
+        execute=_execute_async,  # type: ignore[arg-type]
+        domain_operation=_DOMAIN_OP[S.GENERATE_MEAL_PLAN_DRAFT],
+        domain_request_hash=request_hash,
+    )
+
+
+async def _prepare_replace_food(
+    db: AsyncSession,
+    user_id: str,
+    args: S.ReplaceFoodArguments,
+    iana_timezone: str,
+    now: datetime,
+) -> PreparedAction:
+    try:
+        candidate = await nutrition_service.prepare_replacement_domain(
+            db,
+            user_id,
+            iana_timezone,
+            day_kind=args.day_kind,
+            meal=args.meal,
+            item_index=args.item_index,
+            from_food_id=args.from_food_id,
+            to_food_id=args.to_food_id,
+        )
+    except AppException as exc:
+        _raise_mapped_nutrition_error(exc)
+    diff = candidate.payload.replacement_diff
+    if diff is None:
+        raise AppException(
+            409,
+            "营养替换缺少差异",
+            ResultCode.NUTRITION_INVALID_REPLACEMENT,
+        )
+    payload = {
+        "action": S.REPLACE_FOOD,
+        "source_recommendation_id": str(candidate.source.recommendation_id),
+        "source_version": candidate.source.version,
+        "source_context_fingerprint": candidate.payload.source_context_fingerprint,
+        "replacement_diff": diff.model_dump(mode="json"),
+        "versions": candidate.payload.versions.model_dump(mode="json"),
+    }
+    request_hash = nutrition_persistence.hash_request(payload)
+
+    async def _execute_async() -> ExecutionResult:
+        try:
+            result = await nutrition_persistence.create_replacement_active_core(
+                db,
+                user_id,
+                source_id=candidate.source.recommendation_id,
+                expected_version=candidate.source.version,
+                expected_fingerprint=candidate.source.source_context_fingerprint,
+                payload=candidate.payload,
+                pins=candidate.pins,
+                now=now,
+            )
+        except AppException as exc:
+            _raise_mapped_nutrition_error(exc)
+        ref = str(result.recommendation_id)
+        return ExecutionResult(result_ref=ref, domain_result_ref=ref)
+
+    return PreparedAction(
+        context_fingerprint_payload=payload,
+        execute=_execute_async,  # type: ignore[arg-type]
+        domain_operation=_DOMAIN_OP[S.REPLACE_FOOD],
+        domain_request_hash=request_hash,
+    )
+
+
 _ARGUMENTS_MODELS: Dict[str, type] = {
     S.UPSERT_TODAY_CHECKIN: S.UpsertTodayCheckinArguments,
     S.CREATE_WEIGHT_RECORD: S.CreateWeightRecordArguments,
     S.GENERATE_TRAINING_PLAN_DRAFT: S.GenerateTrainingPlanDraftArguments,
     S.SUBSTITUTE_TODAY_EXERCISE: S.SubstituteTodayExerciseArguments,
     S.RECORD_TRAINING_FEEDBACK: S.RecordTrainingFeedbackArguments,
+    S.GENERATE_MEAL_PLAN_DRAFT: S.GenerateMealPlanDraftArguments,
+    S.REPLACE_FOOD: S.ReplaceFoodArguments,
 }
 
 _PREPARERS: Dict[str, Callable] = {
@@ -432,6 +574,8 @@ _PREPARERS: Dict[str, Callable] = {
     S.GENERATE_TRAINING_PLAN_DRAFT: _prepare_generate_training_plan_draft,
     S.RECORD_TRAINING_FEEDBACK: _prepare_record_training_feedback,
     S.SUBSTITUTE_TODAY_EXERCISE: _prepare_substitute_today_exercise,
+    S.GENERATE_MEAL_PLAN_DRAFT: _prepare_generate_meal_plan_draft,
+    S.REPLACE_FOOD: _prepare_replace_food,
 }
 
 

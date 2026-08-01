@@ -23,6 +23,12 @@ from app.agent.schemas import (
     ExerciseCatalogProviderView,
     HealthProfileDisplayView,
     HealthProfileProviderView,
+    NutritionPortionsDisplayView,
+    NutritionPortionsProviderView,
+    NutritionTargetsDisplayView,
+    NutritionTargetsProviderView,
+    NutritionValidationDisplayView,
+    NutritionValidationProviderView,
     PostureIssueDetailDisplayView,
     PostureIssueDetailProviderView,
     PostureIssueDisplayItem,
@@ -53,6 +59,8 @@ from app.agent.schemas import (
 )
 from app.core.actor_context import ActorContext
 from app.health import service as health_service
+from app.nutrition import service as nutrition_service
+from app.nutrition.schemas import RecommendationPayload
 from app.posture import tools as posture_tools
 from app.training import service as training_service
 
@@ -61,6 +69,17 @@ def _enum_val(value: Any) -> Optional[str]:
     if value is None:
         return None
     return str(value.value) if hasattr(value, "value") else str(value)
+
+
+def _payload_food_ids(payload: RecommendationPayload) -> list[str]:
+    return sorted(
+        {
+            item.food_id
+            for variant in payload.variants
+            for meal in variant.meals
+            for item in meal.items
+        }
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -507,6 +526,92 @@ def _project_training_exercise(today: Any, exercise_id: str) -> ReadToolResult:
     return ReadToolResult("get_training_exercise", provider, display)
 
 
+# --------------------------------------------------------------------------- #
+# Nutrition                                                                    #
+# --------------------------------------------------------------------------- #
+
+
+async def adapt_calculate_nutrition_targets(
+    db: AsyncSession, actor: ActorContext, iana_timezone: str
+) -> ReadToolResult:
+    state, targets = await nutrition_service.read_agent_targets(
+        db, actor.user_id, iana_timezone
+    )
+    common = dict(
+        gate=state.decision.gate.value,
+        reason_codes=list(state.decision.reason_codes),
+        missing_field_codes=list(state.decision.missing_field_codes),
+        targets=targets,
+        versions=nutrition_service.versions(),
+    )
+    return ReadToolResult(
+        "calculate_nutrition_targets",
+        NutritionTargetsProviderView(**common),
+        NutritionTargetsDisplayView(**common),
+    )
+
+
+async def adapt_convert_targets_to_portions(
+    db: AsyncSession, actor: ActorContext, iana_timezone: str
+) -> ReadToolResult:
+    state, _targets = await nutrition_service.read_agent_targets(
+        db, actor.user_id, iana_timezone
+    )
+    food_groups, meal_shares = nutrition_service.read_agent_portion_ranges()
+    versions = nutrition_service.versions()
+    provider = NutritionPortionsProviderView(
+        gate=state.decision.gate.value,
+        food_group_range_codes=sorted(food_groups),
+        meal_share_range_codes=sorted(meal_shares),
+        versions=versions,
+    )
+    display = NutritionPortionsDisplayView(
+        gate=state.decision.gate.value,
+        food_group_ranges=food_groups,
+        meal_share_ranges=meal_shares,
+        versions=versions,
+    )
+    return ReadToolResult("convert_targets_to_portions", provider, display)
+
+
+async def adapt_validate_nutrition_plan(
+    db: AsyncSession,
+    actor: ActorContext,
+    iana_timezone: str,
+    recommendation_id: Optional[str] = None,
+) -> ReadToolResult:
+    _state, row = await nutrition_service.resolve_agent_recommendation(
+        db, actor.user_id, iana_timezone, recommendation_id
+    )
+    if row is None:
+        provider = NutritionValidationProviderView(
+            recommendation_present=False,
+            valid=False,
+            validation_codes=["recommendation_missing"],
+        )
+        display = NutritionValidationDisplayView(
+            recommendation_present=False,
+            valid=False,
+            validation_codes=["recommendation_missing"],
+        )
+    else:
+        payload = RecommendationPayload.model_validate(row.payload)
+        common = dict(
+            recommendation_present=True,
+            recommendation_id=str(row.recommendation_id),
+            recommendation_status=row.status,
+            recommendation_version=row.version,
+            valid=True,
+            validation_codes=list(row.validation_codes),
+        )
+        provider = NutritionValidationProviderView(
+            **common,
+            food_ids=_payload_food_ids(payload),
+        )
+        display = NutritionValidationDisplayView(**common, payload=payload)
+    return ReadToolResult("validate_nutrition_plan", provider, display)
+
+
 __all__ = [
     "adapt_health_profile_summary",
     "adapt_today_checkin",
@@ -520,4 +625,7 @@ __all__ = [
     "adapt_get_active_training_plan",
     "adapt_get_today_training",
     "adapt_get_training_exercise",
+    "adapt_calculate_nutrition_targets",
+    "adapt_convert_targets_to_portions",
+    "adapt_validate_nutrition_plan",
 ]

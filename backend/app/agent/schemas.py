@@ -33,6 +33,13 @@ from app.health.schemas import (
     MuscleSoreness,
     SleepQuality,
 )
+from app.nutrition.schemas import (
+    DayKind,
+    MealName,
+    NutritionTargetRanges,
+    NutritionVersions,
+    RecommendationPayload,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -49,6 +56,7 @@ class EntryType(str, Enum):
     training_plan = "training_plan"
     training_session = "training_session"
     training_exercise = "training_exercise"
+    nutrition_plan = "nutrition_plan"
 
 
 class SideEffectClass(str, Enum):
@@ -510,6 +518,56 @@ class TrainingExerciseDisplayView(DisplayView):
     stop_conditions: List[StopConditionView] = Field(default_factory=list)
 
 
+class NutritionTargetsProviderView(ProviderView):
+    gate: str
+    reason_codes: List[str] = Field(default_factory=list)
+    missing_field_codes: List[str] = Field(default_factory=list)
+    targets: Optional[NutritionTargetRanges] = None
+    versions: NutritionVersions
+
+
+class NutritionTargetsDisplayView(DisplayView):
+    gate: str
+    reason_codes: List[str] = Field(default_factory=list)
+    missing_field_codes: List[str] = Field(default_factory=list)
+    targets: Optional[NutritionTargetRanges] = None
+    versions: NutritionVersions
+
+
+class NutritionPortionsProviderView(ProviderView):
+    gate: str
+    food_group_range_codes: List[str] = Field(default_factory=list)
+    meal_share_range_codes: List[str] = Field(default_factory=list)
+    versions: NutritionVersions
+
+
+class NutritionPortionsDisplayView(DisplayView):
+    gate: str
+    food_group_ranges: Dict[str, List[int]] = Field(default_factory=dict)
+    meal_share_ranges: Dict[str, List[int]] = Field(default_factory=dict)
+    versions: NutritionVersions
+
+
+class NutritionValidationProviderView(ProviderView):
+    recommendation_present: bool
+    recommendation_id: Optional[str] = None
+    recommendation_status: Optional[str] = None
+    recommendation_version: Optional[int] = None
+    valid: bool = False
+    validation_codes: List[str] = Field(default_factory=list)
+    food_ids: List[str] = Field(default_factory=list)
+
+
+class NutritionValidationDisplayView(DisplayView):
+    recommendation_present: bool
+    recommendation_id: Optional[str] = None
+    recommendation_status: Optional[str] = None
+    recommendation_version: Optional[int] = None
+    valid: bool = False
+    validation_codes: List[str] = Field(default_factory=list)
+    payload: Optional[RecommendationPayload] = None
+
+
 # --------------------------------------------------------------------------- #
 # Read Tool result + resolved context                                          #
 # --------------------------------------------------------------------------- #
@@ -607,6 +665,18 @@ class ContextProviderView(BaseModel):
     health_risk_version: Optional[str] = None
     posture_risk_version: Optional[str] = None
     catalog_version: Optional[str] = None
+    # Current nutrition gate/version/status codes. No raw body values or labels.
+    nutrition_gate: Optional[str] = None
+    nutrition_reason_codes: List[str] = Field(default_factory=list)
+    nutrition_missing_field_codes: List[str] = Field(default_factory=list)
+    nutrition_recommendation_id: Optional[str] = None
+    nutrition_recommendation_status: Optional[str] = None
+    nutrition_recommendation_version: Optional[int] = None
+    nutrition_validation_codes: List[str] = Field(default_factory=list)
+    nutrition_food_ids: List[str] = Field(default_factory=list)
+    nutrition_policy_version: Optional[str] = None
+    nutrition_source_manifest_version: Optional[str] = None
+    nutrition_media_manifest_version: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -626,7 +696,8 @@ class ResolvedContext:
 # Write action contracts (Task 3)                                             #
 # --------------------------------------------------------------------------- #
 #
-# Exactly five server-side write actions. Each has a strict (``extra="forbid"``)
+# Seven server-side write actions (five Phase 5 plus two Phase 6 nutrition).
+# Each has a strict (``extra="forbid"``)
 # typed Arguments model carrying ONLY the provider-typeable domain values: no
 # actor/user_id, no server time, no policy/consent/fingerprint fields, and no
 # free text. Arguments are bounded and stored only while a proposal is pending.
@@ -640,12 +711,16 @@ CREATE_WEIGHT_RECORD = "create_weight_record"
 GENERATE_TRAINING_PLAN_DRAFT = "generate_training_plan_draft"
 SUBSTITUTE_TODAY_EXERCISE = "substitute_today_exercise"
 RECORD_TRAINING_FEEDBACK = "record_training_feedback"
+GENERATE_MEAL_PLAN_DRAFT = "generate_meal_plan_draft"
+REPLACE_FOOD = "replace_food"
 WRITE_ACTION_NAMES = (
     UPSERT_TODAY_CHECKIN,
     CREATE_WEIGHT_RECORD,
     GENERATE_TRAINING_PLAN_DRAFT,
     SUBSTITUTE_TODAY_EXERCISE,
     RECORD_TRAINING_FEEDBACK,
+    GENERATE_MEAL_PLAN_DRAFT,
+    REPLACE_FOOD,
 )
 
 
@@ -703,6 +778,18 @@ class RecordTrainingFeedbackArguments(WriteActionArguments):
     outcome_state: Literal["completed", "partial", "too_busy", "intentional_rest"]
 
 
+class GenerateMealPlanDraftArguments(WriteActionArguments):
+    """No provider-supplied target, risk, version, or candidate data."""
+
+
+class ReplaceFoodArguments(WriteActionArguments):
+    day_kind: DayKind
+    meal: MealName
+    item_index: int = Field(..., ge=0, le=20)
+    from_food_id: str = Field(..., pattern=r"^[a-z0-9_]{3,60}$")
+    to_food_id: str = Field(..., pattern=r"^[a-z0-9_]{3,60}$")
+
+
 # --- deterministic typed diffs (server-rendered; no provider free text) -----
 
 
@@ -741,6 +828,20 @@ class SubstituteTodayExerciseDiff(WriteActionDiff):
 class RecordTrainingFeedbackDiff(WriteActionDiff):
     session_id: Optional[str] = None
     outcome_state: str
+
+
+class GenerateMealPlanDraftDiff(WriteActionDiff):
+    requires_draft_review: bool = True
+    activates_recommendation: bool = False
+
+
+class ReplaceFoodDiff(WriteActionDiff):
+    day_kind: DayKind
+    meal: MealName
+    item_index: int
+    from_food_id: str
+    to_food_id: str
+    requires_confirmation: bool = True
 
 
 # --- typed execution results (returned to the caller, never provider prose) -
@@ -903,6 +1004,12 @@ __all__ = [
     "StopConditionView",
     "TrainingExerciseProviderView",
     "TrainingExerciseDisplayView",
+    "NutritionTargetsProviderView",
+    "NutritionTargetsDisplayView",
+    "NutritionPortionsProviderView",
+    "NutritionPortionsDisplayView",
+    "NutritionValidationProviderView",
+    "NutritionValidationDisplayView",
     "ReadToolResult",
     "ContextProviderView",
     "ResolvedContext",
@@ -911,6 +1018,8 @@ __all__ = [
     "GENERATE_TRAINING_PLAN_DRAFT",
     "SUBSTITUTE_TODAY_EXERCISE",
     "RECORD_TRAINING_FEEDBACK",
+    "GENERATE_MEAL_PLAN_DRAFT",
+    "REPLACE_FOOD",
     "WRITE_ACTION_NAMES",
     "WriteActionArguments",
     "UpsertTodayCheckinArguments",
@@ -918,12 +1027,16 @@ __all__ = [
     "GenerateTrainingPlanDraftArguments",
     "SubstituteTodayExerciseArguments",
     "RecordTrainingFeedbackArguments",
+    "GenerateMealPlanDraftArguments",
+    "ReplaceFoodArguments",
     "WriteActionDiff",
     "UpsertTodayCheckinDiff",
     "CreateWeightRecordDiff",
     "GenerateTrainingPlanDraftDiff",
     "SubstituteTodayExerciseDiff",
     "RecordTrainingFeedbackDiff",
+    "GenerateMealPlanDraftDiff",
+    "ReplaceFoodDiff",
     "WriteActionResult",
     "AgentApiModel",
     "AgentDisclosureView",

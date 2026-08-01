@@ -33,15 +33,19 @@ from app.agent.provider import (
 )
 from app.agent.schemas import (
     CREATE_WEIGHT_RECORD,
+    GENERATE_MEAL_PLAN_DRAFT,
     GENERATE_TRAINING_PLAN_DRAFT,
     RECORD_TRAINING_FEEDBACK,
+    REPLACE_FOOD,
     SUBSTITUTE_TODAY_EXERCISE,
     UPSERT_TODAY_CHECKIN,
     CreateWeightRecordArguments,
     EntryType,
     GenerateTrainingPlanDraftArguments,
+    GenerateMealPlanDraftArguments,
     ReadToolResult,
     RecordTrainingFeedbackArguments,
+    ReplaceFoodArguments,
     ResolvedContext,
     SubstituteTodayExerciseArguments,
     TurnInput,
@@ -50,6 +54,7 @@ from app.agent.schemas import (
     WriteActionDiff,
 )
 from app.core.actor_context import ActorContext
+from app.core.config import settings
 from app.core.exceptions import AppException
 
 
@@ -89,6 +94,8 @@ _WRITE_MODELS: Dict[str, type] = {
     GENERATE_TRAINING_PLAN_DRAFT: GenerateTrainingPlanDraftArguments,
     SUBSTITUTE_TODAY_EXERCISE: SubstituteTodayExerciseArguments,
     RECORD_TRAINING_FEEDBACK: RecordTrainingFeedbackArguments,
+    GENERATE_MEAL_PLAN_DRAFT: GenerateMealPlanDraftArguments,
+    REPLACE_FOOD: ReplaceFoodArguments,
 }
 _ENTRY_WRITES = {
     EntryType.general: frozenset(_WRITE_MODELS),
@@ -103,7 +110,20 @@ _ENTRY_WRITES = {
     EntryType.training_exercise: frozenset(
         {SUBSTITUTE_TODAY_EXERCISE, RECORD_TRAINING_FEEDBACK}
     ),
+    EntryType.nutrition_plan: frozenset(
+        {GENERATE_MEAL_PLAN_DRAFT, REPLACE_FOOD}
+    ),
 }
+
+_NUTRITION_TOOLS = frozenset(
+    {
+        "calculate_nutrition_targets",
+        "convert_targets_to_portions",
+        "validate_nutrition_plan",
+        GENERATE_MEAL_PLAN_DRAFT,
+        REPLACE_FOOD,
+    }
+)
 
 
 class OrchestrationFailure(Exception):
@@ -161,6 +181,8 @@ def provider_tools_for(context: ResolvedContext) -> List[ProviderToolDefinition]
     """Return the closed server-owned Tool schema set for this entry."""
     definitions: List[ProviderToolDefinition] = []
     for name in context.allowed_tools:
+        if name in _NUTRITION_TOOLS and not settings.NUTRITION_RUNTIME_ENABLED:
+            continue
         spec = tool_registry.resolve_tool_for_entry(name, context.entry_type)
         definitions.append(
             ProviderToolDefinition(
@@ -170,6 +192,8 @@ def provider_tools_for(context: ResolvedContext) -> List[ProviderToolDefinition]
             )
         )
     for name in sorted(_ENTRY_WRITES[context.entry_type]):
+        if name in _NUTRITION_TOOLS and not settings.NUTRITION_RUNTIME_ENABLED:
+            continue
         definitions.append(
             ProviderToolDefinition(
                 name=name,
@@ -323,6 +347,11 @@ async def _prepare_proposal(
 ) -> ProposalCandidate:
     if decision.tool_name not in _ENTRY_WRITES[context.entry_type]:
         raise OrchestrationFailure(ResultCode.TOOL_NOT_ALLOWED)
+    if (
+        decision.tool_name in _NUTRITION_TOOLS
+        and not settings.NUTRITION_RUNTIME_ENABLED
+    ):
+        raise OrchestrationFailure(ResultCode.NUTRITION_DISABLED)
     try:
         arguments = action_tools.validate_arguments(
             decision.tool_name, decision.arguments
@@ -398,6 +427,18 @@ async def _execute_read_tool(
     elif name == "get_training_exercise":
         result = await spec.adapter(
             db, actor, context.iana_timezone, arguments.exercise_id
+        )
+    elif name in {
+        "calculate_nutrition_targets",
+        "convert_targets_to_portions",
+    }:
+        result = await spec.adapter(db, actor, context.iana_timezone)
+    elif name == "validate_nutrition_plan":
+        result = await spec.adapter(
+            db,
+            actor,
+            context.iana_timezone,
+            context.entity_id,
         )
     else:
         raise AgentError(ResultCode.TOOL_NOT_ALLOWED)

@@ -284,43 +284,62 @@ async def create_draft(
         )
         if replay is not None:
             return PersistenceResult(replay.recommendation_id, "replayed")
-        recommendation_id = uuid.uuid4()
-        prior = await get_current_draft(db, user_id)
-        if prior is not None:
-            _supersede(prior, recommendation_id, current, "superseded_by_new_draft")
-            await db.flush()
-        row = _new_row(
-            recommendation_id=recommendation_id,
-            user_id=user_id,
-            version=await _next_version(db, user_id),
-            status=RecommendationStatus.draft,
-            change_reason="initial_generation",
-            payload=payload,
-            pins=pins,
-            now=current,
+        result = await create_draft_core(
+            db, user_id, payload=payload, pins=pins, now=current
         )
-        db.add(row)
-        await db.flush()
         await _record_idempotency(
             db,
             user_id,
             OP_DRAFT_GENERATE,
             idempotency_key,
             request_hash,
-            recommendation_id,
+            result.recommendation_id,
             current,
         )
         if commit:
             await db.commit()
-        return PersistenceResult(
-            recommendation_id,
-            "created",
-            prior.recommendation_id if prior is not None else None,
-        )
+        return result
     except Exception:
         if commit:
             await db.rollback()
         raise
+
+
+async def create_draft_core(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    payload: RecommendationPayload,
+    pins: RecommendationContextPins,
+    now: datetime,
+) -> PersistenceResult:
+    """Create one draft inside the caller's locked transaction.
+
+    The caller owns locking, idempotency, commit, and rollback. This is shared
+    by the HTTP wrapper and the Agent confirmation unit of work.
+    """
+    recommendation_id = uuid.uuid4()
+    prior = await get_current_draft(db, user_id)
+    if prior is not None:
+        _supersede(prior, recommendation_id, now, "superseded_by_new_draft")
+        await db.flush()
+    row = _new_row(
+        recommendation_id=recommendation_id,
+        user_id=user_id,
+        version=await _next_version(db, user_id),
+        status=RecommendationStatus.draft,
+        change_reason="initial_generation",
+        payload=payload,
+        pins=pins,
+        now=now,
+    )
+    db.add(row)
+    await db.flush()
+    return PersistenceResult(
+        recommendation_id,
+        "created",
+        prior.recommendation_id if prior is not None else None,
+    )
 
 
 async def confirm_draft(
@@ -411,51 +430,76 @@ async def create_replacement_active(
         )
         if replay is not None:
             return PersistenceResult(replay.recommendation_id, "replayed")
-        source = await get_owned(db, user_id, source_id)
-        if source is None:
-            raise AppException(404, "推荐不存在", "not_owner_or_missing_recommendation")
-        if source.status != RecommendationStatus.active.value:
-            raise AppException(409, "当前推荐已变化", "invalid_recommendation_state")
-        if (
-            source.version != expected_version
-            or source.source_context_fingerprint != expected_fingerprint
-            or payload.source_context_fingerprint != expected_fingerprint
-        ):
-            raise AppException(409, "推荐上下文已变化", "stale_context")
-        if payload.replacement_diff is None:
-            raise AppException(400, "缺少替换差异", "invalid_replacement")
-        recommendation_id = uuid.uuid4()
-        row = _new_row(
-            recommendation_id=recommendation_id,
-            user_id=user_id,
-            version=await _next_version(db, user_id),
-            status=RecommendationStatus.active,
-            change_reason="confirmed_food_replacement",
+        result = await create_replacement_active_core(
+            db,
+            user_id,
+            source_id=source_id,
+            expected_version=expected_version,
+            expected_fingerprint=expected_fingerprint,
             payload=payload,
             pins=pins,
             now=current,
-            source_recommendation_id=source.recommendation_id,
         )
-        _supersede(source, recommendation_id, current, "superseded_by_replacement")
-        await db.flush()
-        db.add(row)
-        await db.flush()
         await _record_idempotency(
             db,
             user_id,
             OP_REPLACEMENT_CONFIRM,
             idempotency_key,
             request_hash,
-            recommendation_id,
+            result.recommendation_id,
             current,
         )
         if commit:
             await db.commit()
-        return PersistenceResult(recommendation_id, "confirmed", source.recommendation_id)
+        return result
     except Exception:
         if commit:
             await db.rollback()
         raise
+
+
+async def create_replacement_active_core(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    source_id: uuid.UUID,
+    expected_version: int,
+    expected_fingerprint: str,
+    payload: RecommendationPayload,
+    pins: RecommendationContextPins,
+    now: datetime,
+) -> PersistenceResult:
+    """Create a replacement version inside the caller's locked transaction."""
+    source = await get_owned(db, user_id, source_id)
+    if source is None:
+        raise AppException(404, "推荐不存在", "not_owner_or_missing_recommendation")
+    if source.status != RecommendationStatus.active.value:
+        raise AppException(409, "当前推荐已变化", "invalid_recommendation_state")
+    if (
+        source.version != expected_version
+        or source.source_context_fingerprint != expected_fingerprint
+        or payload.source_context_fingerprint != expected_fingerprint
+    ):
+        raise AppException(409, "推荐上下文已变化", "stale_context")
+    if payload.replacement_diff is None:
+        raise AppException(400, "缺少替换差异", "invalid_replacement")
+    recommendation_id = uuid.uuid4()
+    row = _new_row(
+        recommendation_id=recommendation_id,
+        user_id=user_id,
+        version=await _next_version(db, user_id),
+        status=RecommendationStatus.active,
+        change_reason="confirmed_food_replacement",
+        payload=payload,
+        pins=pins,
+        now=now,
+        source_recommendation_id=source.recommendation_id,
+    )
+    _supersede(source, recommendation_id, now, "superseded_by_replacement")
+    await db.flush()
+    db.add(row)
+    await db.flush()
+    return PersistenceResult(recommendation_id, "confirmed", source.recommendation_id)
 
 
 async def delete_nutrition_data(
@@ -567,7 +611,9 @@ __all__ = [
     "get_active",
     "get_next_version",
     "create_draft",
+    "create_draft_core",
     "confirm_draft",
     "create_replacement_active",
+    "create_replacement_active_core",
     "delete_nutrition_data",
 ]

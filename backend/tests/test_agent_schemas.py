@@ -34,7 +34,7 @@ from app.agent.schemas import (
 # --------------------------------------------------------------------------- #
 
 
-def test_entry_type_is_closed_to_the_six_spec_entries():
+def test_entry_type_is_closed_to_the_seven_spec_entries():
     assert {e.value for e in EntryType} == {
         "general",
         "health_profile",
@@ -42,6 +42,7 @@ def test_entry_type_is_closed_to_the_six_spec_entries():
         "training_plan",
         "training_session",
         "training_exercise",
+        "nutrition_plan",
     }
 
 

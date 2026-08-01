@@ -29,6 +29,10 @@ from app.agent import read_tools, tool_registry
 from app.agent.messages import AgentError, ResultCode
 from app.agent.schemas import ContextProviderView, EntryType, ResolvedContext
 from app.core.actor_context import ActorContext
+from app.core.config import settings
+from app.core.exceptions import AppException
+from app.nutrition import service as nutrition_service
+from app.nutrition.schemas import GateStatus, RecommendationPayload
 from app.posture import service as posture_service
 from app.posture.knowledge import get_issue_by_id
 from app.training import service as training_service
@@ -91,6 +95,8 @@ async def resolve_context(
         ctx = await _resolve_training_session(db, actor, base, entity_id, tz)
     elif entry_type is EntryType.training_exercise:
         ctx = await _resolve_training_exercise(db, actor, base, entity_id, tz)
+    elif entry_type is EntryType.nutrition_plan:
+        ctx = await _resolve_nutrition_plan(db, actor, base, entity_id, tz)
     else:  # pragma: no cover - closed enum
         raise AgentError(ResultCode.TOOL_NOT_ALLOWED)
 
@@ -139,7 +145,7 @@ async def _resolve_general(
     today = await read_tools.adapt_get_today_training(db, actor, tz)
     pv = profile.provider_view
     cv = checkin.provider_view
-    return base.model_copy(
+    resolved = base.model_copy(
         update={
             "profile_configured": pv.configured,
             "health_profile_version": pv.profile_version,
@@ -155,6 +161,9 @@ async def _resolve_general(
             "risk_gate_code": today.provider_view.decision_gate,
         }
     )
+    if settings.NUTRITION_RUNTIME_ENABLED:
+        resolved = await _resolve_nutrition_plan(db, actor, resolved, None, tz)
+    return resolved
 
 
 async def _resolve_health_profile(
@@ -376,6 +385,62 @@ async def _resolve_training_exercise(
             "exercise_training_roles": list(catalog.training_roles),
             "exercise_stop_condition_codes": list(exercise.stop_condition_codes),
             "catalog_version": training_service.catalog().content_version,
+        }
+    )
+
+
+async def _resolve_nutrition_plan(
+    db: AsyncSession,
+    actor: ActorContext,
+    base: ContextProviderView,
+    recommendation_id: Optional[str],
+    tz: str,
+) -> ContextProviderView:
+    try:
+        state, row = await nutrition_service.resolve_agent_context(
+            db, actor.user_id, tz, recommendation_id
+        )
+    except AppException as exc:
+        if exc.code == "nutrition_runtime_disabled":
+            raise AgentError(ResultCode.NUTRITION_DISABLED) from exc
+        if exc.code == "not_owner_or_missing_recommendation":
+            raise AgentError(ResultCode.ENTITY_NOT_FOUND) from exc
+        raise
+    versions = nutrition_service.versions()
+    food_ids: list[str] = []
+    if row is not None and state.decision.gate in {
+        GateStatus.eligible,
+        GateStatus.eligible_conservative,
+    }:
+        payload = RecommendationPayload.model_validate(row.payload)
+        food_ids = sorted(
+            {
+                item.food_id
+                for variant in payload.variants
+                for meal in variant.meals
+                for item in meal.items
+            }
+        )
+    return base.model_copy(
+        update={
+            "nutrition_gate": state.decision.gate.value,
+            "nutrition_reason_codes": list(state.decision.reason_codes),
+            "nutrition_missing_field_codes": list(
+                state.decision.missing_field_codes
+            ),
+            "nutrition_recommendation_id": (
+                str(row.recommendation_id) if row is not None else None
+            ),
+            "nutrition_recommendation_status": row.status if row is not None else None,
+            "nutrition_recommendation_version": row.version if row is not None else None,
+            "nutrition_validation_codes": (
+                list(row.validation_codes) if row is not None else []
+            ),
+            "nutrition_food_ids": food_ids,
+            "nutrition_policy_version": versions.policy_version,
+            "catalog_version": versions.catalog_version,
+            "nutrition_source_manifest_version": versions.source_manifest_version,
+            "nutrition_media_manifest_version": versions.media_manifest_version,
         }
     )
 

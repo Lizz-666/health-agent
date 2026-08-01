@@ -40,6 +40,7 @@ from app.agent.orchestrator import (
 from app.agent.privacy_gate import PrivacyGateInput, evaluate_privacy_gate
 from app.agent.provider import AgentProvider
 from app.agent.safety_precheck import route_turn_text
+from app.agent.nutrition_scope_precheck import is_unsupported_nutrition_scope
 from app.agent.schemas import (
     AgentActionResponse,
     AgentCapabilitiesResponse,
@@ -332,6 +333,14 @@ async def process_turn(
             status="safety_routed",
             result_code=safety.result_code,
             message=render(safety.result_code),
+        )
+
+    if is_unsupported_nutrition_scope(turn.message):
+        await db.rollback()
+        return AgentTurnResponse(
+            status="unsupported",
+            result_code=ResultCode.UNSUPPORTED_NUTRITION,
+            message=render(ResultCode.UNSUPPORTED_NUTRITION),
         )
 
     state = runtime_state()
