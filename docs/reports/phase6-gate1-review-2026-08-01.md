@@ -7,7 +7,7 @@
 
 ## Decision
 
-**LOCAL PASS; EXACT-SHA CI PENDING.** Open P0/P1/P2 findings: zero. The
+**PASS.** Open P0/P1/P2 findings: zero. The
 candidate contains the curated catalog and media, structured profile migration,
 current owned nutrition context, deterministic scope/calculation engines, and
 independent validators. It contains no recommendation persistence, API, Agent
@@ -88,6 +88,9 @@ write tools, or Flutter nutrition workflow from later tasks.
 - Migration SQL checks prove `0009` adds only two nullable JSONB columns, does
   no backfill, and downgrade drops only those columns.
 - `git diff --check`: exit 0; Windows LF/CRLF notices only.
+- Exact-SHA GitHub Actions run `30702540222` on accepted implementation SHA
+  `b3c1bfa8ed2f1519d11790a658fdd2ea07dc2019`: Fast, Flutter, and Full
+  PostgreSQL jobs all passed.
 
 ## Residual P3 Risks
 
@@ -104,6 +107,6 @@ write tools, or Flutter nutrition workflow from later tasks.
 
 ## Gate Condition
 
-Push this candidate to the existing authorized GitHub repository and require
-Fast, Flutter, and Full PostgreSQL jobs to pass on its exact SHA. Only then may a
-metadata closure mark Gate 1 verified and start Task 3.
+Satisfied. Gate 1 accepts implementation SHA `b3c1bfa8ed2f1519d11790a658fdd2ea07dc2019`
+with exact-SHA CI run `30702540222`; Task 3 may start from the subsequent
+metadata closure commit.
