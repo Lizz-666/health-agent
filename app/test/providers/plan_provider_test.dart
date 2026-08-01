@@ -172,6 +172,31 @@ void main() {
     expect(container.read(planProvider).activePlan, isNotNull);
   });
 
+  test('confirm invalidates dependent nutrition state', () async {
+    var invalidations = 0;
+    final adapter = FakeDioAdapter()
+      ..registerJson('POST', '/training/plans:confirm',
+          (_) => {'plan': _planJson(), 'superseded_prior': false});
+    final notifier = PlanNotifier(
+      _apiWith(adapter),
+      onPlanChanged: () => invalidations++,
+    );
+    addTearDown(notifier.dispose);
+
+    final ok = await notifier.confirm(const ConfirmInput(
+      fitnessGoal: 'basic_strength',
+      weeklyFrequency: 3,
+      sessionDurationMinutes: 30,
+      equipmentBodyweight: true,
+      equipmentResistanceBand: false,
+      ianaTimezone: 'Asia/Shanghai',
+      idempotencyKey: 'c1',
+    ));
+
+    expect(ok, isTrue);
+    expect(invalidations, 1);
+  });
+
   test('today blocked state is surfaced honestly', () async {
     final adapter = FakeDioAdapter()
       ..registerJson('GET', '/training/plans/today', (_) => {

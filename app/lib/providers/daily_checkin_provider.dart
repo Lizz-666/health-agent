@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
 import '../models/daily_checkin.dart';
 import 'assessment_provider.dart' show LoadStatus;
+import 'nutrition_provider.dart';
 
 class DailyCheckInState {
   final LoadStatus status;
@@ -49,9 +50,12 @@ class DailyCheckInState {
 
 class DailyCheckInNotifier extends StateNotifier<DailyCheckInState> {
   final ApiClient _api;
+  final void Function() _onSafetyChanged;
   int _generation = 0;
 
-  DailyCheckInNotifier(this._api) : super(const DailyCheckInState());
+  DailyCheckInNotifier(this._api, {void Function()? onSafetyChanged})
+      : _onSafetyChanged = onSafetyChanged ?? _noop,
+        super(const DailyCheckInState());
 
   // ---------------- GET /health/checkins/today ----------------
   Future<void> fetchToday({DateTime? localDate}) async {
@@ -110,6 +114,7 @@ class DailyCheckInNotifier extends StateNotifier<DailyCheckInState> {
         checkin: checkin,
         status: LoadStatus.data,
       );
+      _onSafetyChanged();
       return true;
     } on DioException catch (e) {
       if (!mounted) return false;
@@ -137,6 +142,7 @@ class DailyCheckInNotifier extends StateNotifier<DailyCheckInState> {
       if (state.checkin?.id == id) {
         state = state.copyWith(clearCheckin: true, status: LoadStatus.empty);
       }
+      _onSafetyChanged();
       return true;
     } on DioException catch (e) {
       if (!mounted) return false;
@@ -185,5 +191,10 @@ String? _dioMessage(DioException e) {
 final dailyCheckinProvider =
     StateNotifierProvider<DailyCheckInNotifier, DailyCheckInState>((ref) {
   final api = ref.read(apiClientProvider);
-  return DailyCheckInNotifier(api);
+  return DailyCheckInNotifier(
+    api,
+    onSafetyChanged: () => ref.invalidate(nutritionProvider),
+  );
 });
+
+void _noop() {}

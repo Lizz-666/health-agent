@@ -18,6 +18,7 @@ import 'screens/test/photo_test_screen.dart';
 import 'screens/result/result_screen.dart';
 import 'screens/history/history_screen.dart';
 import 'screens/plan/plan_screen.dart';
+import 'screens/nutrition/nutrition_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/profile/posture_profile_screen.dart';
 import 'screens/profile/health_profile_screen.dart';
@@ -107,7 +108,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/plan', builder: (_, _) => const PlanScreen()),
+              GoRoute(
+                path: '/plan',
+                builder: (_, _) => const PlanScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'nutrition',
+                    builder: (_, _) => const NutritionScreen(),
+                  ),
+                ],
+              ),
             ],
           ),
           StatefulShellBranch(

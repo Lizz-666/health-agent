@@ -27,6 +27,7 @@ import '../../core/constants.dart';
 import '../../models/health_profile.dart';
 import '../../providers/assessment_provider.dart' show LoadStatus;
 import '../../providers/health_profile_provider.dart';
+import '../../providers/nutrition_provider.dart';
 import '../../widgets/disclaimer_banner.dart';
 
 class HealthProfileScreen extends ConsumerStatefulWidget {
@@ -71,7 +72,11 @@ class _HealthProfileScreenState extends ConsumerState<HealthProfileScreen> {
       ),
     );
     if (ok == true && mounted) {
-      await ref.read(healthProfileProvider.notifier).deleteProfile();
+      final deleted =
+          await ref.read(healthProfileProvider.notifier).deleteProfile();
+      if (deleted && mounted) {
+        ref.read(nutritionProvider.notifier).invalidateForProfileChange();
+      }
     }
   }
 
@@ -289,16 +294,30 @@ class _ConfiguredView extends StatelessWidget {
                 ),
               ),
               _Field(
-                label: '过敏',
+                label: '旧版过敏备注',
                 value: _listCountLabel(
                   profile.allergies?.length,
                   singular: '项',
                 ),
               ),
               _Field(
-                label: '饮食排除',
+                label: '旧版饮食备注',
                 value: _listCountLabel(
                   profile.dietExclusions?.length,
+                  singular: '项',
+                ),
+              ),
+              _Field(
+                label: '结构化过敏原',
+                value: _listCountLabel(
+                  profile.foodAllergenCodes?.length,
+                  singular: '项',
+                ),
+              ),
+              _Field(
+                label: '结构化排除项',
+                value: _listCountLabel(
+                  profile.excludedFoodCodes?.length,
                   singular: '项',
                 ),
               ),
@@ -463,6 +482,10 @@ class _HealthProfileEditSheetState
   late YesNoUnknown? _majorChronicCondition;
   late YesNoUnknown? _eatingDisorderConcern;
   late YesNoUnknown? _professionalInstructionLimitations;
+  late bool _allergensAnswered;
+  late Set<FoodAllergenCode> _allergenCodes;
+  late bool _exclusionsAnswered;
+  late Set<ExcludedFoodCode> _excludedFoodCodes;
   bool _saving = false;
 
   @override
@@ -482,6 +505,10 @@ class _HealthProfileEditSheetState
     _majorChronicCondition = r?.majorChronicCondition;
     _eatingDisorderConcern = r?.eatingDisorderConcern;
     _professionalInstructionLimitations = r?.professionalInstructionLimitations;
+    _allergensAnswered = p?.foodAllergenCodes != null;
+    _allergenCodes = {...?p?.foodAllergenCodes};
+    _exclusionsAnswered = p?.excludedFoodCodes != null;
+    _excludedFoodCodes = {...?p?.excludedFoodCodes};
   }
 
   @override
@@ -673,6 +700,86 @@ class _HealthProfileEditSheetState
                     : (v) =>
                         setState(() => _professionalInstructionLimitations = v),
               ),
+              const SizedBox(height: 12),
+              const Text(
+                '食物过敏原（结构化）',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(AppConstants.textMuted),
+                ),
+              ),
+              CheckboxListTile(
+                key: const Key('health-allergens-answered'),
+                contentPadding: EdgeInsets.zero,
+                value: _allergensAnswered,
+                title: const Text('我已回答此项'),
+                subtitle: const Text('不勾选表示未填写；勾选但不选任何项目表示确认没有。'),
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() {
+                          _allergensAnswered = value ?? false;
+                          if (!_allergensAnswered) _allergenCodes.clear();
+                        }),
+              ),
+              Wrap(
+                spacing: 8,
+                children: FoodAllergenCode.values
+                    .map(
+                      (code) => FilterChip(
+                        key: Key('health-allergen-${code.wire}'),
+                        label: Text(_allergenLabel(code)),
+                        selected: _allergenCodes.contains(code),
+                        onSelected: !_allergensAnswered || _saving
+                            ? null
+                            : (selected) => setState(() {
+                                  selected
+                                      ? _allergenCodes.add(code)
+                                      : _allergenCodes.remove(code);
+                                }),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '明确排除的食物',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(AppConstants.textMuted),
+                ),
+              ),
+              CheckboxListTile(
+                key: const Key('health-exclusions-answered'),
+                contentPadding: EdgeInsets.zero,
+                value: _exclusionsAnswered,
+                title: const Text('我已回答此项'),
+                subtitle: const Text('这里只支持当前食物库的明确排除项。'),
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() {
+                          _exclusionsAnswered = value ?? false;
+                          if (!_exclusionsAnswered) _excludedFoodCodes.clear();
+                        }),
+              ),
+              Wrap(
+                spacing: 8,
+                children: ExcludedFoodCode.values
+                    .map(
+                      (code) => FilterChip(
+                        key: Key('health-exclusion-${code.wire}'),
+                        label: Text(_exclusionLabel(code)),
+                        selected: _excludedFoodCodes.contains(code),
+                        onSelected: !_exclusionsAnswered || _saving
+                            ? null
+                            : (selected) => setState(() {
+                                  selected
+                                      ? _excludedFoodCodes.add(code)
+                                      : _excludedFoodCodes.remove(code);
+                                }),
+                      ),
+                    )
+                    .toList(),
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -745,15 +852,36 @@ class _HealthProfileEditSheetState
       ),
       allergies: existing?.allergies,
       dietExclusions: existing?.dietExclusions,
+      foodAllergenCodes:
+          _allergensAnswered ? _allergenCodes.toList(growable: false) : null,
+      excludedFoodCodes:
+          _exclusionsAnswered ? _excludedFoodCodes.toList(growable: false) : null,
     );
     final ok = await notifier.updateProfile(update);
     if (!mounted) return;
     setState(() => _saving = false);
     if (ok) {
+      ref.read(nutritionProvider.notifier).invalidateForProfileChange();
       Navigator.pop(context);
     }
   }
 }
+
+String _allergenLabel(FoodAllergenCode code) => switch (code) {
+      FoodAllergenCode.glutenCereal => '含麸质谷物',
+      FoodAllergenCode.crustacean => '甲壳类',
+      FoodAllergenCode.fish => '鱼类',
+      FoodAllergenCode.egg => '蛋类',
+      FoodAllergenCode.peanut => '花生',
+      FoodAllergenCode.soy => '大豆',
+      FoodAllergenCode.milk => '乳类',
+      FoodAllergenCode.treeNut => '坚果',
+    };
+
+String _exclusionLabel(ExcludedFoodCode code) => switch (code) {
+      ExcludedFoodCode.avoidPork => '不吃猪肉',
+      ExcludedFoodCode.avoidBeef => '不吃牛肉',
+    };
 
 // ---------------------------------------------------------------------------
 // Small shared widgets
