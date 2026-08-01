@@ -382,12 +382,15 @@ def _resolve_diff_base(diff_base: str) -> str:
 
 
 def _print_summary(mode: str, steps: List[StepResult]) -> int:
+    head_rc, head_out, _ = _run(["git", "rev-parse", "HEAD"], REPO_ROOT)
+    checked_out_sha = head_out.strip() if head_rc == 0 else "unknown"
     lines: List[str] = []
     lines.append("=" * 72)
     lines.append(f"verify.py {mode}  (LOCAL evidence, not GitHub CI)")
     lines.append(
         f"workflow={os.environ.get('GITHUB_WORKFLOW', 'local')} "
-        f"sha={os.environ.get('GITHUB_SHA', 'local')} "
+        f"event_sha={os.environ.get('GITHUB_SHA', 'local')} "
+        f"checked_out_sha={checked_out_sha} "
         f"job={os.environ.get('GITHUB_JOB', 'local')}"
     )
     lines.append(

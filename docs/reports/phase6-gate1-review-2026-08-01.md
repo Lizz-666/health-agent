@@ -49,6 +49,11 @@ write tools, or Flutter nutrition workflow from later tasks.
    assertions now track migration `0009_nutrition_profile_codes`.
 7. Structured profile safety lists accepted duplicates, creating multiple
    representations of the same state. API and catalog schemas now reject them.
+8. The first CI candidate exposed an undeclared local Pillow dependency in the
+   media test and PR checkout reported the synthetic merge SHA. The test now
+   parses JPEG dimensions with the standard library; every checkout explicitly
+   selects the PR head (with push fallback), and summaries record both event and
+   checked-out SHAs.
 
 ## Data And License Evidence
 

@@ -3,12 +3,46 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from PIL import Image
-
 from app.nutrition.knowledge import load_media_manifest, load_source_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "backend/app/nutrition/data"
+
+SOF_MARKERS = {
+    0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+    0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF,
+}
+
+
+def _jpeg_dimensions(path: Path) -> tuple[int, int]:
+    data = path.read_bytes()
+    if not data.startswith(b"\xff\xd8"):
+        raise AssertionError("media is not a JPEG")
+    position = 2
+    while position < len(data):
+        while position < len(data) and data[position] != 0xFF:
+            position += 1
+        while position < len(data) and data[position] == 0xFF:
+            position += 1
+        if position >= len(data):
+            break
+        marker = data[position]
+        position += 1
+        if marker in {0x01, *range(0xD0, 0xDA)}:
+            continue
+        if position + 2 > len(data):
+            break
+        segment_length = int.from_bytes(data[position:position + 2], "big")
+        if segment_length < 2 or position + segment_length > len(data):
+            break
+        if marker in SOF_MARKERS:
+            if segment_length < 7:
+                break
+            height = int.from_bytes(data[position + 3:position + 5], "big")
+            width = int.from_bytes(data[position + 5:position + 7], "big")
+            return width, height
+        position += segment_length
+    raise AssertionError("JPEG dimensions are absent or malformed")
 
 
 def test_every_source_subset_checksum_and_license_is_auditable():
@@ -28,9 +62,7 @@ def test_media_inventory_is_local_reviewed_and_exactly_hashed():
         path = ROOT / "app" / item.asset_key
         assert path.is_file()
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item.sha256
-        with Image.open(path) as image:
-            assert image.size == (item.width, item.height) == (800, 600)
-            assert image.format == "JPEG"
+        assert _jpeg_dimensions(path) == (item.width, item.height) == (800, 600)
         assert item.license in {"CC0-1.0", "Public Domain"}
         assert item.source_page_url.startswith("https://commons.wikimedia.org/wiki/File:")
 
