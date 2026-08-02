@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed at Phase 7 Gate 0 (2026-08-02).
+Accepted at Phase 7 Gate 0 (2026-08-02). Contract SHA
+`dceceb7dcd7955359e91939853c5290be799c277`; exact-SHA GitHub
+Fast/Flutter/Full run `30732748723` passed.
 
 ## Context
 

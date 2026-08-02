@@ -1,7 +1,12 @@
 # Phase 7 Adaptive Closure And Weekly Review
 
-> Status: Gate 0 contract candidate, 2026-08-02. The exact implementation base
-> is Phase 6 closure `8eeb28a3a4156eaac5763260129fdde6fedee835`.
+> Status: accepted at Phase 7 Gate 0, 2026-08-02. Contract SHA
+> `dceceb7dcd7955359e91939853c5290be799c277` passed exact-SHA local Fast and
+> Flutter verification plus GitHub Fast/Flutter/Full run `30732748723`. The
+> audit is `docs/reports/phase7-gate0-review-2026-08-02.md`; implementation must
+> start from the later Gate 0 metadata closure SHA, not this candidate directly.
+> The original exact baseline is Phase 6 closure
+> `8eeb28a3a4156eaac5763260129fdde6fedee835`.
 > This specification authorizes synthetic-data development only. It does not
 > authorize deployment, real health data or photos in development tools, live
 > provider calls in tests, or any medical/rehabilitation behavior.

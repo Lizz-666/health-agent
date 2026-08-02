@@ -5,7 +5,7 @@
 
 ## Current Initiative
 
-- 阶段：Phase 7 弹性闭环与综合复盘。Task 0/Gate 0 正在从精确 Phase 6 closure `8eeb28a3a4156eaac5763260129fdde6fedee835` 收敛规格、ADR、实施计划和任务边界；Gate 0 前不写业务代码。
+- 阶段：Phase 7 弹性闭环与综合复盘。Task 0/Gate 0 契约 SHA `dceceb7dcd7955359e91939853c5290be799c277` 已通过本地 Fast 903 passed/0 failed/10 个预期 PG skips、Flutter analyze clean + 384 tests，以及 exact-SHA CI run `30732748723` 的 Fast/Flutter/Full；P0/P1/P2/P3 为零。业务实现只能从本次 Gate 0 元数据 closure SHA 创建的新分支开始。
 - Phase 7 已批准的产品边界：前台按钮可在最新确定性安全复核后直接应用同日小调整；Agent 写入仍为提案加独立确认；长期训练/营养变化只生成草案且不自动激活；体重趋势不参与训练决策；体态复查提醒仅为应用内每周期状态，不引入调度或系统通知。
 - Phase 7 采用有门禁的混合单写入者模式：Gate 0、后端状态机/迁移/安全契约、跨域复盘/Agent 权限和最终 E2E 由 Codex；Gate 1 后仅 Flutter Today/Plan/周复盘局部纵切可交给一个 OpenCode + Claude 会话，严格使用计划内 allowlist，Codex 在其写入期间只读。
 - Phase 7 当前规格、计划和架构决策位于 `docs/specs/training/2026-08-02-adaptive-closure-weekly-review.md`、`docs/plans/training/2026-08-02-adaptive-closure-weekly-review.md` 和 ADR-0007。Gate 0 本地与 CI 证据必须绑定候选/closure exact SHA。
@@ -49,7 +49,7 @@
 | Phase 5 Tasks 5-7 | Codex implementation, cold review, CI and Gate 4 acceptance | same implementation branch/worktree after `9af9bdc` | `9af9bdc` | `committed` | Gate 4 接受 `517d548`；Flutter Agent、E2E、Android enabled/unconsented/disabled 与退出审计完成。本地 Full 1387/1387、Flutter 361；CI `30517131521` 全通过。Phase 5 状态 `verified`，PR #3 保持 draft/unmerged。 |
 | Phase 6 Task 0 | Codex specification, source/license research, and cold review | `codex/phase6-spec-plan` / `health-worktrees/phase6-spec-plan` | `5b268445faab0578ace23b9ecd9757449155a44f` | `verified` | 契约候选 `0109f96` 与 closure `8ef22b4`；P0/P1/P2 为零，closure exact-SHA CI run `30696742677` 的 Fast/Flutter/Full 全通过。 |
 | Phase 6 Tasks 1-6 | Codex sole implementation writer, cold reviewer, CI operator, and final acceptor | `codex/phase6-implementation` / `health-worktrees/phase6-implementation` | `8ef22b4a9a1056ce94570b0c95483a124574243c` | `committed` | Gate 4 接受 `1ff8395`：确定性营养规则/数据、生命周期/API、Agent Tools、Flutter、完整合成 E2E、源/媒体审计及 Android enabled/disabled 完成。本地 Full 1569/0 skipped、PostgreSQL 23/23、Flutter 384；CI `30730437996` 全通过。Phase 6 状态 `verified`，PR #5 保持 draft/unmerged。 |
-| Phase 7 Task 0 | Codex specification, architecture, task split, cold review, CI, and Gate 0 closure | `codex/phase7-spec-plan` / current worktree | `8eeb28a3a4156eaac5763260129fdde6fedee835` | `in_progress` | 仅规格、计划、ADR-0007、任务账本和 Gate 0 审查报告；P0/P1/P2 归零并通过本地 Fast/Flutter 与 exact-SHA CI 前不得开始业务实现。 |
+| Phase 7 Task 0 | Codex specification, architecture, task split, cold review, CI, and Gate 0 closure | `codex/phase7-spec-plan` / current worktree | `8eeb28a3a4156eaac5763260129fdde6fedee835` | `committed` | 契约 `dceceb7` 已通过本地 exact-SHA Fast/Flutter 和 CI `30732748723` 三项；P0/P1/P2/P3 为零。审查报告 `docs/reports/phase7-gate0-review-2026-08-02.md`；业务实现等待元数据 closure exact-SHA 验证。 |
 | Phase 7 Task 1 | Codex sole high-risk backend writer and Gate 1 acceptor | `codex/phase7-implementation` / dedicated worktree after Gate 0 | accepted Gate 0 closure SHA | `planned` | 调整策略/状态、迁移、resolver、API、安全/幂等/并发/删除和 PostgreSQL 演练；禁止委派。 |
 | Phase 7 Task 2 | One OpenCode + Claude Flutter writer; Codex review/fixes/integration | `codex/phase7-flutter` / dedicated worktree after Gate 1 | accepted Gate 1 SHA | `planned` | 只允许计划 Task 2 列出的 Flutter models/providers/Today/Plan/review screens 和测试；不得改 backend/Agent/nutrition/health/docs。 |
 | Phase 7 Task 3 | Codex sole cross-domain writer and Gate 3 acceptor | `codex/phase7-implementation` after accepted Task 2 integration | accepted Gate 2 SHA | `planned` | 周复盘聚合、训练/营养草案来源、体态复查状态/对比、Agent allowlist/确认/隐私与跨域删除。 |
