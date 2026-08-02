@@ -122,6 +122,8 @@ FAST_TEST_TARGETS = [
     "tests/test_nutrition_api.py",
     "tests/test_health_profile.py",
     "tests/test_health_profile_api.py",
+    # Phase 6 Gate 4: synthetic lifecycle, blockers, deletion, and source audit.
+    "tests/test_phase6_e2e.py",
 ]
 
 
