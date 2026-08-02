@@ -99,6 +99,53 @@ enum OutcomeState {
   }
 }
 
+// Phase 7 same-day execution overlay kinds. Mirrors the backend
+// `AdjustmentKind` wire values (the internal `blocked` outcome is never
+// serialized and is therefore intentionally absent here).
+enum AdjustmentKind {
+  shortened,
+  recovery,
+  deferred,
+  activeRest,
+  unchanged;
+
+  static AdjustmentKind tryParse(Object? raw) {
+    if (raw is String) {
+      switch (raw) {
+        case 'shortened':
+          return AdjustmentKind.shortened;
+        case 'recovery':
+          return AdjustmentKind.recovery;
+        case 'deferred':
+          return AdjustmentKind.deferred;
+        case 'active_rest':
+          return AdjustmentKind.activeRest;
+        case 'unchanged':
+          return AdjustmentKind.unchanged;
+      }
+    }
+    throw FormatException('unknown adjustment kind: $raw');
+  }
+}
+
+// Status of a foreground adjustment command response.
+enum AdjustmentApplyStatus {
+  recorded,
+  replayed;
+
+  static AdjustmentApplyStatus tryParse(Object? raw) {
+    if (raw is String) {
+      switch (raw) {
+        case 'recorded':
+          return AdjustmentApplyStatus.recorded;
+        case 'replayed':
+          return AdjustmentApplyStatus.replayed;
+      }
+    }
+    throw FormatException('unknown adjustment status: $raw');
+  }
+}
+
 String _readString(Map<String, dynamic> json, String key) {
   final v = json[key];
   if (v is String && v.trim().isNotEmpty) return v;
@@ -374,6 +421,15 @@ class TodayResult {
   final PlanSession? session;
   final OutcomeState? feedbackOutcomeState;
   final bool substitutionApplied;
+  // Phase 7 effective-execution overlay fields. Cross-field invariants are
+  // checked by fromJson so executable sessions always retain source identity.
+  final String? originalSessionId;
+  final DateTime? sourceLocalDate;
+  final DateTime? targetLocalDate;
+  final String? adjustmentId;
+  final AdjustmentKind? adjustmentKind;
+  final List<String> adjustmentReasonCodes;
+  final String? safetyStatus;
 
   const TodayResult({
     required this.state,
@@ -383,25 +439,76 @@ class TodayResult {
     required this.session,
     required this.feedbackOutcomeState,
     required this.substitutionApplied,
+    this.originalSessionId,
+    this.sourceLocalDate,
+    this.targetLocalDate,
+    this.adjustmentId,
+    this.adjustmentKind,
+    this.adjustmentReasonCodes = const [],
+    this.safetyStatus,
   });
 
   factory TodayResult.fromJson(Map<String, dynamic> json) {
     final s = json['session'];
     final ld = json['local_date'];
+    final state = TodayState.tryParse(json['state']);
+    final session = s is Map<String, dynamic>
+        ? PlanSession.fromJson(s)
+        : (s == null ? null : throw FormatException('invalid session'));
+    final originalSessionId = _readOptionalString(json, 'original_session_id');
+    final sourceLocalDate = _readOptionalDateTime(json, 'source_local_date');
+    final targetLocalDate = _readOptionalDateTime(json, 'target_local_date');
+    final adjustmentId = _readOptionalString(json, 'adjustment_id');
+    final adjustmentKind = json['adjustment_kind'] == null
+        ? null
+        : AdjustmentKind.tryParse(json['adjustment_kind']);
+
+    if (state == TodayState.session &&
+        (session == null ||
+            originalSessionId == null ||
+            sourceLocalDate == null)) {
+      throw const FormatException(
+        'session Today requires effective and original identity',
+      );
+    }
+    if (state != TodayState.session && session != null) {
+      throw const FormatException('non-session Today cannot include a session');
+    }
+    if (state != TodayState.blocked && adjustmentKind != null) {
+      if (originalSessionId == null ||
+          sourceLocalDate == null ||
+          adjustmentId == null) {
+        throw const FormatException(
+          'effective adjustment requires persisted source identity',
+        );
+      }
+      if (adjustmentKind == AdjustmentKind.deferred &&
+          targetLocalDate == null) {
+        throw const FormatException('deferred adjustment requires target date');
+      }
+    }
+
     return TodayResult(
-      state: TodayState.tryParse(json['state']),
+      state: state,
       localDate: ld is String ? DateTime.tryParse(ld) : null,
       changeReason: _readOptionalString(json, 'change_reason'),
       decisionGate: _readOptionalString(json, 'decision_gate'),
-      session: s is Map<String, dynamic>
-          ? PlanSession.fromJson(s)
-          : (s == null ? null : throw FormatException('invalid session')),
+      session: session,
       feedbackOutcomeState: json['feedback_outcome_state'] == null
           ? null
           : OutcomeState.tryParse(json['feedback_outcome_state']),
       substitutionApplied: json['substitution_applied'] == null
           ? false
           : _readBool(json, 'substitution_applied'),
+      originalSessionId: originalSessionId,
+      sourceLocalDate: sourceLocalDate,
+      targetLocalDate: targetLocalDate,
+      adjustmentId: adjustmentId,
+      adjustmentKind: adjustmentKind,
+      adjustmentReasonCodes: json['adjustment_reason_codes'] == null
+          ? const []
+          : _readStringList(json, 'adjustment_reason_codes'),
+      safetyStatus: _readOptionalString(json, 'safety_status'),
     );
   }
 }
@@ -430,12 +537,59 @@ class SubstitutionResult {
   final String substitutionId;
   final String status; // "recorded" | "replayed"
 
-  const SubstitutionResult({required this.substitutionId, required this.status});
+  const SubstitutionResult({
+    required this.substitutionId,
+    required this.status,
+  });
 
   factory SubstitutionResult.fromJson(Map<String, dynamic> json) {
     return SubstitutionResult(
       substitutionId: _readString(json, 'substitution_id'),
       status: _readString(json, 'status'),
+    );
+  }
+}
+
+// Result of an explicit foreground adjustment command
+// (POST /training/today/adjustments). Mirrors backend AdjustmentResponse.
+class AdjustmentResult {
+  final String adjustmentId;
+  final AdjustmentApplyStatus status;
+  final AdjustmentKind adjustmentKind;
+  final String originalSessionId;
+  final DateTime sourceLocalDate;
+  final DateTime? targetLocalDate;
+  final int? targetMinutes;
+  final List<String> reasonCodes;
+
+  const AdjustmentResult({
+    required this.adjustmentId,
+    required this.status,
+    required this.adjustmentKind,
+    required this.originalSessionId,
+    required this.sourceLocalDate,
+    required this.targetLocalDate,
+    required this.targetMinutes,
+    required this.reasonCodes,
+  });
+
+  factory AdjustmentResult.fromJson(Map<String, dynamic> json) {
+    final adjustmentKind = AdjustmentKind.tryParse(json['adjustment_kind']);
+    final targetLocalDate = _readOptionalDateTime(json, 'target_local_date');
+    if (adjustmentKind == AdjustmentKind.deferred && targetLocalDate == null) {
+      throw const FormatException('deferred adjustment requires target date');
+    }
+    return AdjustmentResult(
+      adjustmentId: _readString(json, 'adjustment_id'),
+      status: AdjustmentApplyStatus.tryParse(json['status']),
+      adjustmentKind: adjustmentKind,
+      originalSessionId: _readString(json, 'original_session_id'),
+      sourceLocalDate: _readDateTime(json, 'source_local_date'),
+      targetLocalDate: targetLocalDate,
+      targetMinutes: _readOptionalInt(json, 'target_minutes'),
+      reasonCodes: json['reason_codes'] == null
+          ? const []
+          : _readStringList(json, 'reason_codes'),
     );
   }
 }
@@ -462,14 +616,14 @@ class DraftInput {
   });
 
   Map<String, dynamic> toJson() => {
-        'fitness_goal': fitnessGoal,
-        'weekly_frequency': weeklyFrequency,
-        'session_duration_minutes': sessionDurationMinutes,
-        'equipment_bodyweight': equipmentBodyweight,
-        'equipment_resistance_band': equipmentResistanceBand,
-        'iana_timezone': ianaTimezone,
-        'idempotency_key': idempotencyKey,
-      };
+    'fitness_goal': fitnessGoal,
+    'weekly_frequency': weeklyFrequency,
+    'session_duration_minutes': sessionDurationMinutes,
+    'equipment_bodyweight': equipmentBodyweight,
+    'equipment_resistance_band': equipmentResistanceBand,
+    'iana_timezone': ianaTimezone,
+    'idempotency_key': idempotencyKey,
+  };
 }
 
 class ConfirmInput {
@@ -492,26 +646,29 @@ class ConfirmInput {
   });
 
   Map<String, dynamic> toJson() => {
-        'fitness_goal': fitnessGoal,
-        'weekly_frequency': weeklyFrequency,
-        'session_duration_minutes': sessionDurationMinutes,
-        'equipment_bodyweight': equipmentBodyweight,
-        'equipment_resistance_band': equipmentResistanceBand,
-        'iana_timezone': ianaTimezone,
-        'idempotency_key': idempotencyKey,
-      };
+    'fitness_goal': fitnessGoal,
+    'weekly_frequency': weeklyFrequency,
+    'session_duration_minutes': sessionDurationMinutes,
+    'equipment_bodyweight': equipmentBodyweight,
+    'equipment_resistance_band': equipmentResistanceBand,
+    'iana_timezone': ianaTimezone,
+    'idempotency_key': idempotencyKey,
+  };
 }
 
 class FeedbackInput {
   final OutcomeState outcomeState;
   final String idempotencyKey;
 
-  const FeedbackInput({required this.outcomeState, required this.idempotencyKey});
+  const FeedbackInput({
+    required this.outcomeState,
+    required this.idempotencyKey,
+  });
 
   Map<String, dynamic> toJson() => {
-        'outcome_state': outcomeState.wire,
-        'idempotency_key': idempotencyKey,
-      };
+    'outcome_state': outcomeState.wire,
+    'idempotency_key': idempotencyKey,
+  };
 }
 
 class SubstitutionInput {
@@ -526,8 +683,34 @@ class SubstitutionInput {
   });
 
   Map<String, dynamic> toJson() => {
-        'original_exercise_id': originalExerciseId,
-        'replacement_exercise_id': replacementExerciseId,
-        'idempotency_key': idempotencyKey,
-      };
+    'original_exercise_id': originalExerciseId,
+    'replacement_exercise_id': replacementExerciseId,
+    'idempotency_key': idempotencyKey,
+  };
+}
+
+// Foreground same-day adjustment request. The client sends only the intent,
+// expected plan/session identity, timezone, and idempotency key. It never sends
+// the adjustment kind, target date, replacement exercise, risk tier, target
+// minutes, or any safety result; the server derives those deterministically.
+class AdjustmentRequestInput {
+  final String expectedPlanVersionId;
+  final String expectedSessionId;
+  final String ianaTimezone;
+  final String idempotencyKey;
+
+  const AdjustmentRequestInput({
+    required this.expectedPlanVersionId,
+    required this.expectedSessionId,
+    required this.ianaTimezone,
+    required this.idempotencyKey,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'intent': 'apply_today_adjustment',
+    'expected_plan_version_id': expectedPlanVersionId,
+    'expected_session_id': expectedSessionId,
+    'iana_timezone': ianaTimezone,
+    'idempotency_key': idempotencyKey,
+  };
 }

@@ -92,18 +92,22 @@ void main() {
 
   testWidgets('not checked in shows the quick check-in form', (tester) async {
     final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/checkins/today', (_) => _todayResult(null))
       ..registerJson(
         'GET',
-        '/health/checkins/today',
-        (_) => _todayResult(null),
+        '/training/today',
+        (_) => {'state': 'no_active_plan'},
       );
     await tester.pumpWidget(_wrap(_apiWith(adapter)));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('今日尚未签到'), findsOneWidget);
     expect(find.byKey(const Key('today-checkin-submit')), findsOneWidget);
-    // Plan absence is communicated (not active).
-    expect(find.textContaining('尚未开放'), findsOneWidget);
+    // Compact read-only training card replaces the old "unavailable" placeholder.
+    expect(find.byKey(const Key('today-training-card')), findsOneWidget);
+    expect(find.textContaining('暂无生效的训练计划'), findsOneWidget);
+    // No adjustment button lives on Today (only an explicit Plan-screen button).
+    expect(find.byKey(const Key('today-adjust-button')), findsNothing);
   });
 
   testWidgets('normal check-in path submits and shows summary', (tester) async {
@@ -335,13 +339,18 @@ void main() {
   });
 
   testWidgets(
-    'route: TodayScreen mounts under /today and communicates plan absence',
+    'route: TodayScreen mounts under /today and shows compact training card',
     (tester) async {
       final adapter = FakeDioAdapter()
         ..registerJson(
           'GET',
           '/health/checkins/today',
           (_) => _todayResult(null),
+        )
+        ..registerJson(
+          'GET',
+          '/training/today',
+          (_) => {'state': 'no_active_plan'},
         );
       final router = GoRouter(
         initialLocation: '/today',
@@ -358,9 +367,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('今日尚未签到'), findsOneWidget);
-      // Plan is explicitly unavailable, never rendered as an active plan.
-      expect(find.textContaining('尚未开放'), findsOneWidget);
+      // Compact read-only training card is present.
+      expect(find.byKey(const Key('today-training-card')), findsOneWidget);
       expect(find.textContaining('开始训练'), findsNothing);
+      // No adjustment mutation surface on Today.
+      expect(find.byKey(const Key('today-adjust-button')), findsNothing);
     },
   );
 
@@ -448,10 +459,177 @@ void main() {
         'GET',
         '/health/checkins/today',
         (_) => _todayResult(_checkin(riskSummary: 'red_flag')),
+      )
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {'state': 'no_active_plan'},
       );
     await tester.pumpWidget(_wrap(_apiWith(adapter)));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
+  });
+
+  // -------------------------------------------------------------------------
+  // Phase 7: compact read-only training-today card. The Today screen never
+  // hosts the adjustment mutation (only the Plan screen does); it never POSTs
+  // to /training/today/adjustments on load or on check-in save.
+  // -------------------------------------------------------------------------
+
+  Map<String, dynamic> trainingSessionJson() => {
+    'session_id': 's-1',
+    'week_index': 1,
+    'day_of_week': 1,
+    'session_order': 1,
+    'target_minutes': null,
+    'prescriptions': [
+      {
+        'prescription_id': 'p-1',
+        'exercise_id': 'ex-1',
+        'sets': 3,
+        'reps': 10,
+        'duration_seconds': null,
+        'rest_seconds': 60,
+        'relation_reason': null,
+        'exercise': {
+          'exercise_id': 'ex-1',
+          'name_en': 'Squat',
+          'name_zh': '深蹲',
+          'training_roles': ['strength'],
+          'difficulty': 'beginner',
+          'illustration_asset_key': 'assets/training/illustrations/ex-1.svg',
+          'illustration_alt_zh': '深蹲',
+          'instruction_steps': ['stand'],
+          'form_cues': ['straight'],
+          'substitution_ids': [],
+        },
+      },
+    ],
+  };
+
+  testWidgets('training card shows session + adjustment chip when adjusted', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/checkins/today', (_) => _todayResult(null))
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {
+          'state': 'session',
+          'session': trainingSessionJson(),
+          'adjustment_kind': 'shortened',
+          'original_session_id': 's-1',
+          'source_local_date': '2026-07-27',
+          'adjustment_id': 'adj-1',
+        },
+      );
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('today-training-card')), findsOneWidget);
+    expect(find.textContaining('今日有训练安排'), findsOneWidget);
+    // Adjustment kind surfaced as a non-failure chip.
+    expect(find.textContaining('已调整：缩短'), findsOneWidget);
+    expect(find.byKey(const Key('today-adjust-button')), findsNothing);
+  });
+
+  testWidgets('training card shows blocked as a safety state, never success', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/checkins/today', (_) => _todayResult(null))
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {
+          'state': 'blocked',
+          'decision_gate': 'restricted',
+          'safety_status': 'restricted',
+        },
+      );
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('today-training-card')), findsOneWidget);
+    expect(find.textContaining('暂停训练'), findsOneWidget);
+    expect(find.textContaining('今日有训练安排'), findsNothing);
+  });
+
+  testWidgets(
+    'training card shows active-rest deferral as a valid non-failure state',
+    (tester) async {
+      final adapter = FakeDioAdapter()
+        ..registerJson(
+          'GET',
+          '/health/checkins/today',
+          (_) => _todayResult(null),
+        )
+        ..registerJson(
+          'GET',
+          '/training/today',
+          (_) => {
+            'state': 'rest_day',
+            'adjustment_kind': 'active_rest',
+            'original_session_id': 's-1',
+            'source_local_date': '2026-07-27',
+            'adjustment_id': 'adj-1',
+          },
+        );
+      await tester.pumpWidget(_wrap(_apiWith(adapter)));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('today-training-card')), findsOneWidget);
+      expect(find.textContaining('今日主动休息'), findsOneWidget);
+      expect(find.textContaining('缺勤'), findsNothing);
+    },
+  );
+
+  testWidgets('Today never POSTs an adjustment on load or on check-in save', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/checkins/today', (_) => _todayResult(null))
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {
+          'state': 'session',
+          'local_date': '2026-07-27',
+          'session': trainingSessionJson(),
+          'original_session_id': 's-1',
+          'source_local_date': '2026-07-27',
+        },
+      )
+      ..register('PUT', '/health/checkins/today', (options) {
+        return Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: _checkin(),
+        );
+      });
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('today-checkin-submit')));
+    await tester.tap(find.byKey(const Key('today-checkin-submit')));
+    await tester.pumpAndSettle();
+
+    expect(
+      adapter.calls
+          .where(
+            (c) =>
+                c.method == 'POST' && c.path == '/training/today/adjustments',
+          )
+          .toList(),
+      isEmpty,
+    );
+    expect(
+      adapter.calls
+          .where((c) => c.method == 'GET' && c.path == '/training/today')
+          .length,
+      greaterThanOrEqualTo(2),
+    );
   });
 }

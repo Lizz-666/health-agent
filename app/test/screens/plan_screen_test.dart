@@ -3,6 +3,9 @@
 // Phase 4 plan flow widget test (Task 6): generation form -> draft review ->
 // confirm. Honest states are covered by the model/provider tests; this test
 // covers the user-facing wiring (entry button, draft rendering, confirm action).
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -174,7 +177,7 @@ void main() {
       )
       ..registerJson(
         'GET',
-        '/training/plans/today',
+        '/training/today',
         (_) => {'state': 'rest_day', 'local_date': '2026-07-27'},
       );
     await tester.pumpWidget(_wrap(_apiWith(adapter)));
@@ -255,7 +258,7 @@ void main() {
       )
       ..registerJson(
         'GET',
-        '/training/plans/today',
+        '/training/today',
         (_) => {
           'state': 'session',
           'local_date': '2026-07-27',
@@ -263,6 +266,8 @@ void main() {
           'session': session,
           'feedback_outcome_state': null,
           'substitution_applied': false,
+          'original_session_id': 's-1',
+          'source_local_date': '2026-07-27',
         },
       );
 
@@ -298,7 +303,7 @@ void main() {
       )
       ..registerJson(
         'GET',
-        '/training/plans/today',
+        '/training/today',
         (_) => {
           'state': 'session',
           'local_date': '2026-07-27',
@@ -306,6 +311,8 @@ void main() {
           'session': session,
           'feedback_outcome_state': null,
           'substitution_applied': false,
+          'original_session_id': 's-1',
+          'source_local_date': '2026-07-27',
         },
       );
     late Uri captured;
@@ -335,5 +342,446 @@ void main() {
       'entity_id': 'ex-1',
     });
     expect(captured.queryParameters.containsKey('health_profile'), isFalse);
+  });
+
+  // -------------------------------------------------------------------------
+  // Phase 7: foreground same-day adjustment + weekly-review entry.
+  // -------------------------------------------------------------------------
+
+  Map<String, dynamic> activePlanJson() => _draftPlanJson()
+    ..['status'] = 'active'
+    ..['confirmed_at'] = '2026-07-27T08:00:00Z';
+
+  Map<String, dynamic> todaySessionJson({
+    String? originalSessionId = 's-1',
+    String? adjustmentKind,
+    List<String> reasonCodes = const [],
+  }) => {
+    'state': 'session',
+    'local_date': '2026-07-27',
+    'decision_gate': 'eligible',
+    'session': (activePlanJson()['sessions'] as List).first,
+    'feedback_outcome_state': null,
+    'substitution_applied': false,
+    'original_session_id': originalSessionId,
+    'source_local_date': '2026-07-27',
+    'adjustment_kind': adjustmentKind,
+    'adjustment_reason_codes': reasonCodes,
+    'safety_status': 'eligible',
+  };
+
+  testWidgets(
+    'adjustment button posts correct body using original session id, then refetches',
+    (tester) async {
+      final active = activePlanJson();
+      final adapter = FakeDioAdapter()
+        ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+        ..registerJson(
+          'GET',
+          '/training/plans/active',
+          (_) => {'has_active': true, 'plan': active},
+        )
+        ..registerJson(
+          'GET',
+          '/training/plans/draft',
+          (_) => {'has_draft': false},
+        )
+        ..registerJson('GET', '/training/today', (_) => todaySessionJson())
+        ..registerJson(
+          'POST',
+          '/training/today/adjustments',
+          (_) => {
+            'adjustment_id': 'adj-1',
+            'status': 'recorded',
+            'adjustment_kind': 'shortened',
+            'original_session_id': 's-1',
+            'source_local_date': '2026-07-27',
+            'target_minutes': 30,
+            'reason_codes': ['available_time_shortened'],
+          },
+        );
+      await tester.pumpWidget(_wrap(_apiWith(adapter)));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('today-adjust-button')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('today-adjust-button')));
+      await tester.pumpAndSettle();
+
+      final post = adapter.calls.firstWhere(
+        (c) => c.path == '/training/today/adjustments' && c.method == 'POST',
+      );
+      expect(post.data['intent'], 'apply_today_adjustment');
+      // Uses the ORIGINAL source session identity returned by Today.
+      expect(post.data['expected_session_id'], 's-1');
+      expect(post.data['expected_plan_version_id'], 'pv-1');
+      expect(post.data['iana_timezone'], 'Asia/Shanghai');
+      expect(post.data['idempotency_key'], isA<String>());
+      // Success status banner.
+      expect(find.byKey(const Key('adjust-status-applied')), findsOneWidget);
+      // Today refetched after success.
+      expect(
+        adapter.calls
+            .where((c) => c.path == '/training/today' && c.method == 'GET')
+            .length,
+        greaterThanOrEqualTo(2),
+      );
+    },
+  );
+
+  testWidgets('adjustment button disabled while applying (no duplicate post)', (
+    tester,
+  ) async {
+    final active = activePlanJson();
+    final gate = Completer<Response>();
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerJson('GET', '/training/today', (_) => todaySessionJson())
+      ..register('POST', '/training/today/adjustments', (_) => gate.future);
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('today-adjust-button')));
+    await tester.pump();
+    // Button disabled while in flight.
+    final button = tester.widget<FilledButton>(
+      find.byKey(const Key('today-adjust-button')),
+    );
+    expect(button.enabled, isFalse);
+
+    gate.complete(
+      Response(
+        requestOptions: RequestOptions(path: '/training/today/adjustments'),
+        statusCode: 200,
+        data: {
+          'adjustment_id': 'a',
+          'status': 'recorded',
+          'adjustment_kind': 'unchanged',
+          'original_session_id': 's-1',
+          'source_local_date': '2026-07-27',
+          'reason_codes': [],
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      adapter.calls
+          .where(
+            (c) =>
+                c.path == '/training/today/adjustments' && c.method == 'POST',
+          )
+          .length,
+      1,
+    );
+  });
+
+  Future<void> pumpAndAssertBanner(
+    WidgetTester tester,
+    String code,
+    int status,
+    Key expectedKey,
+  ) async {
+    final active = activePlanJson();
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerJson('GET', '/training/today', (_) => todaySessionJson())
+      ..registerError('POST', '/training/today/adjustments', status, {
+        'detail': 'x',
+        'code': code,
+      });
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('today-adjust-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(expectedKey), findsOneWidget);
+  }
+
+  testWidgets('adjustment banner: stale_context', (tester) async {
+    await pumpAndAssertBanner(
+      tester,
+      'stale_context',
+      409,
+      const Key('adjust-status-stale'),
+    );
+  });
+
+  testWidgets('adjustment banner: red_flag_stop -> safety', (tester) async {
+    await pumpAndAssertBanner(
+      tester,
+      'red_flag_stop',
+      409,
+      const Key('adjust-status-safety'),
+    );
+  });
+
+  testWidgets('adjustment banner: missing_current_checkin', (tester) async {
+    await pumpAndAssertBanner(
+      tester,
+      'missing_current_checkin',
+      409,
+      const Key('adjust-status-missing'),
+    );
+  });
+
+  testWidgets('adjustment banner: adjustment_collision -> conflict', (
+    tester,
+  ) async {
+    await pumpAndAssertBanner(
+      tester,
+      'adjustment_collision',
+      409,
+      const Key('adjust-status-conflict'),
+    );
+  });
+
+  testWidgets('adjustment banner: generation_failed -> unavailable', (
+    tester,
+  ) async {
+    await pumpAndAssertBanner(
+      tester,
+      'generation_failed',
+      503,
+      const Key('adjust-status-unavailable'),
+    );
+  });
+
+  testWidgets('replayed adjustment shows replayed banner', (tester) async {
+    final active = activePlanJson();
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerJson('GET', '/training/today', (_) => todaySessionJson())
+      ..registerJson(
+        'POST',
+        '/training/today/adjustments',
+        (_) => {
+          'adjustment_id': 'a',
+          'status': 'replayed',
+          'adjustment_kind': 'deferred',
+          'original_session_id': 's-1',
+          'source_local_date': '2026-07-27',
+          'target_local_date': '2026-07-29',
+          'reason_codes': ['no_available_time'],
+        },
+      );
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('today-adjust-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('adjust-status-replayed')), findsOneWidget);
+  });
+
+  testWidgets('deferral renders source/target date as a non-failure state', (
+    tester,
+  ) async {
+    final active = activePlanJson();
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {
+          'state': 'rest_day',
+          'local_date': '2026-07-27',
+          'adjustment_kind': 'deferred',
+          'original_session_id': 's-1',
+          'source_local_date': '2026-07-27',
+          'target_local_date': '2026-07-29',
+          'adjustment_id': 'adj-1',
+          'adjustment_reason_codes': ['no_available_time'],
+        },
+      );
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('today-deferral')), findsOneWidget);
+    expect(find.textContaining('2026-07-29'), findsOneWidget);
+    expect(find.textContaining('缺勤'), findsNothing);
+  });
+
+  testWidgets('ordinary rest day has no adjustment mutation button', (
+    tester,
+  ) async {
+    final active = activePlanJson();
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {
+          'state': 'rest_day',
+          'local_date': '2026-07-27',
+          'decision_gate': 'eligible',
+        },
+      );
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('今天是休息日'), findsOneWidget);
+    expect(find.byKey(const Key('today-adjust-button')), findsNothing);
+  });
+
+  testWidgets('stale effective Today is not mislabeled as a safety signal', (
+    tester,
+  ) async {
+    final active = activePlanJson();
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {
+          'state': 'blocked',
+          'local_date': '2026-07-27',
+          'change_reason': 'adjustment_stale',
+          'decision_gate': 'eligible',
+          'original_session_id': 's-1',
+        },
+      );
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('today-status-stale')), findsOneWidget);
+    expect(find.textContaining('安全风险信号'), findsNothing);
+  });
+
+  testWidgets('adjusted session renders original and effective summaries', (
+    tester,
+  ) async {
+    final active = activePlanJson();
+    final effective = Map<String, dynamic>.from(
+      (activePlanJson()['sessions'] as List).first as Map<String, dynamic>,
+    )..['target_minutes'] = 15;
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {
+          ...todaySessionJson(
+            adjustmentKind: 'shortened',
+            reasonCodes: const ['available_time_shortened'],
+          ),
+          'session': effective,
+          'adjustment_id': 'adj-1',
+        },
+      );
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('today-original-summary')), findsOneWidget);
+    expect(find.byKey(const Key('today-effective-summary')), findsOneWidget);
+    expect(find.textContaining('30 分钟'), findsOneWidget);
+    expect(find.textContaining('15 分钟'), findsWidgets);
+  });
+
+  testWidgets('weekly-review entry navigates to /plan/weekly-review', (
+    tester,
+  ) async {
+    final active = activePlanJson();
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerJson('GET', '/training/today', (_) => todaySessionJson());
+    late Uri captured;
+    final router = GoRouter(
+      initialLocation: '/plan',
+      routes: [
+        GoRoute(path: '/plan', builder: (_, _) => const PlanScreen()),
+        GoRoute(
+          path: '/plan/weekly-review',
+          builder: (_, state) {
+            captured = state.uri;
+            return const Scaffold(body: Text('WEEKLY_REVIEW_PAGE'));
+          },
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(_wrapWithRouter(_apiWith(adapter), router));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('plan-weekly-review-entry')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('WEEKLY_REVIEW_PAGE'), findsOneWidget);
+    expect(captured.path, '/plan/weekly-review');
   });
 }

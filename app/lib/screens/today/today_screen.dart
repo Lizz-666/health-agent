@@ -17,18 +17,22 @@
 //    distinguishable from normal.
 //  - active_rest and safety_adjustment daily_status values are presented as
 //    VALID, non-failure engagement states (never as missed/absent).
-//  - Plan functionality does not exist: no executable plan, action, progress
-//    or active-looking placeholder is rendered; plan absence is communicated
-//    explicitly as unavailable.
+//  - Training is a compact read-only status card. The executable session and
+//    foreground adjustment mutation remain exclusively on the Plan screen.
 //  - No AI, no recommendation / plan / diet generation.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
 import '../../models/daily_checkin.dart';
+import '../../models/plan.dart';
 import '../../providers/assessment_provider.dart' show LoadStatus;
 import '../../providers/daily_checkin_provider.dart';
+import '../../providers/plan_provider.dart';
 import '../../widgets/disclaimer_banner.dart';
+
+const String _kTrainingTimezone = 'Asia/Shanghai';
 
 class TodayScreen extends ConsumerStatefulWidget {
   const TodayScreen({super.key});
@@ -46,6 +50,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(dailyCheckinProvider.notifier).fetchToday();
+      // Read-only effective training state (Phase 7). This is a GET only; it
+      // never applies an adjustment. The adjustment button lives exclusively
+      // on the Plan screen and only fires on an explicit foreground press.
+      ref.read(planProvider.notifier).fetchToday(_kTrainingTimezone);
     });
   }
 
@@ -68,10 +76,18 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     ref.read(dailyCheckinProvider.notifier).fetchToday(),
                 onSubmit: (input) async {
                   setState(() => _saving = true);
-                  await ref
+                  final saved = await ref
                       .read(dailyCheckinProvider.notifier)
                       .saveToday(input);
-                  if (mounted) setState(() => _saving = false);
+                  if (!mounted) return;
+                  setState(() => _saving = false);
+                  if (saved) {
+                    // Check-in changes safety/availability context. Refresh the
+                    // read-only Today projection, but never trigger adjustment.
+                    ref
+                        .read(planProvider.notifier)
+                        .fetchToday(_kTrainingTimezone);
+                  }
                 },
               ),
             ),
@@ -139,7 +155,9 @@ class _TodayBody extends StatelessWidget {
       );
     }
     if (status == LoadStatus.parseError) {
-      return _box(child: _ErrorState(message: '数据解析异常', onRetry: onRetry));
+      return _box(
+        child: _ErrorState(message: '数据解析异常', onRetry: onRetry),
+      );
     }
     if (status == LoadStatus.empty) {
       return Column(
@@ -149,7 +167,7 @@ class _TodayBody extends StatelessWidget {
           const SizedBox(height: 16),
           _CheckInForm(onSubmit: onSubmit),
           const SizedBox(height: 16),
-          const _PlanUnavailableCard(),
+          const _TrainingTodayCard(),
         ],
       );
     }
@@ -160,7 +178,7 @@ class _TodayBody extends StatelessWidget {
       children: [
         _CheckInSummary(checkin: checkin),
         const SizedBox(height: 16),
-        const _PlanUnavailableCard(),
+        const _TrainingTodayCard(),
       ],
     );
   }
@@ -346,7 +364,8 @@ class _CheckInFormState extends State<_CheckInForm> {
                 child: Text('45 分钟以上'),
               ),
             ],
-            onChanged: (v) => setState(() => _availableTime = v ?? _availableTime),
+            onChanged: (v) =>
+                setState(() => _availableTime = v ?? _availableTime),
           ),
           _DropdownField<DailyStatus>(
             label: '今日状态',
@@ -424,10 +443,7 @@ class _CheckInFormState extends State<_CheckInForm> {
       TextField(
         key: const Key('today-pain-area'),
         controller: _painAreaCtrl,
-        decoration: const InputDecoration(
-          labelText: '疼痛部位',
-          isDense: true,
-        ),
+        decoration: const InputDecoration(labelText: '疼痛部位', isDense: true),
       ),
       const SizedBox(height: 8),
       _DropdownField<PainStarted?>(
@@ -437,10 +453,7 @@ class _CheckInFormState extends State<_CheckInForm> {
         items: const [
           DropdownMenuItem(value: null, child: Text('请选择')),
           DropdownMenuItem(value: PainStarted.today, child: Text('今天')),
-          DropdownMenuItem(
-            value: PainStarted.recentDays,
-            child: Text('最近几天'),
-          ),
+          DropdownMenuItem(value: PainStarted.recentDays, child: Text('最近几天')),
           DropdownMenuItem(value: PainStarted.ongoing, child: Text('持续')),
           DropdownMenuItem(
             value: PainStarted.afterAcuteEvent,
@@ -483,10 +496,7 @@ class _CheckInFormState extends State<_CheckInForm> {
         key: const Key('today-pain-note'),
         controller: _painNoteCtrl,
         maxLines: 2,
-        decoration: const InputDecoration(
-          labelText: '备注（可选）',
-          isDense: true,
-        ),
+        decoration: const InputDecoration(labelText: '备注（可选）', isDense: true),
       ),
     ];
   }
@@ -525,10 +535,7 @@ class _CheckInSummary extends StatelessWidget {
                 label: '可用时间',
                 value: _availableLabel(checkin.availableTime),
               ),
-              _Field(
-                label: '异常疼痛',
-                value: checkin.abnormalPain ? '是' : '否',
-              ),
+              _Field(label: '异常疼痛', value: checkin.abnormalPain ? '是' : '否'),
               const SizedBox(height: 8),
               Text(
                 '日期：${_formatDate(checkin.localDate)}',
@@ -682,50 +689,148 @@ class _DailyStatusCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Plan absence — explicitly unavailable, never an active-looking placeholder
+// Compact read-only training-today card (Phase 7). Reflects the effective
+// training state from GET /training/today but never hosts the adjustment
+// mutation; the foreground adjustment button lives only on the Plan screen.
+// Safety / parse-error / network states are distinct and never rendered as a
+// normal/success state. Active rest and deferral are valid non-failure states.
 // ---------------------------------------------------------------------------
 
-class _PlanUnavailableCard extends StatelessWidget {
-  const _PlanUnavailableCard();
+class _TrainingTodayCard extends ConsumerWidget {
+  const _TrainingTodayCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final plan = ref.watch(planProvider);
+    Widget content;
+    if (plan.todayStatus == LoadStatus.idle ||
+        plan.todayStatus == LoadStatus.loading) {
+      content = const Text(
+        '训练状态加载中…',
+        style: TextStyle(fontSize: 12, color: Color(AppConstants.textMuted)),
+      );
+    } else if (plan.todayStatus == LoadStatus.networkError) {
+      content = const Text(
+        '训练状态加载失败，请在“计划”页重试。',
+        style: TextStyle(fontSize: 12, color: Color(AppConstants.textMuted)),
+      );
+    } else if (plan.todayStatus == LoadStatus.parseError ||
+        plan.today == null) {
+      content = const Text(
+        '训练数据解析异常，未显示为可执行训练。',
+        style: TextStyle(fontSize: 12, color: Color(AppConstants.severeColor)),
+      );
+    } else {
+      content = _summary(plan.today!);
+    }
     return _box(
-      child: Row(
-        children: const [
-          Icon(
-            Icons.lock_outline,
-            color: Color(AppConstants.textMuted),
-            size: 20,
-          ),
-          SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '训练计划（尚未开放）',
+      child: Column(
+        key: const Key('today-training-card'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.fitness_center,
+                color: Color(AppConstants.accentColor),
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  '今日训练',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Color(AppConstants.textColor),
                   ),
                 ),
-                SizedBox(height: 2),
-                Text(
-                  '个性化训练计划功能仍在开发中，暂不可用。当前仅记录今日状态。',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(AppConstants.textMuted),
-                  ),
-                ),
-              ],
-            ),
+              ),
+              TextButton(
+                key: const Key('today-training-open'),
+                onPressed: () => context.go('/plan'),
+                child: const Text('查看'),
+              ),
+            ],
           ),
+          const SizedBox(height: 4),
+          content,
         ],
       ),
     );
   }
+
+  Widget _summary(TodayResult t) {
+    final (label, isSafety) = t.state == TodayState.blocked
+        ? _blockedLabel(t)
+        : switch (t.state) {
+            TodayState.noActivePlan => ('暂无生效的训练计划', false),
+            TodayState.blocked => throw StateError('handled above'),
+            TodayState.restDay => (
+              t.adjustmentKind == AdjustmentKind.deferred
+                  ? '今日已延期，主动休息（有效状态）'
+                  : (t.adjustmentKind == AdjustmentKind.activeRest
+                        ? '今日主动休息（有效状态）'
+                        : '今天是休息日'),
+              false,
+            ),
+            TodayState.planComplete => ('四周计划已完成', false),
+            TodayState.session => ('今日有训练安排', false),
+          };
+    final kind = _kindLabel(t.adjustmentKind);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isSafety
+                ? const Color(AppConstants.severeColor)
+                : const Color(AppConstants.textMuted),
+          ),
+        ),
+        if (kind != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              '已调整：$kind',
+              style: const TextStyle(
+                fontSize: 11,
+                color: Color(AppConstants.accentColor),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  (String, bool) _blockedLabel(TodayResult today) {
+    if (_isStaleToday(today)) return ('今日调整已过期，请到计划页刷新', false);
+    if (today.decisionGate == 'clarification_required') {
+      return ('缺少今日必要信息', false);
+    }
+    if (today.decisionGate == 'restricted' ||
+        today.decisionGate == 'red_flag' ||
+        today.changeReason == 'safety_revalidation_failed') {
+      return ('今日暂停训练（安全状态）', true);
+    }
+    return ('今日训练暂不可执行', false);
+  }
+
+  bool _isStaleToday(TodayResult today) => const {
+    'adjustment_stale',
+    'adjustment_version_stale',
+  }.contains(today.changeReason);
+
+  String? _kindLabel(AdjustmentKind? k) => switch (k) {
+    AdjustmentKind.shortened => '缩短',
+    AdjustmentKind.recovery => '恢复',
+    AdjustmentKind.deferred => '延期',
+    AdjustmentKind.activeRest => '主动休息',
+    AdjustmentKind.unchanged => '未调整',
+    null => null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -868,15 +973,15 @@ class _DropdownField<T extends Object?> extends StatelessWidget {
 }
 
 Widget _box({required Widget child}) => Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(AppConstants.cardColor),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(AppConstants.glassBorder)),
-      ),
-      child: child,
-    );
+  width: double.infinity,
+  padding: const EdgeInsets.all(16),
+  decoration: BoxDecoration(
+    color: const Color(AppConstants.cardColor),
+    borderRadius: BorderRadius.circular(8),
+    border: Border.all(color: const Color(AppConstants.glassBorder)),
+  ),
+  child: child,
+);
 
 String _formatDate(DateTime dt) {
   String two(int v) => v.toString().padLeft(2, '0');
@@ -884,26 +989,26 @@ String _formatDate(DateTime dt) {
 }
 
 String _sleepLabel(SleepQuality v) => switch (v) {
-      SleepQuality.poor => '差',
-      SleepQuality.ok => '一般',
-      SleepQuality.good => '好',
-    };
+  SleepQuality.poor => '差',
+  SleepQuality.ok => '一般',
+  SleepQuality.good => '好',
+};
 
 String _energyLabel(Energy v) => switch (v) {
-      Energy.low => '低',
-      Energy.normal => '正常',
-      Energy.high => '充沛',
-    };
+  Energy.low => '低',
+  Energy.normal => '正常',
+  Energy.high => '充沛',
+};
 
 String _sorenessLabel(MuscleSoreness v) => switch (v) {
-      MuscleSoreness.none => '无',
-      MuscleSoreness.mild => '轻微',
-      MuscleSoreness.significant => '明显',
-    };
+  MuscleSoreness.none => '无',
+  MuscleSoreness.mild => '轻微',
+  MuscleSoreness.significant => '明显',
+};
 
 String _availableLabel(AvailableTime v) => switch (v) {
-      AvailableTime.none => '无',
-      AvailableTime.fifteenMin => '15 分钟',
-      AvailableTime.thirtyMin => '30 分钟',
-      AvailableTime.fortyFiveMinPlus => '45 分钟以上',
-    };
+  AvailableTime.none => '无',
+  AvailableTime.fifteenMin => '15 分钟',
+  AvailableTime.thirtyMin => '30 分钟',
+  AvailableTime.fortyFiveMinPlus => '45 分钟以上',
+};
