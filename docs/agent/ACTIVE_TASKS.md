@@ -51,7 +51,7 @@
 | Phase 6 Tasks 1-6 | Codex sole implementation writer, cold reviewer, CI operator, and final acceptor | `codex/phase6-implementation` / `health-worktrees/phase6-implementation` | `8ef22b4a9a1056ce94570b0c95483a124574243c` | `committed` | Gate 4 接受 `1ff8395`：确定性营养规则/数据、生命周期/API、Agent Tools、Flutter、完整合成 E2E、源/媒体审计及 Android enabled/disabled 完成。本地 Full 1569/0 skipped、PostgreSQL 23/23、Flutter 384；CI `30730437996` 全通过。Phase 6 状态 `verified`，PR #5 保持 draft/unmerged。 |
 | Phase 7 Task 0 | Codex specification, architecture, task split, cold review, CI, and Gate 0 closure | `codex/phase7-spec-plan` / current worktree | `8eeb28a3a4156eaac5763260129fdde6fedee835` | `committed` | 契约 `dceceb7` 已通过本地 exact-SHA Fast/Flutter 和 CI `30732748723` 三项；P0/P1/P2/P3 为零。审查报告 `docs/reports/phase7-gate0-review-2026-08-02.md`；业务实现等待元数据 closure exact-SHA 验证。 |
 | Phase 7 Task 1 | Codex sole high-risk backend writer and Gate 1 acceptor | `codex/phase7-implementation` / `health-worktrees/phase7-implementation` | `5edfa0fcaced135fd434629945f60c49095e6665` | `verified` | 接受实现 `a27dddc944973d25e1c974f709068c67ae6f2d00`；本地 Full 1615/0/0、PostgreSQL 25/25，CI `30744694166` 的 Fast/Flutter/Full 全绿；审查报告 `docs/reports/phase7-gate1-review-2026-08-02.md`。 |
-| Phase 7 Task 2 | One OpenCode + Claude Flutter writer; Codex review/fixes/integration | `codex/phase7-flutter` / dedicated worktree after Gate 1 | accepted Gate 1 SHA | `planned` | 只允许计划 Task 2 列出的 Flutter models/providers/Today/Plan/review screens 和测试；不得改 backend/Agent/nutrition/health/docs。 |
+| Phase 7 Task 2 | One OpenCode + Claude Flutter writer; Codex review/fixes/integration | `codex/phase7-flutter` / `health-worktrees/phase7-flutter` | `fbf96d389de1eb36689411fb13eaf2ce91ad34fd` | `in_progress` | OpenCode 是业务代码唯一写入者；只允许计划 Task 2 列出的 Flutter models/providers/Today/Plan/review screens 和测试；不得改 backend/Agent/nutrition/health/docs，不得 commit/push/merge/rebase。Codex 在交接前只读。 |
 | Phase 7 Task 3 | Codex sole cross-domain writer and Gate 3 acceptor | `codex/phase7-implementation` after accepted Task 2 integration | accepted Gate 2 SHA | `planned` | 周复盘聚合、训练/营养草案来源、体态复查状态/对比、Agent allowlist/确认/隐私与跨域删除。 |
 | Phase 7 Task 4 | Codex sole E2E writer, cold reviewer, CI operator, and final acceptor | same implementation branch/worktree | accepted Gate 3 SHA | `planned` | 完整合成 E2E、Android enabled/disabled、严格 Full/PostgreSQL、exact-SHA CI、退出审计；不得 merge/deploy/write main。 |
 
@@ -67,6 +67,7 @@
 
 ## Worktree State
 
+- Phase 7 Task 2 uses `health-worktrees/phase7-flutter` on `codex/phase7-flutter`, created from verified Gate 1 closure `fbf96d389de1eb36689411fb13eaf2ce91ad34fd`; OpenCode + Claude is the sole allowlisted implementation writer until handoff.
 - Phase 7 唯一 Codex 实现 worktree 为 `health-worktrees/phase7-implementation`，分支 `codex/phase7-implementation`，精确 base `5edfa0fcaced135fd434629945f60c49095e6665`；Gate 1 已接受实现 `a27dddc944973d25e1c974f709068c67ae6f2d00`，Task 2 只能从后续 Gate 1 元数据 closure SHA 创建独立 worktree。
 - Phase 7 规格 worktree 为当前 Codex 规格目录，分支 `codex/phase7-spec-plan`，停在已验证 Gate 0 closure `5edfa0fcaced135fd434629945f60c49095e6665`；业务实现不在该目录写入。
 - `health` 根 worktree：当前 `codex/phase3-spec-plan`，用于协调基线和 Phase 3 draft PR。未跟踪 `.opencode/package-lock.json` 与当前工作无关，保持未暂存、未提交。
