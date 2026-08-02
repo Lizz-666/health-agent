@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/constants.dart';
 import '../../core/idempotency_key.dart';
 import '../../models/plan.dart';
 import '../../providers/assessment_provider.dart' show LoadStatus;
@@ -126,6 +127,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       appBar: AppBar(
         title: const Text('训练计划'),
         actions: [
+          TextButton.icon(
+            key: const Key('plan-weekly-review-entry'),
+            onPressed: () => context.go('/plan/weekly-review'),
+            icon: const Icon(Icons.assignment_turned_in_outlined),
+            label: const Text('周回顾'),
+          ),
           TextButton.icon(
             key: const Key('plan-nutrition-entry'),
             onPressed: () => context.go('/plan/nutrition'),
@@ -437,12 +444,12 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
           style: const TextStyle(fontSize: 12),
         ),
         const Divider(),
-        _todaySection(plan),
+        _todaySection(plan, active),
       ],
     );
   }
 
-  Widget _todaySection(PlanState plan) {
+  Widget _todaySection(PlanState plan, PlanVersion active) {
     if (plan.todayStatus == LoadStatus.loading) {
       return const Padding(
         padding: EdgeInsets.all(16),
@@ -467,21 +474,82 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
       );
     }
     final today = plan.today!;
+    if (today.state == TodayState.blocked) {
+      if (_isStaleToday(today)) {
+        return const _StatusCard(
+          key: Key('today-status-stale'),
+          icon: Icons.sync_problem,
+          title: '今日调整已过期',
+          detail: '签到或策略上下文已变化，旧调整不可执行。请刷新后重新操作。',
+        );
+      }
+      if (today.decisionGate == 'clarification_required') {
+        return const _StatusCard(
+          key: Key('today-status-missing'),
+          icon: Icons.help_outline,
+          title: '缺少今日必要信息',
+          detail: '请先完成必要信息，再重新加载今日训练。',
+        );
+      }
+      if (today.decisionGate == 'restricted' ||
+          today.decisionGate == 'red_flag' ||
+          today.changeReason == 'safety_revalidation_failed') {
+        return _StatusCard(
+          key: const Key('today-status-safety'),
+          icon: Icons.block,
+          title: '当前安全状态暂停训练',
+          detail: '当前状态为 ${today.decisionGate ?? "blocked"}，不会显示为可执行训练。',
+        );
+      }
+      return const _StatusCard(
+        key: Key('today-status-unavailable'),
+        icon: Icons.error_outline,
+        title: '今日训练暂不可执行',
+        detail: '当前执行状态存在冲突或缺少可验证来源，不会按安全状态或成功状态展示。',
+      );
+    }
+    final originalSession = _findSession(active, today.originalSessionId);
+    if (today.originalSessionId != null && originalSession == null) {
+      return const _StatusCard(
+        key: Key('today-status-unavailable'),
+        icon: Icons.error_outline,
+        title: '原始训练场次不可用',
+        detail: '无法核对原始与有效训练，不会提供调整按钮。',
+      );
+    }
+    final controls = _AdjustmentControls(
+      today: today,
+      originalSession: originalSession,
+      originalPlanMinutes: active.sessionDurationMinutes,
+      planVersionId: active.planVersionId,
+      state: plan.adjustState,
+      message: plan.adjustMessage,
+      timezone: _kDefaultTimezone,
+      ref: ref,
+    );
     switch (today.state) {
       case TodayState.noActivePlan:
         return const _StatusCard(icon: Icons.event_busy, title: '没有生效的训练计划');
       case TodayState.blocked:
-        return _StatusCard(
-          icon: Icons.block,
-          title: '当前状态暂停训练',
-          detail:
-              '检测到安全风险信号（${today.decisionGate ?? "blocked"}），已停止训练；不会显示为成功。',
-        );
+        throw StateError('blocked Today handled before adjustment controls');
       case TodayState.restDay:
-        return _StatusCard(
-          icon: Icons.self_improvement,
-          title: '今天是休息日',
-          detail: '按计划今日无训练任务。',
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _StatusCard(
+              icon: Icons.self_improvement,
+              title: today.adjustmentKind == AdjustmentKind.activeRest
+                  ? '今日主动休息（有效状态）'
+                  : '今天是休息日',
+              detail: today.adjustmentKind == AdjustmentKind.activeRest
+                  ? '主动休息是有效的恢复状态，不计为缺勤或失败。'
+                  : '按计划今日无训练任务。',
+            ),
+            if (originalSession != null) ...[
+              const SizedBox(height: 12),
+              controls,
+            ],
+          ],
         );
       case TodayState.planComplete:
         return const _StatusCard(
@@ -490,44 +558,302 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
           detail: '本周期已结束，不会重复显示第一周课程。',
         );
       case TodayState.session:
-        return _SessionSection(
-          session: today.session!,
-          feedback: today.feedbackOutcomeState,
-          substitutionApplied: today.substitutionApplied,
-          onFeedback: (OutcomeState outcome) async {
-            await ref
-                .read(planProvider.notifier)
-                .recordFeedback(
-                  today.session!.sessionId,
-                  FeedbackInput(
-                    outcomeState: outcome,
-                    idempotencyKey: newIdempotencyKey(),
-                  ),
-                  _kDefaultTimezone,
-                );
-            if (mounted) {
-              ref.read(planProvider.notifier).fetchToday(_kDefaultTimezone);
-            }
-          },
-          onSubstitute: (original, replacement) async {
-            await ref
-                .read(planProvider.notifier)
-                .recordSubstitution(
-                  today.session!.sessionId,
-                  SubstitutionInput(
-                    originalExerciseId: original,
-                    replacementExerciseId: replacement,
-                    idempotencyKey: newIdempotencyKey(),
-                  ),
-                  _kDefaultTimezone,
-                );
-            if (mounted) {
-              ref.read(planProvider.notifier).fetchToday(_kDefaultTimezone);
-            }
-          },
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            controls,
+            const SizedBox(height: 12),
+            _SessionSection(
+              session: today.session!,
+              feedback: today.feedbackOutcomeState,
+              substitutionApplied: today.substitutionApplied,
+              onFeedback: (OutcomeState outcome) async {
+                await ref
+                    .read(planProvider.notifier)
+                    .recordFeedback(
+                      today.session!.sessionId,
+                      FeedbackInput(
+                        outcomeState: outcome,
+                        idempotencyKey: newIdempotencyKey(),
+                      ),
+                      _kDefaultTimezone,
+                    );
+                if (mounted) {
+                  ref.read(planProvider.notifier).fetchToday(_kDefaultTimezone);
+                }
+              },
+              onSubstitute: (original, replacement) async {
+                await ref
+                    .read(planProvider.notifier)
+                    .recordSubstitution(
+                      today.session!.sessionId,
+                      SubstitutionInput(
+                        originalExerciseId: original,
+                        replacementExerciseId: replacement,
+                        idempotencyKey: newIdempotencyKey(),
+                      ),
+                      _kDefaultTimezone,
+                    );
+                if (mounted) {
+                  ref.read(planProvider.notifier).fetchToday(_kDefaultTimezone);
+                }
+              },
+            ),
+          ],
         );
     }
   }
+}
+
+bool _isStaleToday(TodayResult today) => const {
+  'adjustment_stale',
+  'adjustment_version_stale',
+}.contains(today.changeReason);
+
+PlanSession? _findSession(PlanVersion plan, String? sessionId) {
+  if (sessionId == null) return null;
+  for (final session in plan.sessions) {
+    if (session.sessionId == sessionId) return session;
+  }
+  return null;
+}
+
+String _kindLabel(AdjustmentKind? k) => switch (k) {
+  AdjustmentKind.shortened => '缩短',
+  AdjustmentKind.recovery => '恢复',
+  AdjustmentKind.deferred => '延期',
+  AdjustmentKind.activeRest => '主动休息',
+  AdjustmentKind.unchanged => '未调整',
+  null => '未调整',
+};
+
+String _formatDate(DateTime dt) {
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${dt.year}-${two(dt.month)}-${two(dt.day)}';
+}
+
+/// Foreground same-day adjustment controls. The button is the ONLY surface
+/// that calls POST /training/today/adjustments; it never fires on load,
+/// check-in save, feedback, substitution, or retry. It uses the original
+/// source session identity returned by Today and the active plan version id.
+/// Distinct loading/replay/stale/safety/missing/conflict/unavailable/parse
+/// states are rendered separately and never as success.
+class _AdjustmentControls extends ConsumerWidget {
+  final TodayResult today;
+  final PlanSession? originalSession;
+  final int originalPlanMinutes;
+  final String planVersionId;
+  final AdjustApplyState state;
+  final String? message;
+  final String timezone;
+  final WidgetRef ref;
+
+  const _AdjustmentControls({
+    required this.today,
+    required this.originalSession,
+    required this.originalPlanMinutes,
+    required this.planVersionId,
+    required this.state,
+    required this.message,
+    required this.timezone,
+    required this.ref,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef _) {
+    final applying = state == AdjustApplyState.applying;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (today.adjustmentKind != null ||
+            today.adjustmentReasonCodes.isNotEmpty)
+          _effectiveOriginalBlock(),
+        if (today.adjustmentKind != null ||
+            today.adjustmentReasonCodes.isNotEmpty)
+          const SizedBox(height: 12),
+        FilledButton.icon(
+          key: const Key('today-adjust-button'),
+          onPressed: applying ? null : _apply,
+          icon: applying
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.tune),
+          label: Text(applying ? '调整中…' : '根据今日状态调整'),
+        ),
+        if (state != AdjustApplyState.idle &&
+            state != AdjustApplyState.applying)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _statusBanner(),
+          ),
+      ],
+    );
+  }
+
+  Widget _effectiveOriginalBlock() {
+    return Container(
+      key: const Key('today-effective-original'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(AppConstants.cardColor),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(AppConstants.glassBorder)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (today.adjustmentKind != null)
+            Text(
+              '本次调整：${_kindLabel(today.adjustmentKind)}',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(AppConstants.accentColor),
+              ),
+            ),
+          if (originalSession != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                key: const Key('today-original-summary'),
+                '原始场次：${_sessionSummary(originalSession!, originalPlanMinutes)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(AppConstants.textMuted),
+                ),
+              ),
+            ),
+          if (today.session != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                key: const Key('today-effective-summary'),
+                '有效场次：${_sessionSummary(today.session!, originalPlanMinutes)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(AppConstants.textColor),
+                ),
+              ),
+            ),
+          if (today.adjustmentReasonCodes.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                '原因：${today.adjustmentReasonCodes.join("、")}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(AppConstants.textMuted),
+                ),
+              ),
+            ),
+          if (today.adjustmentKind == AdjustmentKind.deferred &&
+              today.sourceLocalDate != null &&
+              today.targetLocalDate != null)
+            Padding(
+              key: const Key('today-deferral'),
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '延期：${_formatDate(today.sourceLocalDate!)} → '
+                '${_formatDate(today.targetLocalDate!)}（有效状态，已移至合法日期）',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(AppConstants.textColor),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusBanner() {
+    final (key, color, text) = switch (state) {
+      AdjustApplyState.applied => (
+        const Key('adjust-status-applied'),
+        Color(AppConstants.normalColor),
+        '已根据今日状态调整，已刷新今日执行。',
+      ),
+      AdjustApplyState.replayed => (
+        const Key('adjust-status-replayed'),
+        Color(AppConstants.normalColor),
+        '该调整此前已记录，本次为幂等重放。',
+      ),
+      AdjustApplyState.stale => (
+        const Key('adjust-status-stale'),
+        Color(AppConstants.moderateColor),
+        '今日上下文已变化（stale），请刷新后重试。',
+      ),
+      AdjustApplyState.safetyBlocked => (
+        const Key('adjust-status-safety'),
+        Color(AppConstants.severeColor),
+        '当前安全状态不允许调整；不会显示为成功。',
+      ),
+      AdjustApplyState.missingInput => (
+        const Key('adjust-status-missing'),
+        Color(AppConstants.moderateColor),
+        '缺少当日签到等必要信息，无法安全调整。',
+      ),
+      AdjustApplyState.conflict => (
+        const Key('adjust-status-conflict'),
+        Color(AppConstants.moderateColor),
+        message ?? '当前冲突，暂不可调整。',
+      ),
+      AdjustApplyState.unavailable => (
+        const Key('adjust-status-unavailable'),
+        Color(AppConstants.textMuted),
+        '调整服务暂不可用，请稍后重试。',
+      ),
+      AdjustApplyState.parseError => (
+        const Key('adjust-status-parse'),
+        Color(AppConstants.severeColor),
+        '调整结果解析异常，不会显示为成功。',
+      ),
+      AdjustApplyState.idle || AdjustApplyState.applying => (
+        const Key('adjust-status-idle'),
+        Color(AppConstants.textMuted),
+        '',
+      ),
+    };
+    return Container(
+      key: key,
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color),
+      ),
+      child: Text(text, style: TextStyle(fontSize: 12, color: color)),
+    );
+  }
+
+  void _apply() {
+    // Only an explicit foreground button press reaches the mutation. The
+    // Expected identity is always the original source session from Today. A
+    // missing source fails closed before this control is rendered.
+    ref
+        .read(planProvider.notifier)
+        .applyTodayAdjustment(
+          AdjustmentRequestInput(
+            expectedPlanVersionId: planVersionId,
+            expectedSessionId: today.originalSessionId!,
+            ianaTimezone: timezone,
+            idempotencyKey: newIdempotencyKey(),
+          ),
+        );
+  }
+}
+
+String _sessionSummary(PlanSession session, int fallbackMinutes) {
+  final minutes = session.targetMinutes ?? fallbackMinutes;
+  final exercises = session.prescriptions
+      .map((item) => item.exercise?.nameZh ?? item.exerciseId)
+      .join('、');
+  return '$minutes 分钟 · $exercises';
 }
 
 class _SessionSection extends StatelessWidget {
@@ -651,6 +977,7 @@ class _StatusCard extends StatelessWidget {
   final VoidCallback? action;
   final String? actionLabel;
   const _StatusCard({
+    super.key,
     required this.icon,
     required this.title,
     this.detail,
