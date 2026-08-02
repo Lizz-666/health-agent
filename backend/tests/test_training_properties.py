@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from hypothesis import given, settings, strategies as st
+from hypothesis import HealthCheck, given, settings, strategies as st
 
 from app.training.candidates import select_candidates
 from app.training.knowledge import build_index, load_catalog, recommendation_ready
@@ -99,7 +99,11 @@ _eligible_contexts = st.builds(
                     or c.request.equipment_resistance_band))
 
 
-@settings(max_examples=60, deadline=None)
+@settings(
+    max_examples=60,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
 @given(ctx=_eligible_contexts)
 def test_invariants_for_any_eligible_context(ctx):
     decision, result = _run(ctx)
@@ -137,7 +141,11 @@ def test_invariants_for_any_eligible_context(ctx):
         c.sort_key for c in result.candidates)
 
 
-@settings(max_examples=20, deadline=None)
+@settings(
+    max_examples=20,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
 @given(ctx=_eligible_contexts)
 def test_red_flag_overrides_to_zero_candidates(ctx):
     # Force a red-flag check-in on top of an otherwise eligible context.

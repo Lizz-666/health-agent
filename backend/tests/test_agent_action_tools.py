@@ -27,7 +27,7 @@ def _hmac_key(monkeypatch):
     monkeypatch.setattr(settings, "AGENT_AUDIT_HMAC_KEY_VERSION", HMAC_VERSION)
 
 
-def test_exactly_five_write_actions_and_not_in_read_registry():
+def test_exactly_the_reviewed_write_actions_and_not_in_read_registry():
     assert set(at._ARGUMENTS_MODELS.keys()) == set(S.WRITE_ACTION_NAMES)
     # Write actions are NOT provider-exposed read tools.
     for name in S.WRITE_ACTION_NAMES:

@@ -147,6 +147,44 @@ enum YesNoUnknown {
   }
 }
 
+enum FoodAllergenCode {
+  glutenCereal('gluten_cereal'),
+  crustacean('crustacean'),
+  fish('fish'),
+  egg('egg'),
+  peanut('peanut'),
+  soy('soy'),
+  milk('milk'),
+  treeNut('tree_nut');
+
+  final String wire;
+  const FoodAllergenCode(this.wire);
+
+  static FoodAllergenCode? tryParse(Object? raw) {
+    if (raw is! String) return null;
+    for (final value in values) {
+      if (value.wire == raw) return value;
+    }
+    return null;
+  }
+}
+
+enum ExcludedFoodCode {
+  avoidPork('avoid_pork'),
+  avoidBeef('avoid_beef');
+
+  final String wire;
+  const ExcludedFoodCode(this.wire);
+
+  static ExcludedFoodCode? tryParse(Object? raw) {
+    if (raw is! String) return null;
+    for (final value in values) {
+      if (value.wire == raw) return value;
+    }
+    return null;
+  }
+}
+
 class Equipment {
   final bool? bodyweight;
   final bool? resistanceBand;
@@ -368,6 +406,8 @@ class HealthProfile {
   final RiskScreen? riskScreen;
   final List<Allergy>? allergies;
   final List<DietExclusion>? dietExclusions;
+  final List<FoodAllergenCode>? foodAllergenCodes;
+  final List<ExcludedFoodCode>? excludedFoodCodes;
   final int version;
   final DateTime? updatedAt;
   final DateTime createdAt;
@@ -383,6 +423,8 @@ class HealthProfile {
     required this.riskScreen,
     required this.allergies,
     required this.dietExclusions,
+    required this.foodAllergenCodes,
+    required this.excludedFoodCodes,
     required this.version,
     required this.updatedAt,
     required this.createdAt,
@@ -407,6 +449,16 @@ class HealthProfile {
           (e) => Allergy.fromJson(_readJsonObject(e, 'HealthProfile.allergies'))),
       dietExclusions: _parseNullableList(json['diet_exclusions'], 'HealthProfile.diet_exclusions',
           (e) => DietExclusion.fromJson(_readJsonObject(e, 'HealthProfile.diet_exclusions'))),
+      foodAllergenCodes: _parseNullableEnumList(
+        json['food_allergen_codes'],
+        'HealthProfile.food_allergen_codes',
+        FoodAllergenCode.tryParse,
+      ),
+      excludedFoodCodes: _parseNullableEnumList(
+        json['excluded_food_codes'],
+        'HealthProfile.excluded_food_codes',
+        ExcludedFoodCode.tryParse,
+      ),
       version: _readRequiredNonNegativeInt(json, 'version', 'HealthProfile'),
       updatedAt: _readNullableDateTime(json['updated_at'], 'HealthProfile.updated_at'),
       createdAt: _readRequiredDateTime(json, 'created_at', 'HealthProfile'),
@@ -473,6 +525,8 @@ class HealthProfileUpdate {
   final RiskScreen? riskScreen;
   final List<Allergy>? allergies;
   final List<DietExclusion>? dietExclusions;
+  final List<FoodAllergenCode>? foodAllergenCodes;
+  final List<ExcludedFoodCode>? excludedFoodCodes;
 
   const HealthProfileUpdate({
     this.fitnessGoal,
@@ -484,6 +538,8 @@ class HealthProfileUpdate {
     this.riskScreen,
     this.allergies,
     this.dietExclusions,
+    this.foodAllergenCodes,
+    this.excludedFoodCodes,
   });
 
   Map<String, dynamic> toJson() => {
@@ -497,6 +553,8 @@ class HealthProfileUpdate {
         'risk_screen': riskScreen?.toJson(),
         'allergies': allergies?.map((e) => e.toJson()).toList(),
         'diet_exclusions': dietExclusions?.map((e) => e.toJson()).toList(),
+        'food_allergen_codes': foodAllergenCodes?.map((e) => e.wire).toList(),
+        'excluded_food_codes': excludedFoodCodes?.map((e) => e.wire).toList(),
       };
 }
 
@@ -620,6 +678,24 @@ List<T>? _parseNullableList<T>(
     throw FormatException('$context must be a list when present');
   }
   return raw.cast<Object>().map(mapper).toList(growable: false);
+}
+
+List<T>? _parseNullableEnumList<T>(
+    Object? raw, String context, T? Function(Object?) tryParse) {
+  if (raw == null) return null;
+  if (raw is! List) {
+    throw FormatException('$context must be a list when present');
+  }
+  final result = <T>[];
+  for (final item in raw) {
+    final parsed = tryParse(item);
+    if (parsed == null) throw FormatException('$context: unknown enum value');
+    if (result.contains(parsed)) {
+      throw FormatException('$context must not contain duplicates');
+    }
+    result.add(parsed);
+  }
+  return List.unmodifiable(result);
 }
 
 String _formatDate(DateTime dt) {

@@ -40,6 +40,26 @@ def _resolve_ref(schema: dict, openapi: dict) -> dict:
     return schema
 
 
+def test_nutrition_routes_are_jwt_typed_and_have_no_intake_contract(openapi_schema):
+    nutrition_paths = {
+        path: methods
+        for path, methods in openapi_schema["paths"].items()
+        if path.startswith("/api/v1/nutrition/")
+    }
+    assert len(nutrition_paths) == 11
+    for path, methods in nutrition_paths.items():
+        for method, operation in methods.items():
+            if method not in {"get", "post", "delete"}:
+                continue
+            assert operation.get("security"), f"{method} {path} is not JWT-only"
+            response = operation["responses"]["200"]
+            assert response["content"]["application/json"]["schema"]
+    assert "requestBody" not in nutrition_paths["/api/v1/nutrition/data"]["delete"]
+    schemas = str(openapi_schema["components"]["schemas"]).lower()
+    for forbidden in ("meal_event", "eaten_quantity", "consumed_quantity", "intake_state"):
+        assert forbidden not in schemas
+
+
 @pytest.mark.parametrize("method,path", POSTURE_ROUTES)
 def test_posture_route_has_response_schema(method, path, openapi_schema):
     """Each posture route must have a non-empty 200 response schema."""

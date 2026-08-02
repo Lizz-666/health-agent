@@ -88,6 +88,30 @@ def test_each_action_owner_repo_is_pinned_to_a_single_sha():
     assert not inconsistent, f"action pinned to multiple SHAs: {inconsistent}"
 
 
+def test_every_checkout_uses_exact_pr_head_with_push_fallback():
+    text = CI_PATH.read_text(encoding="utf-8")
+    checkout_count = sum(
+        pin["owner"] == "actions" and pin["repo"] == "checkout"
+        for pin in _pins()
+    )
+    exact_ref = "ref: ${{ github.event.pull_request.head.sha || github.sha }}"
+    assert checkout_count > 0
+    assert text.count(exact_ref) == checkout_count
+
+
+def test_fast_and_full_pin_checks_use_the_read_only_workflow_token():
+    text = CI_PATH.read_text(encoding="utf-8")
+    token_line = "GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}"
+    for step_name in (
+        "Fast verify (lint + SQLite tests + git diff --check)",
+        "Full verify (lint + complete tests + PostgreSQL 16 + git diff)",
+    ):
+        start = text.index(f"- name: {step_name}")
+        end = text.index("\n      - name:", start + 1)
+        assert token_line in text[start:end]
+    assert text.count(token_line) == 2
+
+
 def _resolve_tag_commit(owner: str, repo: str, tag: str, token: str | None):
     """Resolve ``tag`` to its commit SHA via the GitHub git refs API.
 

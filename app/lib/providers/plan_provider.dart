@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
 import '../models/plan.dart';
 import 'assessment_provider.dart' show LoadStatus;
+import 'nutrition_provider.dart';
 
 class PlanState {
   final LoadStatus draftStatus;
@@ -64,10 +65,13 @@ class PlanState {
 
 class PlanNotifier extends StateNotifier<PlanState> {
   final ApiClient _api;
+  final void Function() _onPlanChanged;
   int _draftGen = 0;
   int _todayGen = 0;
 
-  PlanNotifier(this._api) : super(const PlanState());
+  PlanNotifier(this._api, {void Function()? onPlanChanged})
+      : _onPlanChanged = onPlanChanged ?? _noop,
+        super(const PlanState());
 
   // POST /training/plans:draft
   Future<bool> generateDraft(DraftInput input) async {
@@ -133,6 +137,7 @@ class PlanNotifier extends StateNotifier<PlanState> {
         clearDraft: true,
         draftStatus: LoadStatus.empty,
       );
+      _onPlanChanged();
       return true;
     } on DioException catch (e) {
       if (!mounted) return false;
@@ -307,5 +312,10 @@ String? _dioMessage(DioException e) {
 
 final planProvider = StateNotifierProvider<PlanNotifier, PlanState>((ref) {
   final api = ref.read(apiClientProvider);
-  return PlanNotifier(api);
+  return PlanNotifier(
+    api,
+    onPlanChanged: () => ref.invalidate(nutritionProvider),
+  );
 });
+
+void _noop() {}

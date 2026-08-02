@@ -10,6 +10,7 @@ import 'package:posture_app/providers/assessment_provider.dart';
 import 'package:posture_app/providers/auth_provider.dart';
 import 'package:posture_app/providers/daily_checkin_provider.dart';
 import 'package:posture_app/providers/health_profile_provider.dart';
+import 'package:posture_app/providers/nutrition_provider.dart';
 import 'package:posture_app/providers/plan_provider.dart';
 import 'package:posture_app/providers/posture_profile_provider.dart';
 import 'package:posture_app/providers/posture_state_provider.dart';
@@ -17,6 +18,7 @@ import 'package:posture_app/providers/user_provider.dart';
 import 'package:posture_app/providers/weight_trend_provider.dart';
 
 import '_test_dio.dart';
+import '../nutrition_fixtures.dart';
 
 ApiClient _apiWith(FakeDioAdapter adapter) {
   final api = ApiClient()..dio.interceptors.clear();
@@ -25,6 +27,36 @@ ApiClient _apiWith(FakeDioAdapter adapter) {
 }
 
 void main() {
+  test('auth failure clears Phase 6 nutrition state', () async {
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/nutrition/eligibility', (_) => eligibilityJson())
+      ..registerJson('GET', '/nutrition/foods', (_) => foodListJson())
+      ..registerJson('GET', '/nutrition/targets', (_) => targetsResponseJson())
+      ..registerJson(
+        'GET',
+        '/nutrition/recommendations/draft',
+        (_) => recommendationResultJson(),
+      )
+      ..registerJson(
+        'GET',
+        '/nutrition/recommendations/active',
+        (_) => recommendationResultJson(status: 'active'),
+      );
+    final api = _apiWith(adapter);
+    final container = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(api)],
+    );
+    addTearDown(container.dispose);
+    container.read(authProvider);
+    await container.read(nutritionProvider.notifier).load();
+    expect(container.read(nutritionProvider).active, isNotNull);
+
+    api.onAuthFailed?.call();
+
+    expect(container.read(nutritionProvider).active, isNull);
+    expect(container.read(nutritionProvider).foods, isEmpty);
+  });
+
   test('auth failure synchronously invalidates cached health state', () async {
     final adapter = FakeDioAdapter();
     adapter.register(

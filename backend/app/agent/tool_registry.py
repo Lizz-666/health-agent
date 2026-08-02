@@ -34,6 +34,12 @@ from app.agent.schemas import (
     HealthProfileDisplayView,
     HealthProfileProviderView,
     ListPostureIssuesInput,
+    NutritionPortionsDisplayView,
+    NutritionPortionsProviderView,
+    NutritionTargetsDisplayView,
+    NutritionTargetsProviderView,
+    NutritionValidationDisplayView,
+    NutritionValidationProviderView,
     PostureIssueDetailDisplayView,
     PostureIssueDetailProviderView,
     PostureIssueListDisplayView,
@@ -146,6 +152,7 @@ _TRAINING_TODAY_ENTRIES = frozenset(
 _EXERCISE_ENTRIES = frozenset(
     {EntryType.training_session, EntryType.training_exercise}
 )
+_NUTRITION_ENTRIES = frozenset({EntryType.general, EntryType.nutrition_plan})
 
 
 READ_TOOLS: Dict[str, ReadToolSpec] = {
@@ -251,6 +258,31 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
             TrainingExerciseDisplayView,
             read_tools.adapt_get_training_exercise,
             auth_model=AuthModel.CURRENT_SESSION,
+        ),
+        _spec(
+            "calculate_nutrition_targets",
+            _NUTRITION_ENTRIES,
+            EmptyToolInput,
+            NutritionTargetsProviderView,
+            NutritionTargetsDisplayView,
+            read_tools.adapt_calculate_nutrition_targets,
+        ),
+        _spec(
+            "convert_targets_to_portions",
+            _NUTRITION_ENTRIES,
+            EmptyToolInput,
+            NutritionPortionsProviderView,
+            NutritionPortionsDisplayView,
+            read_tools.adapt_convert_targets_to_portions,
+        ),
+        _spec(
+            "validate_nutrition_plan",
+            _NUTRITION_ENTRIES,
+            EmptyToolInput,
+            NutritionValidationProviderView,
+            NutritionValidationDisplayView,
+            read_tools.adapt_validate_nutrition_plan,
+            auth_model=AuthModel.ENTRY_OWNER,
         ),
     )
 }

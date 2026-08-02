@@ -123,7 +123,17 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   Widget build(BuildContext context) {
     final plan = ref.watch(planProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('训练计划')),
+      appBar: AppBar(
+        title: const Text('训练计划'),
+        actions: [
+          TextButton.icon(
+            key: const Key('plan-nutrition-entry'),
+            onPressed: () => context.go('/plan/nutrition'),
+            icon: const Icon(Icons.restaurant_menu),
+            label: const Text('饮食建议'),
+          ),
+        ],
+      ),
       body: SafeArea(child: _body(context, plan)),
     );
   }

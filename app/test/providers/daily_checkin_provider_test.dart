@@ -110,6 +110,33 @@ void main() {
         CheckInRiskSummary.caution);
   });
 
+  test('successful safety check-in invalidates dependent nutrition state',
+      () async {
+    var invalidations = 0;
+    final adapter = FakeDioAdapter()
+      ..registerJson('PUT', '/health/checkins/today', (_) => _checkin());
+    final notifier = DailyCheckInNotifier(
+      _apiWith(adapter),
+      onSafetyChanged: () => invalidations++,
+    );
+    addTearDown(notifier.dispose);
+
+    final ok = await notifier.saveToday(
+      CheckInCreate(
+        localDate: DateTime(2026, 7, 23),
+        sleepQuality: SleepQuality.good,
+        energy: Energy.normal,
+        muscleSoreness: MuscleSoreness.mild,
+        availableTime: AvailableTime.thirtyMin,
+        dailyStatus: DailyStatus.checkedIn,
+        abnormalPain: false,
+      ),
+    );
+
+    expect(ok, isTrue);
+    expect(invalidations, 1);
+  });
+
   test('deleteCheckin clears the in-view check-in', () async {
     final adapter = FakeDioAdapter()
       ..registerJson('GET', '/health/checkins/today', (_) => {

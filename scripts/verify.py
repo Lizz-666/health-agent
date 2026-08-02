@@ -99,9 +99,31 @@ FAST_TEST_TARGETS = [
     "tests/test_agent_orchestrator.py",
     "tests/test_agent_api.py",
     "tests/test_agent_adversarial.py",
+    "tests/test_agent_nutrition.py",
     # Phase 5 Batch D / Task 6: isolated synthetic end-to-end acceptance.
     "tests/test_phase5_e2e.py",
     "tests/test_openapi_contracts.py",
+    # Phase 6 Gate 1: curated data, pure safety/calculation, and profile codes.
+    "tests/test_nutrition_knowledge.py",
+    "tests/test_nutrition_importers.py",
+    "tests/test_nutrition_licenses.py",
+    "tests/test_nutrition_calculator.py",
+    "tests/test_nutrition_portions.py",
+    "tests/test_nutrition_safety.py",
+    "tests/test_nutrition_validator.py",
+    "tests/test_nutrition_context.py",
+    "tests/test_nutrition_profile_migrations.py",
+    # Phase 6 Gate 2: deterministic recommendation lifecycle and JWT API.
+    "tests/test_nutrition_generator.py",
+    "tests/test_nutrition_properties.py",
+    "tests/test_nutrition_persistence.py",
+    "tests/test_nutrition_migrations.py",
+    "tests/test_nutrition_service.py",
+    "tests/test_nutrition_api.py",
+    "tests/test_health_profile.py",
+    "tests/test_health_profile_api.py",
+    # Phase 6 Gate 4: synthetic lifecycle, blockers, deletion, and source audit.
+    "tests/test_phase6_e2e.py",
 ]
 
 
@@ -370,12 +392,15 @@ def _resolve_diff_base(diff_base: str) -> str:
 
 
 def _print_summary(mode: str, steps: List[StepResult]) -> int:
+    head_rc, head_out, _ = _run(["git", "rev-parse", "HEAD"], REPO_ROOT)
+    checked_out_sha = head_out.strip() if head_rc == 0 else "unknown"
     lines: List[str] = []
     lines.append("=" * 72)
     lines.append(f"verify.py {mode}  (LOCAL evidence, not GitHub CI)")
     lines.append(
         f"workflow={os.environ.get('GITHUB_WORKFLOW', 'local')} "
-        f"sha={os.environ.get('GITHUB_SHA', 'local')} "
+        f"event_sha={os.environ.get('GITHUB_SHA', 'local')} "
+        f"checked_out_sha={checked_out_sha} "
         f"job={os.environ.get('GITHUB_JOB', 'local')}"
     )
     lines.append(

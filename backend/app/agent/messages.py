@@ -60,6 +60,13 @@ class ResultCode:
     UNSUPPORTED_MEDICAL = "agent_unsupported_medical"
     UNSUPPORTED_NUTRITION = "agent_unsupported_nutrition"
 
+    # Phase 6 deterministic nutrition domain states.
+    NUTRITION_DISABLED = "agent_nutrition_disabled"
+    NUTRITION_BLOCKED = "agent_nutrition_blocked"
+    NUTRITION_INCOMPLETE = "agent_nutrition_incomplete"
+    NUTRITION_NO_SAFE_CANDIDATE = "agent_nutrition_no_safe_candidate"
+    NUTRITION_INVALID_REPLACEMENT = "agent_nutrition_invalid_replacement"
+
     # Proposal/confirmation lifecycle.
     ACTION_CONFIRMATION_REQUIRED = "agent_action_confirmation_required"
     ACTION_EXPIRED = "agent_action_expired"
@@ -103,6 +110,11 @@ TEMPLATES: Dict[str, str] = {
     ResultCode.UNSUPPORTED_SCOPE: "该请求超出当前健康教练的支持范围。",
     ResultCode.UNSUPPORTED_MEDICAL: "当前产品不提供医学诊断或治疗建议，请使用适当的专业服务。",
     ResultCode.UNSUPPORTED_NUTRITION: "当前阶段尚不提供该饮食建议，请勿将此功能视为营养治疗。",
+    ResultCode.NUTRITION_DISABLED: "营养建议功能当前未启用，其他 Agent 功能仍可使用。",
+    ResultCode.NUTRITION_BLOCKED: "当前结构化安全状态不支持自动营养建议，未执行任何操作。",
+    ResultCode.NUTRITION_INCOMPLETE: "生成营养建议前还需要补全结构化资料。",
+    ResultCode.NUTRITION_NO_SAFE_CANDIDATE: "当前目录无法组成满足限制的安全候选，未生成建议。",
+    ResultCode.NUTRITION_INVALID_REPLACEMENT: "该食物替换未通过当前规则校验，未执行任何操作。",
     ResultCode.ACTION_CONFIRMATION_REQUIRED: "操作尚未执行，请核对变更内容并明确确认或取消。",
     ResultCode.ACTION_EXPIRED: "该操作提案已过期，请重新发起。",
     ResultCode.ACTION_INVALIDATED: "相关信息已变化，该操作未执行。",

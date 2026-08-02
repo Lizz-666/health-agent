@@ -1,0 +1,26 @@
+{
+  "policy_version": "v1",
+  "supported_catalog_version": "v1",
+  "allergen_codes": ["gluten_cereal", "crustacean", "fish", "egg", "peanut", "soy", "milk", "tree_nut"],
+  "exclusion_food_ids": {
+    "avoid_pork": ["pork_tenderloin"],
+    "avoid_beef": ["beef_tenderloin"]
+  },
+  "whole_grain_food_ids": ["rice_brown", "oats_cooked"],
+  "meal_share_pct": {
+    "breakfast": [25, 30],
+    "lunch": [30, 40],
+    "dinner": [30, 35]
+  },
+  "food_group_daily_ranges": {
+    "grains": [200, 300],
+    "whole_grains_mixed_beans": [50, 150],
+    "tubers": [50, 100],
+    "vegetables": [300, 1000],
+    "fruit": [200, 350],
+    "animal_foods": [120, 200],
+    "dairy_ml": [300, 1000],
+    "soy_nuts": [25, 35]
+  },
+  "education_only_groups": ["cooking_oil_25_30g", "salt_at_most_5g"]
+}

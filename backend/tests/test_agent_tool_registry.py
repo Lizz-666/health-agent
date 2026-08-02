@@ -41,6 +41,9 @@ _READ_TOOLS = {
     "get_active_training_plan",
     "get_today_training",
     "get_training_exercise",
+    "calculate_nutrition_targets",
+    "convert_targets_to_portions",
+    "validate_nutrition_plan",
 }
 
 # Write Tools appear in the spec matrix but MUST NOT be registered in Task 1.
@@ -50,6 +53,8 @@ _WRITE_TOOLS = {
     "generate_training_plan_draft",
     "substitute_today_exercise",
     "record_training_feedback",
+    "generate_meal_plan_draft",
+    "replace_food",
 }
 
 # Mandatory server wrappers / non-Tools that must never be provider-exposed.
@@ -74,6 +79,9 @@ _EXPECTED_ALLOWLIST = {
         "get_training_draft",
         "get_active_training_plan",
         "get_today_training",
+        "calculate_nutrition_targets",
+        "convert_targets_to_portions",
+        "validate_nutrition_plan",
     },
     EntryType.health_profile: {
         "get_health_profile_summary",
@@ -99,6 +107,11 @@ _EXPECTED_ALLOWLIST = {
     EntryType.training_exercise: {
         "get_today_training",
         "get_training_exercise",
+    },
+    EntryType.nutrition_plan: {
+        "calculate_nutrition_targets",
+        "convert_targets_to_portions",
+        "validate_nutrition_plan",
     },
 }
 

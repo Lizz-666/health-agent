@@ -83,6 +83,8 @@ def _response_from_row(row: HealthProfile) -> HealthProfileResponse:
         risk_screen=row.risk_screen,
         allergies=row.allergies,
         diet_exclusions=row.diet_exclusions,
+        food_allergen_codes=row.food_allergen_codes,
+        excluded_food_codes=row.excluded_food_codes,
         version=row.version,
         updated_at=row.updated_at,
         created_at=row.created_at,
@@ -143,6 +145,7 @@ async def upsert_profile_result(
     the existing row's editable fields are replaced and ``version`` is
     incremented deterministically; on first save ``version`` starts at 1.
     """
+    await acquire_user_transaction_lock(db, user_id)
     user_uuid = _to_uuid(user_id)
     row = await _fetch(db, user_id)
 
@@ -172,6 +175,7 @@ async def upsert_profile_result(
 async def delete_profile(db: AsyncSession, user_id: str) -> None:
     """Remove the caller's profile if present. Idempotent: a missing profile is
     a no-op (the post-delete state, no profile present, is what matters)."""
+    await acquire_user_transaction_lock(db, user_id)
     row = await _fetch(db, user_id)
     if row is not None:
         await db.delete(row)
@@ -366,6 +370,7 @@ async def delete_checkin(db: AsyncSession, user_id: str, checkin_id: UUID) -> No
     existence is leaked across users. A missing id is also a 404. ``checkin_id``
     is validated as a UUID by FastAPI before reaching the service.
     """
+    await acquire_user_transaction_lock(db, user_id)
     user_uuid = _to_uuid(user_id)
     result = await db.execute(
         select(DailyCheckIn).where(
@@ -463,6 +468,7 @@ async def create_weight_record(
     Thin committing wrapper around ``create_weight_record_core``; existing
     button/API behaviour and signature are unchanged.
     """
+    await acquire_user_transaction_lock(db, user_id)
     response = await create_weight_record_core(db, user_id, data)
     await db.commit()
     return response
@@ -491,6 +497,25 @@ async def list_weight_records(
     return [_weight_response(row) for row in result.scalars().all()]
 
 
+async def get_latest_manual_weight_at(
+    db: AsyncSession, user_id: str, evaluated_at: datetime
+) -> Optional[WeightRecordResponse]:
+    """Return the latest caller-owned, non-future manual weight record."""
+    user_uuid = _to_uuid(user_id)
+    result = await db.execute(
+        select(WeightRecord)
+        .where(
+            WeightRecord.user_id == user_uuid,
+            WeightRecord.source == WEIGHT_SOURCE_MANUAL,
+            WeightRecord.recorded_at <= evaluated_at,
+        )
+        .order_by(WeightRecord.recorded_at.desc(), WeightRecord.id.desc())
+        .limit(1)
+    )
+    row = result.scalar_one_or_none()
+    return _weight_response(row) if row is not None else None
+
+
 async def _fetch_weight(
     db: AsyncSession, user_id: str, record_id: UUID
 ) -> Optional[WeightRecord]:
@@ -512,6 +537,7 @@ async def update_weight_record(
     Ownership-scoped: a record belonging to another user (or a missing id)
     surfaces as a deterministic 404.
     """
+    await acquire_user_transaction_lock(db, user_id)
     row = await _fetch_weight(db, user_id, record_id)
     if row is None:
         raise NotFound("体重记录不存在")
@@ -528,6 +554,7 @@ async def delete_weight_record(
 ) -> None:
     """Delete one caller-owned weight record. Ownership-scoped: not-owned or
     missing id surfaces as a deterministic 404."""
+    await acquire_user_transaction_lock(db, user_id)
     row = await _fetch_weight(db, user_id, record_id)
     if row is None:
         raise NotFound("体重记录不存在")
