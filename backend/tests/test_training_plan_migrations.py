@@ -68,7 +68,11 @@ def _upgrade_sql() -> str:
 def _downgrade_sql() -> str:
     global _downgrade_cache
     if _downgrade_cache is None:
-        proc = _run_alembic("downgrade", "head:base", "--sql")
+        proc = _run_alembic(
+            "downgrade",
+            "0007_training_plans:0006_health_weight_tracking",
+            "--sql",
+        )
         assert proc.returncode == 0, f"alembic downgrade --sql failed:\n{proc.stderr}"
         _downgrade_cache = proc.stdout
     return _downgrade_cache
@@ -102,10 +106,8 @@ def test_upgrade_creates_phase4_unique_constraints():
 
 
 def test_downgrade_drops_only_phase4_training_tables():
-    # The full ``head:base`` downgrade legitimately drops earlier domains'
-    # tables (e.g. users from 0001). What matters for Phase 4 isolation is that
-    # its own downgrade step drops EXACTLY the five training tables and nothing
-    # else training-related, in dependency order.
+    # Render only the Phase 4 revision interval. Later phases may legitimately
+    # add more training tables, but 0007's own downgrade remains isolated.
     import re
 
     sql = _downgrade_sql()

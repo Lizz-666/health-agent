@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import List, Literal, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -54,6 +55,13 @@ class FeedbackRequest(_Idempotent):
 class SubstitutionRequest(_Idempotent):
     original_exercise_id: str = Field(..., min_length=1, max_length=60)
     replacement_exercise_id: str = Field(..., min_length=1, max_length=60)
+
+
+class AdjustmentRequest(_Idempotent):
+    intent: Literal["apply_today_adjustment"]
+    expected_plan_version_id: UUID
+    expected_session_id: UUID
+    iana_timezone: str = Field(..., min_length=1, max_length=60)
 
 
 # --- catalog-enriched views -------------------------------------------------
@@ -149,6 +157,29 @@ class TodayResponse(BaseModel):
     session: Optional[SessionView] = None
     feedback_outcome_state: Optional[str] = None
     substitution_applied: bool = False
+    original_session_id: Optional[str] = None
+    source_local_date: Optional[date] = None
+    target_local_date: Optional[date] = None
+    adjustment_id: Optional[str] = None
+    adjustment_kind: Optional[
+        Literal["shortened", "recovery", "deferred", "active_rest", "unchanged"]
+    ] = None
+    adjustment_reason_codes: List[str] = Field(default_factory=list)
+    safety_status: Optional[str] = None
+
+
+class AdjustmentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    adjustment_id: str
+    status: Literal["recorded", "replayed"]
+    adjustment_kind: Literal[
+        "shortened", "recovery", "deferred", "active_rest", "unchanged"
+    ]
+    original_session_id: str
+    source_local_date: date
+    target_local_date: Optional[date] = None
+    target_minutes: Optional[int] = None
+    reason_codes: List[str]
 
 
 class FeedbackResponse(BaseModel):
@@ -169,6 +200,7 @@ __all__ = [
     "ConfirmRequest",
     "FeedbackRequest",
     "SubstitutionRequest",
+    "AdjustmentRequest",
     "ExerciseView",
     "PrescriptionView",
     "SessionView",
@@ -177,6 +209,7 @@ __all__ = [
     "ConfirmResponse",
     "ActivePlanResponse",
     "TodayResponse",
+    "AdjustmentResponse",
     "FeedbackResponse",
     "SubstitutionResponse",
 ]

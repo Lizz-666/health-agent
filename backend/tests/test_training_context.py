@@ -9,6 +9,8 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
+import pytest
+
 from app.posture.safety import compute_signals_digest
 from app.training.context import (
     checkin_token,
@@ -16,6 +18,7 @@ from app.training.context import (
     validate_iana_timezone,
     _structured_checkin_hash,
 )
+from app.training.schemas import CheckInSnapshot
 
 UTC = datetime(2026, 7, 26, 1, 30, tzinfo=timezone.utc)
 
@@ -38,9 +41,28 @@ def _checkin(note="secret free text", acute=False):
         local_date=date(2026, 7, 26),
         updated_at=UTC,
         risk_version="2026-07-22-v1",
+        energy="normal",
+        muscle_soreness="mild",
+        available_time="30_min",
+        daily_status="checked_in",
         abnormal_pain=True,
         pain_followup=_followup(note=note, acute=acute),
     )
+
+
+def test_adaptive_checkin_fields_use_closed_existing_enums():
+    with pytest.raises(ValueError):
+        CheckInSnapshot(present=True, energy="exhausted")
+
+
+def test_legacy_safety_snapshot_without_adaptive_fields_remains_parseable():
+    snapshot = CheckInSnapshot(
+        present=True,
+        local_date=date(2026, 7, 26),
+        recomputed_risk="normal",
+        token="current-token",
+    )
+    assert snapshot.available_time is None
 
 
 def test_validate_iana_timezone_accepts_real_zones():

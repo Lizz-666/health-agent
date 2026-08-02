@@ -172,15 +172,18 @@ signal immediately blocks execution.
 
 `training_day_adjustments` is an append-only decision-version table. Each row
 owns a user, active plan, source session/date, optional target date, adjustment
-kind (`shortened`, `recovery`, `deferred`, `active_rest`), structured trigger and
+kind (`shortened`, `recovery`, `deferred`, `active_rest`, `unchanged`), structured trigger and
 reason codes, context/decision fingerprints, policy/catalog/source versions,
 surface (`button` or `agent_confirmation`), and timestamps. It stores no prose.
 
 `training_day_adjustment_items` stores the typed effective delta/snapshot:
 source prescription, action (`keep`, `drop`, `replace`), effective reviewed
-exercise and bounded prescription values, and display order. Deferral and active
-rest need no item rows. A uniqueness key over the owned source, date, context
-fingerprint, policy version, and command kind plus reviewed idempotency prevents
+exercise and bounded prescription values, and display order. Deferral, active
+rest, and `unchanged` need no item rows. `unchanged` is an explicit fresh-command
+version that clears a stale prior overlay and returns execution to the immutable
+source session after current safety and full-plan validation. A uniqueness key
+over the owned source, date, context fingerprint, policy version, and command
+kind plus reviewed idempotency prevents
 duplicate application. The newest row matching current context is effective;
 older rows remain immutable audit history.
 

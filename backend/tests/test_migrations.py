@@ -84,6 +84,11 @@ ALL_TABLES = {
     "agent_action_proposals",
     # Phase 6 nutrition recommendation versions (migration 0010).
     "nutrition_recommendations",
+    # Phase 7 adaptive execution/review foundations (migration 0011).
+    "training_day_adjustments",
+    "training_day_adjustment_items",
+    "training_weekly_reviews",
+    "posture_recheck_dismissals",
 }
 
 # Phase 1 expand 阶段新增的 6 张表。
@@ -103,12 +108,12 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0010_nutrition_recommendations。"""
+    """Alembic 只有一个 head，且为 0011_adaptive_reviews。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0010_nutrition_recommendations", head_lines[0]
+    assert head_lines[0].split()[0] == "0011_adaptive_reviews", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
@@ -542,6 +547,11 @@ def test_metadata_indexes_match_offline_sql():
         "agent_action_proposals",
         # Phase 6 nutrition recommendation versions (migration 0010).
         "nutrition_recommendations",
+        # Phase 7 adaptive execution/review foundations (migration 0011).
+        "training_day_adjustments",
+        "training_day_adjustment_items",
+        "training_weekly_reviews",
+        "posture_recheck_dismissals",
     }
 
     # Indexes that exist ONLY in the migration SQL, by design (ADR-0002): the

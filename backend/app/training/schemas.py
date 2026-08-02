@@ -25,7 +25,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -619,9 +619,16 @@ class CheckInSnapshot(BaseModel):
     local_date: Optional[date] = None
     recomputed_risk: Optional[SafetyRiskTier] = None
     token: Optional[str] = None
+    energy: Optional[Literal["low", "normal", "high"]] = None
+    muscle_soreness: Optional[Literal["none", "mild", "significant"]] = None
+    available_time: Optional[
+        Literal["none", "15_min", "30_min", "45_min_plus"]
+    ] = None
+    daily_status: Optional[
+        Literal["checked_in", "active_rest", "safety_adjustment"]
+    ] = None
     abnormal_pain: bool = False
     pain_area_canonical: Optional[str] = None
-
 
 class RetainedPainRecord(BaseModel):
     """A retained abnormal-pain check-in record (recomputed, token-bearing)."""

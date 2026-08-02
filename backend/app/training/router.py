@@ -18,6 +18,8 @@ from app.db.database import get_db
 from app.training import service
 from app.training.schemas_api import (
     ActivePlanResponse,
+    AdjustmentRequest,
+    AdjustmentResponse,
     ConfirmRequest,
     ConfirmResponse,
     DraftRequest,
@@ -90,6 +92,26 @@ async def get_today(
     ``session``. A blocked safety gate never surfaces as success.
     """
     return await service.get_today(db, user_id, iana_timezone)
+
+
+@router.get("/today", response_model=TodayResponse)
+async def get_effective_today(
+    iana_timezone: str = Query(..., description="User IANA timezone; the local date is server-derived."),
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the Phase 7 effective Today state; legacy path remains supported."""
+    return await service.get_today(db, user_id, iana_timezone)
+
+
+@router.post("/today/adjustments", response_model=AdjustmentResponse)
+async def post_today_adjustment(
+    request: AdjustmentRequest,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Apply one foreground, deterministic adjustment after fresh safety checks."""
+    return await service.apply_today_adjustment(db, user_id, request)
 
 
 @router.post("/plans/sessions/{session_id}:substitute", response_model=SubstitutionResponse)

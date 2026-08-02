@@ -270,6 +270,10 @@ async def build_context(
         checkin_snap = CheckInSnapshot(
             present=True, local_date=current.local_date,
             recomputed_risk=risk.risk_summary, token=token,
+            energy=_enum_val(current.energy),
+            muscle_soreness=_enum_val(current.muscle_soreness),
+            available_time=_enum_val(current.available_time),
+            daily_status=_enum_val(current.daily_status),
             abnormal_pain=current.abnormal_pain,
             pain_area_canonical=(
                 policy.normalize_body_area(followup.pain_area)

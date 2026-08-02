@@ -14,7 +14,7 @@ Two layers:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -98,6 +98,8 @@ async def test_openapi_exposes_training_endpoints_with_security(client):
         ("/api/v1/training/plans:confirm", "post"),
         ("/api/v1/training/plans/active", "get"),
         ("/api/v1/training/plans/today", "get"),
+        ("/api/v1/training/today", "get"),
+        ("/api/v1/training/today/adjustments", "post"),
     ]
     for path, method in expected:
         assert path in paths, f"missing path {path}"
@@ -116,6 +118,8 @@ async def test_openapi_exposes_training_endpoints_with_security(client):
     ("post", "/api/v1/training/plans:confirm"),
     ("get", "/api/v1/training/plans/active"),
     ("get", "/api/v1/training/plans/today?iana_timezone=Asia/Shanghai"),
+    ("get", "/api/v1/training/today?iana_timezone=Asia/Shanghai"),
+    ("post", "/api/v1/training/today/adjustments"),
 ])
 async def test_endpoints_require_auth(client, method, path):
     fn = getattr(client, method)
@@ -130,6 +134,22 @@ async def test_draft_rejects_invalid_body(client):
     resp = await client.post("/api/v1/training/plans:draft",
                              json={"idempotency_key": "k"}, headers=_auth(uid))
     assert resp.status_code == 422
+
+
+async def test_adjustment_request_is_strict_and_validates_expected_ids(client):
+    uid = str(uuid.uuid4())
+    await _seed_user(uid, "13800010031")
+    body = {
+        "intent": "apply_today_adjustment",
+        "expected_plan_version_id": "not-a-uuid",
+        "expected_session_id": str(uuid.uuid4()),
+        "iana_timezone": "Asia/Shanghai",
+        "idempotency_key": "adjust-invalid",
+        "risk_tier": "normal",
+    }
+    response = await client.post(
+        "/api/v1/training/today/adjustments", json=body, headers=_auth(uid))
+    assert response.status_code == 422
 
 
 async def test_get_draft_active_today_empty_for_new_user(client):
@@ -231,6 +251,260 @@ async def eligible_user(monkeypatch):
 
     monkeypatch.setattr(service, "_classify", fake_classify)
     return uid, ctx, decision
+
+
+def _with_adaptive_checkin(ctx, *, local_date="2026-07-27", **values):
+    checkin = ctx.checkin.model_copy(update={
+        "local_date": date.fromisoformat(local_date),
+        "energy": "normal",
+        "muscle_soreness": "mild",
+        "available_time": "15_min",
+        "daily_status": "checked_in",
+        "token": "adaptive-token-v1",
+        **values,
+    })
+    evaluation = ctx.eval.model_copy(update={
+        "current_local_date": date.fromisoformat(local_date),
+    })
+    return ctx.model_copy(update={"checkin": checkin, "eval": evaluation})
+
+
+async def _active_today_for_adjustment(
+        db, uid, *, freq=3, goal="basic_strength", band=False):
+    from app.training.schemas_api import ConfirmRequest, DraftRequest
+
+    body = _draft_body(goal=goal, freq=freq, key="adaptive-generate")
+    body["equipment_resistance_band"] = band
+    await service.generate_draft(db, uid, DraftRequest(**body))
+    confirm_body = _draft_body(goal=goal, freq=freq, key="adaptive-confirm")
+    confirm_body["equipment_resistance_band"] = band
+    confirmed = await service.confirm(db, uid, ConfirmRequest(**confirm_body))
+    today = await service.get_today(db, uid, "Asia/Shanghai")
+    assert today.state == "session"
+    return confirmed.plan.plan_version_id, today.session.session_id
+
+
+async def test_service_applies_shortening_replays_and_today_uses_overlay(
+        eligible_user, monkeypatch):
+    from app.training.schemas_api import AdjustmentRequest
+
+    uid, original_ctx, _ = eligible_user
+    goal_ctx = original_ctx.model_copy(update={
+        "health": original_ctx.health.model_copy(update={
+            "fitness_goal": "fat_loss"}),
+        "request": original_ctx.request.model_copy(update={
+            "fitness_goal": type(original_ctx.request.fitness_goal)(
+                "fat_loss")}),
+    })
+    adaptive_ctx = _with_adaptive_checkin(goal_ctx)
+
+    async def classify_current(db, user_id, request, now=None):
+        return adaptive_ctx, classify_safety(adaptive_ctx, SPOLICY)
+
+    monkeypatch.setattr(service, "_classify", classify_current)
+    monkeypatch.setattr(service, "_utc_now", lambda: EVAL_AT)
+    async with TestSession() as db:
+        plan_id, session_id = await _active_today_for_adjustment(
+            db, uid, goal="fat_loss")
+        request = AdjustmentRequest(
+            intent="apply_today_adjustment",
+            expected_plan_version_id=plan_id,
+            expected_session_id=session_id,
+            iana_timezone="Asia/Shanghai",
+            idempotency_key="shorten-v1",
+        )
+        result = await service.apply_today_adjustment(db, uid, request)
+        assert result.status == "recorded"
+        assert result.adjustment_kind == "shortened"
+        replay = await service.apply_today_adjustment(db, uid, request)
+        assert replay.status == "replayed"
+        assert replay.adjustment_id == result.adjustment_id
+
+        today = await service.get_today(db, uid, "Asia/Shanghai")
+        assert today.state == "session"
+        assert today.adjustment_id == result.adjustment_id
+        assert today.adjustment_kind == "shortened"
+        assert today.original_session_id == session_id
+        assert today.session.target_minutes == 15
+        assert len(today.session.prescriptions) <= 3
+
+
+async def test_edited_checkin_blocks_stored_same_day_overlay(
+        eligible_user, monkeypatch):
+    from app.training.schemas_api import AdjustmentRequest
+
+    uid, original_ctx, _ = eligible_user
+    current_ctx = _with_adaptive_checkin(original_ctx)
+
+    async def classify_current(db, user_id, request, now=None):
+        return current_ctx, classify_safety(current_ctx, SPOLICY)
+
+    monkeypatch.setattr(service, "_classify", classify_current)
+    monkeypatch.setattr(service, "_utc_now", lambda: EVAL_AT)
+    async with TestSession() as db:
+        plan_id, session_id = await _active_today_for_adjustment(db, uid)
+        await service.apply_today_adjustment(db, uid, AdjustmentRequest(
+            intent="apply_today_adjustment",
+            expected_plan_version_id=plan_id,
+            expected_session_id=session_id,
+            iana_timezone="Asia/Shanghai",
+            idempotency_key="stale-overlay",
+        ))
+        edited_ctx = _with_adaptive_checkin(
+            original_ctx,
+            token="adaptive-token-v2",
+            available_time="45_min_plus",
+        )
+
+        async def classify_edited(db, user_id, request, now=None):
+            return edited_ctx, classify_safety(edited_ctx, SPOLICY)
+
+        monkeypatch.setattr(service, "_classify", classify_edited)
+        today = await service.get_today(db, uid, "Asia/Shanghai")
+        assert today.state == "blocked"
+        assert today.change_reason == "adjustment_stale"
+        refreshed = await service.apply_today_adjustment(db, uid, AdjustmentRequest(
+            intent="apply_today_adjustment",
+            expected_plan_version_id=plan_id,
+            expected_session_id=session_id,
+            iana_timezone="Asia/Shanghai",
+            idempotency_key="fresh-overlay",
+        ))
+        assert refreshed.status == "recorded"
+        assert refreshed.adjustment_kind == "unchanged"
+        assert refreshed.adjustment_id != today.adjustment_id
+        current = await service.get_today(db, uid, "Asia/Shanghai")
+        assert current.state == "session"
+        assert current.adjustment_id == refreshed.adjustment_id
+        assert current.adjustment_kind == "unchanged"
+        assert current.safety_status in ("eligible", "eligible_conservative")
+
+
+async def test_no_time_defers_to_earliest_valid_date(
+        monkeypatch):
+    from app.training.schemas_api import AdjustmentRequest, FeedbackRequest
+
+    uid = str(uuid.uuid4())
+    await _seed_user(uid, "13800010032")
+    base = _eligible_ctx(freq=2)
+    adaptive_ctx = _with_adaptive_checkin(
+        base, local_date="2026-07-28", available_time="none")
+
+    async def classify_current(db, user_id, request, now=None):
+        return adaptive_ctx, classify_safety(adaptive_ctx, SPOLICY)
+
+    now = datetime(2026, 7, 28, 1, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(service, "_classify", classify_current)
+    monkeypatch.setattr(service, "_utc_now", lambda: now)
+    async with TestSession() as db:
+        plan_id, session_id = await _active_today_for_adjustment(db, uid, freq=2)
+        result = await service.apply_today_adjustment(db, uid, AdjustmentRequest(
+            intent="apply_today_adjustment",
+            expected_plan_version_id=plan_id,
+            expected_session_id=session_id,
+            iana_timezone="Asia/Shanghai",
+            idempotency_key="defer-v1",
+        ))
+        assert result.adjustment_kind == "deferred"
+        assert result.target_local_date == date(2026, 7, 29)
+        source_today = await service.get_today(db, uid, "Asia/Shanghai")
+        assert source_today.state == "rest_day"
+        assert source_today.adjustment_kind == "deferred"
+
+        target_now = datetime(2026, 7, 29, 1, 0, tzinfo=timezone.utc)
+        target_ctx = _with_adaptive_checkin(
+            base, local_date="2026-07-29", available_time="45_min_plus")
+
+        async def classify_target(db, user_id, request, now=None):
+            return target_ctx, classify_safety(target_ctx, SPOLICY)
+
+        monkeypatch.setattr(service, "_classify", classify_target)
+        monkeypatch.setattr(service, "_utc_now", lambda: target_now)
+        deferred_today = await service.get_today(db, uid, "Asia/Shanghai")
+        assert deferred_today.state == "session"
+        assert deferred_today.original_session_id == session_id
+        assert deferred_today.target_local_date == date(2026, 7, 29)
+        feedback = await service.record_feedback(
+            db, uid, session_id,
+            FeedbackRequest(outcome_state="completed", idempotency_key="defer-fb"),
+            "Asia/Shanghai")
+        assert feedback.status == "recorded"
+
+
+async def test_low_energy_recovery_overlay_is_independently_validated(
+        eligible_user, monkeypatch):
+    from app.training.schemas_api import AdjustmentRequest
+
+    uid, original_ctx, _ = eligible_user
+    goal_ctx = original_ctx.model_copy(update={
+        "health": original_ctx.health.model_copy(update={
+            "fitness_goal": "fat_loss"}),
+        "request": original_ctx.request.model_copy(update={
+            "fitness_goal": type(original_ctx.request.fitness_goal)("fat_loss")}),
+    })
+    adaptive_ctx = _with_adaptive_checkin(
+        goal_ctx, energy="low", available_time="45_min_plus")
+
+    async def classify_current(db, user_id, request, now=None):
+        return adaptive_ctx, classify_safety(adaptive_ctx, SPOLICY)
+
+    monkeypatch.setattr(service, "_classify", classify_current)
+    monkeypatch.setattr(service, "_utc_now", lambda: EVAL_AT)
+    async with TestSession() as db:
+        plan_id, session_id = await _active_today_for_adjustment(
+            db, uid, goal="fat_loss")
+        result = await service.apply_today_adjustment(db, uid, AdjustmentRequest(
+            intent="apply_today_adjustment",
+            expected_plan_version_id=plan_id,
+            expected_session_id=session_id,
+            iana_timezone="Asia/Shanghai",
+            idempotency_key="recovery-v1",
+        ))
+        assert result.adjustment_kind == "recovery"
+        today = await service.get_today(db, uid, "Asia/Shanghai")
+        assert today.state == "session"
+        assert today.adjustment_kind == "recovery"
+        assert all(
+            set(item.exercise.training_roles) & {"warmup", "mobility", "recovery"}
+            for item in today.session.prescriptions
+        )
+
+
+@pytest.mark.parametrize(
+    "updates,expected_code",
+    [
+        ({"available_time": None}, "missing_current_checkin"),
+        ({"recomputed_risk": "red_flag"}, "red_flag_stop"),
+        ({"abnormal_pain": True, "pain_area_canonical": "knee"},
+         "pain_blocks_adjustment"),
+    ],
+)
+async def test_adjustment_missing_and_safety_states_fail_closed(
+        eligible_user, monkeypatch, updates, expected_code):
+    from app.core.exceptions import AppException
+    from app.training.schemas_api import AdjustmentRequest
+
+    uid, original_ctx, _ = eligible_user
+    holder = {"ctx": _with_adaptive_checkin(original_ctx)}
+
+    async def classify_current(db, user_id, request, now=None):
+        ctx = holder["ctx"]
+        return ctx, classify_safety(ctx, SPOLICY)
+
+    monkeypatch.setattr(service, "_classify", classify_current)
+    monkeypatch.setattr(service, "_utc_now", lambda: EVAL_AT)
+    async with TestSession() as db:
+        plan_id, session_id = await _active_today_for_adjustment(db, uid)
+        holder["ctx"] = _with_adaptive_checkin(original_ctx, **updates)
+        with pytest.raises(AppException) as exc:
+            await service.apply_today_adjustment(db, uid, AdjustmentRequest(
+                intent="apply_today_adjustment",
+                expected_plan_version_id=plan_id,
+                expected_session_id=session_id,
+                iana_timezone="Asia/Shanghai",
+                idempotency_key=f"blocked-{expected_code}",
+            ))
+        assert exc.value.code == expected_code
 
 
 async def test_service_generate_confirm_active_today_feedback_substitute(

@@ -1,0 +1,17 @@
+{
+  "policy_version": "adaptive-v1",
+  "review_scope": "personal_development",
+  "duration_minutes": {
+    "15_min": 15,
+    "30_min": 30,
+    "45_min_plus": 45
+  },
+  "exercise_caps": {
+    "15": 3,
+    "30": 5,
+    "45": 7,
+    "60": 8
+  },
+  "required_roles": ["warmup"],
+  "recovery_roles": ["warmup", "mobility", "recovery"]
+}

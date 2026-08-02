@@ -25,20 +25,24 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
 from app.posture.models import IdempotencyRecord
 from app.posture.user_lock import acquire_user_transaction_lock
 from app.training.models import (
+    PostureRecheckDismissal,
+    TrainingDayAdjustment,
+    TrainingDayAdjustmentItem,
     TrainingPlanVersion,
     TrainingPrescription,
     TrainingSession,
     TrainingSessionFeedback,
     TrainingSessionSubstitution,
+    TrainingWeeklyReview,
 )
 from app.training.schemas import TrainingPlanDraft
 from app.training.state import (
@@ -53,6 +57,7 @@ OP_PLAN_GENERATE = "plan_generate"
 OP_PLAN_CONFIRM = "plan_confirm"
 OP_SESSION_SUBSTITUTE = "session_substitute"
 OP_SESSION_FEEDBACK = "session_feedback"
+OP_TODAY_ADJUSTMENT = "today_adjustment"
 
 IDEMPOTENCY_TTL = timedelta(hours=24)
 
@@ -107,6 +112,33 @@ class FeedbackResult:
 class SubstitutionResult:
     substitution_id: uuid.UUID
     status: str  # "recorded" | "replayed"
+
+
+@dataclass(frozen=True)
+class AdjustmentItemInput:
+    source_prescription_id: Optional[uuid.UUID]
+    item_action: str
+    effective_exercise_id: Optional[str]
+    sets: Optional[int]
+    reps: Optional[int]
+    duration_seconds: Optional[int]
+    rest_seconds: Optional[int]
+    display_order: int
+
+
+@dataclass(frozen=True)
+class AdjustmentResult:
+    adjustment_id: uuid.UUID
+    status: str  # "recorded" | "replayed"
+
+
+@dataclass(frozen=True)
+class AdaptiveDeletionResult:
+    adjustments: int
+    adjustment_items: int
+    weekly_reviews: int
+    posture_dismissals: int
+    idempotency_records: int
 
 
 # --- Idempotency helper -----------------------------------------------------
@@ -619,6 +651,165 @@ async def record_substitution(
     return SubstitutionResult(substitution_id, "recorded")
 
 
+async def _persist_adjustment_core(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    plan_version_id: uuid.UUID,
+    source_session_id: uuid.UUID,
+    source_local_date: date,
+    target_local_date: Optional[date],
+    adjustment_kind: str,
+    trigger_code: str,
+    reason_codes: Sequence[str],
+    source_context_fingerprint: str,
+    decision_fingerprint: str,
+    adaptive_policy_version: str,
+    training_policy_version: str,
+    catalog_version: str,
+    source_manifest_version: str,
+    surface: str,
+    target_minutes: Optional[int],
+    items: Sequence[AdjustmentItemInput],
+) -> uuid.UUID:
+    """Insert one immutable adjustment and its typed item snapshot."""
+    adjustment = TrainingDayAdjustment(
+        user_id=uuid.UUID(user_id),
+        plan_version_id=plan_version_id,
+        source_session_id=source_session_id,
+        source_local_date=source_local_date,
+        target_local_date=target_local_date,
+        adjustment_kind=adjustment_kind,
+        trigger_code=trigger_code,
+        reason_codes=list(reason_codes),
+        source_context_fingerprint=source_context_fingerprint,
+        decision_fingerprint=decision_fingerprint,
+        adaptive_policy_version=adaptive_policy_version,
+        training_policy_version=training_policy_version,
+        catalog_version=catalog_version,
+        source_manifest_version=source_manifest_version,
+        surface=surface,
+        target_minutes=target_minutes,
+        created_at=_now(),
+    )
+    db.add(adjustment)
+    await db.flush()
+    for item in items:
+        db.add(TrainingDayAdjustmentItem(
+            adjustment_id=adjustment.adjustment_id,
+            source_prescription_id=item.source_prescription_id,
+            item_action=item.item_action,
+            effective_exercise_id=item.effective_exercise_id,
+            sets=item.sets,
+            reps=item.reps,
+            duration_seconds=item.duration_seconds,
+            rest_seconds=item.rest_seconds,
+            display_order=item.display_order,
+        ))
+    await db.flush()
+    return adjustment.adjustment_id
+
+
+async def record_adjustment(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    plan_version_id: uuid.UUID,
+    source_session_id: uuid.UUID,
+    source_local_date: date,
+    target_local_date: Optional[date],
+    adjustment_kind: str,
+    trigger_code: str,
+    reason_codes: Sequence[str],
+    source_context_fingerprint: str,
+    decision_fingerprint: str,
+    adaptive_policy_version: str,
+    training_policy_version: str,
+    catalog_version: str,
+    source_manifest_version: str,
+    surface: str,
+    target_minutes: Optional[int],
+    items: Sequence[AdjustmentItemInput],
+    idempotency_key: str,
+    request_hash: str,
+) -> AdjustmentResult:
+    """Atomically append one owned adjustment and its idempotency result."""
+    now = _now()
+    await acquire_user_transaction_lock(db, user_id)
+    action, record = await _check_idempotency(
+        db, user_id, OP_TODAY_ADJUSTMENT, idempotency_key, request_hash, now
+    )
+    if action == "replay":
+        result_ref = record.result_ref
+        await db.rollback()
+        adjustment = (
+            await get_adjustment_owned(db, user_id, uuid.UUID(result_ref))
+            if result_ref is not None
+            else None
+        )
+        if adjustment is None:
+            raise AppException(
+                409,
+                "调整重放记录已失效",
+                "idempotency_result_missing",
+            )
+        return AdjustmentResult(adjustment.adjustment_id, "replayed")
+    if action == "conflict":
+        raise AppException(
+            400, "idempotency_key 已用于不同请求", "idempotency_key_conflict"
+        )
+
+    await _assert_session_owned(db, user_id, plan_version_id, source_session_id)
+    existing_decision = await db.execute(
+        select(TrainingDayAdjustment).where(
+            TrainingDayAdjustment.user_id == uuid.UUID(user_id),
+            TrainingDayAdjustment.plan_version_id == plan_version_id,
+            TrainingDayAdjustment.source_session_id == source_session_id,
+            TrainingDayAdjustment.source_local_date == source_local_date,
+            TrainingDayAdjustment.source_context_fingerprint
+            == source_context_fingerprint,
+            TrainingDayAdjustment.adaptive_policy_version
+            == adaptive_policy_version,
+            TrainingDayAdjustment.adjustment_kind == adjustment_kind,
+        )
+    )
+    if existing_decision.scalar_one_or_none() is not None:
+        raise AppException(
+            409, "当前上下文的调整已经记录", "adjustment_already_applied"
+        )
+    adjustment_id = await _persist_adjustment_core(
+        db,
+        user_id,
+        plan_version_id=plan_version_id,
+        source_session_id=source_session_id,
+        source_local_date=source_local_date,
+        target_local_date=target_local_date,
+        adjustment_kind=adjustment_kind,
+        trigger_code=trigger_code,
+        reason_codes=reason_codes,
+        source_context_fingerprint=source_context_fingerprint,
+        decision_fingerprint=decision_fingerprint,
+        adaptive_policy_version=adaptive_policy_version,
+        training_policy_version=training_policy_version,
+        catalog_version=catalog_version,
+        source_manifest_version=source_manifest_version,
+        surface=surface,
+        target_minutes=target_minutes,
+        items=items,
+    )
+    await _record_idempotency(
+        db,
+        user_id,
+        OP_TODAY_ADJUSTMENT,
+        idempotency_key,
+        request_hash,
+        str(adjustment_id),
+        now,
+    )
+    await db.commit()
+    return AdjustmentResult(adjustment_id, "recorded")
+
+
 async def _assert_session_owned(
     db: AsyncSession,
     user_id: str,
@@ -726,6 +917,137 @@ async def get_substitution_owned(
     return res.scalar_one_or_none()
 
 
+async def get_adjustment_owned(
+    db: AsyncSession, user_id: str, adjustment_id: uuid.UUID
+) -> Optional[TrainingDayAdjustment]:
+    res = await db.execute(
+        select(TrainingDayAdjustment).where(
+            TrainingDayAdjustment.user_id == uuid.UUID(user_id),
+            TrainingDayAdjustment.adjustment_id == adjustment_id,
+        )
+    )
+    return res.scalar_one_or_none()
+
+
+async def get_latest_source_adjustment(
+    db: AsyncSession,
+    user_id: str,
+    plan_version_id: uuid.UUID,
+    source_session_id: uuid.UUID,
+    source_local_date: date,
+) -> Optional[TrainingDayAdjustment]:
+    res = await db.execute(
+        select(TrainingDayAdjustment)
+        .where(
+            TrainingDayAdjustment.user_id == uuid.UUID(user_id),
+            TrainingDayAdjustment.plan_version_id == plan_version_id,
+            TrainingDayAdjustment.source_session_id == source_session_id,
+            TrainingDayAdjustment.source_local_date == source_local_date,
+        )
+        .order_by(
+            TrainingDayAdjustment.created_at.desc(),
+            TrainingDayAdjustment.adjustment_id.desc(),
+        )
+        .limit(1)
+    )
+    return res.scalar_one_or_none()
+
+
+async def get_incoming_deferral(
+    db: AsyncSession,
+    user_id: str,
+    plan_version_id: uuid.UUID,
+    target_local_date: date,
+) -> Optional[TrainingDayAdjustment]:
+    matches = [
+        item for item in await list_effective_plan_adjustments(
+            db, user_id, plan_version_id
+        )
+        if item.adjustment_kind == "deferred"
+        and item.target_local_date == target_local_date
+    ]
+    return matches[-1] if matches else None
+
+
+async def list_plan_adjustments(
+    db: AsyncSession, user_id: str, plan_version_id: uuid.UUID
+) -> list[TrainingDayAdjustment]:
+    res = await db.execute(
+        select(TrainingDayAdjustment)
+        .where(
+            TrainingDayAdjustment.user_id == uuid.UUID(user_id),
+            TrainingDayAdjustment.plan_version_id == plan_version_id,
+        )
+        .order_by(
+            TrainingDayAdjustment.created_at.asc(),
+            TrainingDayAdjustment.adjustment_id.asc(),
+        )
+    )
+    return list(res.scalars().all())
+
+
+async def list_effective_plan_adjustments(
+    db: AsyncSession, user_id: str, plan_version_id: uuid.UUID
+) -> list[TrainingDayAdjustment]:
+    """Return only the newest append-only decision per source session/day."""
+    latest = {}
+    for item in await list_plan_adjustments(db, user_id, plan_version_id):
+        latest[(item.source_session_id, item.source_local_date)] = item
+    return list(latest.values())
+
+
+async def load_adjustment_items(
+    db: AsyncSession, adjustment_id: uuid.UUID
+) -> list[TrainingDayAdjustmentItem]:
+    res = await db.execute(
+        select(TrainingDayAdjustmentItem)
+        .where(TrainingDayAdjustmentItem.adjustment_id == adjustment_id)
+        .order_by(TrainingDayAdjustmentItem.display_order.asc())
+    )
+    return list(res.scalars().all())
+
+
+async def delete_adaptive_data(
+    db: AsyncSession, user_id: str, *, commit: bool = True
+) -> AdaptiveDeletionResult:
+    """Delete only Phase 7 derived records for one authenticated owner."""
+    owner = uuid.UUID(user_id)
+    adjustment_ids = select(TrainingDayAdjustment.adjustment_id).where(
+        TrainingDayAdjustment.user_id == owner
+    )
+    item_result = await db.execute(
+        delete(TrainingDayAdjustmentItem).where(
+            TrainingDayAdjustmentItem.adjustment_id.in_(adjustment_ids)
+        )
+    )
+    dismissal_result = await db.execute(
+        delete(PostureRecheckDismissal).where(
+            PostureRecheckDismissal.user_id == owner
+        )
+    )
+    review_result = await db.execute(
+        delete(TrainingWeeklyReview).where(TrainingWeeklyReview.user_id == owner)
+    )
+    adjustment_result = await db.execute(
+        delete(TrainingDayAdjustment).where(TrainingDayAdjustment.user_id == owner)
+    )
+    idempotency_result = await db.execute(
+        delete(IdempotencyRecord).where(
+            IdempotencyRecord.user_id == owner,
+            IdempotencyRecord.operation == OP_TODAY_ADJUSTMENT,
+        )
+    )
+    if commit:
+        await db.commit()
+    return AdaptiveDeletionResult(
+        adjustments=adjustment_result.rowcount or 0,
+        adjustment_items=item_result.rowcount or 0,
+        weekly_reviews=review_result.rowcount or 0,
+        posture_dismissals=dismissal_result.rowcount or 0,
+        idempotency_records=idempotency_result.rowcount or 0,
+    )
+
+
 async def load_sessions(
     db: AsyncSession, plan_version_id: uuid.UUID
 ) -> list[TrainingSession]:
@@ -756,6 +1078,7 @@ __all__ = [
     "OP_PLAN_CONFIRM",
     "OP_SESSION_SUBSTITUTE",
     "OP_SESSION_FEEDBACK",
+    "OP_TODAY_ADJUSTMENT",
     "IDEMPOTENCY_TTL",
     "hash_request",
     "peek_idempotency",
@@ -764,14 +1087,19 @@ __all__ = [
     "CancelResult",
     "FeedbackResult",
     "SubstitutionResult",
+    "AdjustmentItemInput",
+    "AdjustmentResult",
+    "AdaptiveDeletionResult",
     "_persist_draft_core",
     "_persist_feedback_core",
     "_persist_substitution_core",
+    "_persist_adjustment_core",
     "create_draft",
     "confirm_and_activate",
     "cancel",
     "record_feedback",
     "record_substitution",
+    "record_adjustment",
     "get_pending_draft",
     "get_active_version",
     "get_version_owned",
@@ -779,6 +1107,13 @@ __all__ = [
     "get_feedback_owned",
     "get_substitution",
     "get_substitution_owned",
+    "get_adjustment_owned",
+    "get_latest_source_adjustment",
+    "get_incoming_deferral",
+    "list_plan_adjustments",
+    "list_effective_plan_adjustments",
+    "load_adjustment_items",
+    "delete_adaptive_data",
     "load_sessions",
     "load_prescriptions",
 ]
