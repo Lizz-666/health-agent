@@ -388,6 +388,14 @@ flowchart TB
 
 ## 10. 阶段 6：饮食推荐 MVP
 
+**阶段 6 已完成工程验收（2026-08-02）。** 接受实现 SHA 为 `1ff8395`；
+本地严格 Full 为 1569 passed、0 skipped（PostgreSQL 23/23），Flutter
+analyze 无问题且 384 tests，Android API 34 上启用/禁用营养流程 2/2、APK
+构建/安装/启动通过；exact-SHA CI run `30730437996` 的 Fast/Flutter/Full
+全通过。运行时保持默认关闭，只批准合成数据个人开发验证；真实健康数据、治疗性
+营养和公开发布不在本完成状态内。逐条证据见
+`docs/reports/phase6-codex-exit-audit-2026-08-02.md`。
+
 ### 目标
 
 根据身体状态、目标和训练计划生成普通饮食建议，不建设记录系统。

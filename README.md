@@ -2,7 +2,7 @@
 
 体态评估为核心的个人健康教练，Flutter + FastAPI 架构。
 
-当前阶段：阶段 2（健康档案、签到与趋势）已完成（自动化验证 + PostgreSQL 16 + Android 启动证据；Android 人工逐屏冒烟由用户决定跳过，作为接受的残余风险）；详见 `docs/reports/phase2-exit-audit-2026-07-26.md`
+当前阶段：阶段 6（普通饮食推荐 MVP）已完成工程验收；功能默认关闭，仅批准使用合成数据进行个人开发验证。详见 `docs/reports/phase6-codex-exit-audit-2026-08-02.md`。
 
 ## 运行时要求
 
@@ -19,7 +19,8 @@
 
 ### 准备 PostgreSQL 数据库
 
-生产/开发后端依赖 PostgreSQL 16。测试（`pytest`）使用文件型 SQLite，不依赖 PostgreSQL。
+生产/开发后端依赖 PostgreSQL 16。默认 pytest/Fast 使用文件型 SQLite；严格 Full
+还会在一次性 PostgreSQL 16 中运行标记的迁移、约束和并发集成测试。
 
 **方式 A：使用已有 PostgreSQL 16**
 
@@ -97,8 +98,8 @@ python -m alembic downgrade base         # 回退到空库（会删除所有表�
 > 不要对包含真实或需要保留数据的数据库运行 `downgrade`。
 
 FastAPI 启动时**不会**自动建表；必须先运行 `alembic upgrade head`。
-测试使用文件型 SQLite 测试数据库 `./test.db`（`conftest.py` 自动建表和删表），
-不依赖 PostgreSQL，也不使用 Alembic migration。
+默认测试使用文件型 SQLite 测试数据库 `./test.db`（`conftest.py` 自动建表和删表），
+不使用 Alembic migration；严格 Full 的 `requires_pg` 用例另行使用可丢弃 PostgreSQL 16。
 
 ### 测试
 
@@ -143,8 +144,10 @@ GitHub Actions：
 
 启动后端后访问 `http://127.0.0.1:8000/docs` 查看 OpenAPI 文档。
 
-营养建议 API 由后端 `NUTRITION_RUNTIME_ENABLED` 开关控制，默认关闭。只有在迁移、
-发布审计和客户端流程均通过验收后才应启用；关闭时，营养数据删除接口仍保持可用。
+营养建议 API 由后端 `NUTRITION_RUNTIME_ENABLED` 开关控制，默认关闭。Phase 6 的迁移、
+发布审计、客户端流程和 Android 合成数据验收已通过；个人开发时可在 `backend/.env`
+中设置 `NUTRITION_RUNTIME_ENABLED=true`。该授权不覆盖真实健康数据或生产流量。
+关闭时，营养数据删除接口仍保持可用。
 
 ## Flutter 客户端
 
@@ -199,7 +202,7 @@ health/
 
 - Android command-line tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不阻塞构建或模拟器）
 - 照片分析默认关闭，隐私门和 STS 凭证尚未实现
-- 当前仅有体态问题浏览、图示自测和评估历史功能
+- 当前已包含体态、健康档案/签到、训练计划、受控 Agent 和普通饮食建议；营养与 live Agent 运行时默认关闭
 - AI 模型不可用时返回 503，不降级为正常结果
 - 详情页首次加载偶现"加载失败"，重试后恢复
 - 历史页登录后首次进入且评估记录为空时不提供下拉刷新入口
@@ -228,6 +231,10 @@ start ms-settings:developers   # 打开设置并启用开发者模式
 | Flutter analyze | No issues found | 2026-07-26 |
 | Flutter test | 300 passed | 2026-07-26 |
 | Android（阶段 2） | Pixel 6 AVD 构建、安装、启动（MainActivity resumed）+ 一次性 PG16/uvicorn 实时旅程 15/15 + 300 widget；人工逐屏冒烟由用户决定跳过（接受残余风险） | 2026-07-26 |
+| 后端（阶段 6，严格 Full） | 1569 passed，0 failed，0 skipped；PostgreSQL 16 专项 23/23 | 2026-08-02 |
+| Flutter（阶段 6） | analyze 无问题；384 tests passed | 2026-08-02 |
+| Android（阶段 6） | Pixel 6 AVD / API 34：营养启用与禁用集成测试 2/2；带 API define 的 APK 构建、安装、MainActivity resumed | 2026-08-02 |
+| GitHub CI（阶段 6） | exact SHA `1ff8395`，run `30730437996`：Fast/Flutter/Full 全通过 | 2026-08-02 |
 
 ### 依赖升级记录
 
