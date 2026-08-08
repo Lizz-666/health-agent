@@ -161,8 +161,9 @@ def _request_snapshot(goal: str, freq: int, duration: int, bw: bool, band: bool,
 async def _profile_equipment(db: AsyncSession, user_id: str) -> Tuple[bool, bool]:
     profile = await get_profile_result(db, user_id)
     data = profile.profile
-    bw = bool(getattr(data, "equipment_bodyweight", False)) if data else False
-    band = bool(getattr(data, "equipment_resistance_band", False)) if data else False
+    equipment = data.equipment if data is not None else None
+    bw = bool(equipment.bodyweight) if equipment is not None else False
+    band = bool(equipment.resistance_band) if equipment is not None else False
     return bw, band
 
 

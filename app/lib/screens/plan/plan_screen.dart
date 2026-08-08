@@ -458,6 +458,7 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
     }
     if (plan.todayStatus == LoadStatus.networkError) {
       return _StatusCard(
+        key: const Key('today-status-unavailable'),
         icon: Icons.cloud_off,
         title: '今日加载失败',
         detail: plan.error ?? '请稍后重试',

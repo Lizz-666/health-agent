@@ -27,6 +27,18 @@ def _load_verify():
 verify = _load_verify()
 
 
+def test_fast_targets_include_current_phase_e2e_and_exist():
+    assert {
+        "tests/test_phase5_e2e.py",
+        "tests/test_phase6_e2e.py",
+        "tests/test_phase7_e2e.py",
+    }.issubset(verify.FAST_TEST_TARGETS)
+    assert all(
+        (REPO_ROOT / "backend" / target).is_file()
+        for target in verify.FAST_TEST_TARGETS
+    )
+
+
 def _write_junit(path: Path, *, tests: int, failures: int, errors: int,
                  skipped: int) -> None:
     xml = (
