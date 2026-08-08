@@ -9,7 +9,7 @@
 状态：**verified**。
 
 Gate 4 接受 `codex/phase7-implementation` 上的实现 SHA
-`56058591cb970c5bfa0627bb0d5effadbaa8fcc3`。Codex 完成两轮 findings-first
+`7bee078b3456c71ea902446e3d92a8cd9d6c1e06`。Codex 完成两轮 findings-first
 冷审，未留下 P0/P1/P2/P3。分支已推送但未合并；当前没有为该分支创建 PR。
 
 ## Findings First
@@ -23,6 +23,10 @@ Gate 4 接受 `codex/phase7-implementation` 上的实现 SHA
    `today-status-unavailable`，Android unavailable 流明确验证无调整按钮且零 POST。
 3. Fast 验证清单未包含最终 Phase 7 E2E。现将 `test_phase7_e2e.py` 纳入
    `FAST_TEST_TARGETS`，并用 runner 回归测试要求 Phase 5/6/7 E2E 均存在。
+4. 首次 closure 严格 CI 暴露隐私删除竞态：初始 purge 的短 lease 过期后，重试 worker
+   可先完成 OSS 删除；等待用户锁的初始路径取得锁后仍使用陈旧 ORM 状态，导致同一对象
+   删除被调用两次。现于锁内权威 refresh，已完成或已 scrub 的 operation 直接 no-op；
+   PostgreSQL 并发回归和完整严格 CI 均通过。
 
 ### 冷审结论
 
@@ -40,7 +44,7 @@ Gate 4 接受 `codex/phase7-implementation` 上的实现 SHA
 ## 验证证据
 
 所有最终本地证据均绑定 accepted SHA
-`56058591cb970c5bfa0627bb0d5effadbaa8fcc3`：
+`7bee078b3456c71ea902446e3d92a8cd9d6c1e06`：
 
 | 命令或检查 | 结果 |
 | --- | --- |
@@ -50,6 +54,7 @@ Gate 4 接受 `codex/phase7-implementation` 上的实现 SHA
 | `flutter test` | `472 passed` |
 | `flutter test integration_test/phase7_adaptive_review_smoke_test.dart -d emulator-5554` | Android 14/API 34，enabled 与 unavailable fail-closed 流程 `2/2` |
 | `python -m pytest tests/test_phase7_e2e.py -q` | `9 passed` |
+| 隐私删除状态机 + Phase 7 E2E 聚焦集合 | `79 passed / 1 expected PG skip` |
 | 训练 API/周回顾/Phase 6-7 聚焦集合 | `66 passed` |
 | Phase 7 迁移与 E2E 隔离数据库集合 | `13 passed / 3 conditional PG skips` |
 
@@ -60,16 +65,25 @@ Gate 4 接受 `codex/phase7-implementation` 上的实现 SHA
 ## Exact-SHA CI
 
 严格验收 run
-[31271328357](https://github.com/Lizz-666/health-agent/actions/runs/31271328357)
+[31273365507](https://github.com/Lizz-666/health-agent/actions/runs/31273365507)
 的 event SHA 与 checked-out SHA 均为
-`56058591cb970c5bfa0627bb0d5effadbaa8fcc3`：
+`7bee078b3456c71ea902446e3d92a8cd9d6c1e06`：
 
 - Fast：success；ruff clean；`936 passed / 0 failed / 10 expected skips`；diff clean。
 - Flutter：success；analyze clean；`472 tests passed`。
 - Full：success；`1665 passed / 0 failed / 0 skipped`；
   `VERIFY_REQUIRE_PG=1`；PostgreSQL expected `27` / actual `27`，版本证据存在。
 
-较早的 run
+首次候选 `56058591cb970c5bfa0627bb0d5effadbaa8fcc3` 的严格 run
+[31271328357](https://github.com/Lizz-666/health-agent/actions/runs/31271328357)
+曾为 `1665/0/0`。其文档 closure `8a19af7608ef873b5155f55361125f4e1bb27b96`
+在 run
+[31272112939](https://github.com/Lizz-666/health-agent/actions/runs/31272112939)
+复现 `test_pg_initial_purge_lease_does_not_duplicate_oss_delete`：
+`1664 passed / 1 failed / 0 skipped`，因此该 closure 未被接受。Codex 修复真实竞态后，
+以最终 `7bee078b` 和 run `31273365507` 重新完成全部本地/设备/严格 CI 验证。
+
+更早的辅助 run
 [31271174140](https://github.com/Lizz-666/health-agent/actions/runs/31271174140)
 未传 `run_full=true`，因此 Full 被条件跳过。它只提供 Fast/Flutter 辅助证据，不属于
 Gate 4 验收证据，也没有被用来替代严格 run。
