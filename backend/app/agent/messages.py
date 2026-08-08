@@ -66,6 +66,7 @@ class ResultCode:
     NUTRITION_INCOMPLETE = "agent_nutrition_incomplete"
     NUTRITION_NO_SAFE_CANDIDATE = "agent_nutrition_no_safe_candidate"
     NUTRITION_INVALID_REPLACEMENT = "agent_nutrition_invalid_replacement"
+    ADAPTIVE_UNAVAILABLE = "agent_adaptive_action_unavailable"
 
     # Proposal/confirmation lifecycle.
     ACTION_CONFIRMATION_REQUIRED = "agent_action_confirmation_required"
@@ -115,6 +116,7 @@ TEMPLATES: Dict[str, str] = {
     ResultCode.NUTRITION_INCOMPLETE: "生成营养建议前还需要补全结构化资料。",
     ResultCode.NUTRITION_NO_SAFE_CANDIDATE: "当前目录无法组成满足限制的安全候选，未生成建议。",
     ResultCode.NUTRITION_INVALID_REPLACEMENT: "该食物替换未通过当前规则校验，未执行任何操作。",
+    ResultCode.ADAPTIVE_UNAVAILABLE: "当前没有可执行的训练调整或周复盘动作，未写入任何数据。",
     ResultCode.ACTION_CONFIRMATION_REQUIRED: "操作尚未执行，请核对变更内容并明确确认或取消。",
     ResultCode.ACTION_EXPIRED: "该操作提案已过期，请重新发起。",
     ResultCode.ACTION_INVALIDATED: "相关信息已变化，该操作未执行。",

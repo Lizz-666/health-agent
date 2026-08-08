@@ -222,6 +222,7 @@ def _new_row(
     pins: RecommendationContextPins,
     now: datetime,
     source_recommendation_id: Optional[uuid.UUID] = None,
+    origin_weekly_review_id: Optional[uuid.UUID] = None,
 ) -> NutritionRecommendation:
     versions = payload.versions
     return NutritionRecommendation(
@@ -231,6 +232,7 @@ def _new_row(
         status=status.value,
         change_reason=change_reason,
         source_recommendation_id=source_recommendation_id,
+        origin_weekly_review_id=origin_weekly_review_id,
         superseded_by_id=None,
         source_context_fingerprint=payload.source_context_fingerprint,
         profile_version=pins.profile_version,
@@ -312,6 +314,7 @@ async def create_draft_core(
     payload: RecommendationPayload,
     pins: RecommendationContextPins,
     now: datetime,
+    origin_weekly_review_id: Optional[uuid.UUID] = None,
 ) -> PersistenceResult:
     """Create one draft inside the caller's locked transaction.
 
@@ -332,6 +335,7 @@ async def create_draft_core(
         payload=payload,
         pins=pins,
         now=now,
+        origin_weekly_review_id=origin_weekly_review_id,
     )
     db.add(row)
     await db.flush()

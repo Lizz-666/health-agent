@@ -49,6 +49,8 @@ from app.agent.schemas import (
     TodayCheckinProviderView,
     TodayTrainingDisplayView,
     TodayTrainingProviderView,
+    TodayAdjustmentAvailabilityDisplayView,
+    TodayAdjustmentAvailabilityProviderView,
     TrainingDraftDisplayView,
     TrainingDraftProviderView,
     TrainingExerciseDisplayView,
@@ -56,13 +58,17 @@ from app.agent.schemas import (
     TrainingPlanSummaryView,
     WeightTrendDisplayView,
     WeightTrendProviderView,
+    WeeklyReviewSummaryDisplayView,
+    WeeklyReviewSummaryProviderView,
 )
 from app.core.actor_context import ActorContext
+from app.core.exceptions import AppException
 from app.health import service as health_service
 from app.nutrition import service as nutrition_service
 from app.nutrition.schemas import RecommendationPayload
 from app.posture import tools as posture_tools
 from app.training import service as training_service
+from app.training import review_service
 
 
 def _enum_val(value: Any) -> Optional[str]:
@@ -393,6 +399,50 @@ async def adapt_get_today_training(
     return _project_today_training(today)
 
 
+async def adapt_get_today_adjustment_availability(
+    db: AsyncSession, actor: ActorContext, iana_timezone: str
+) -> ReadToolResult:
+    today = await training_service.get_today(db, actor.user_id, iana_timezone)
+    common = dict(
+        state=today.state,
+        can_apply=(today.state == "session" and today.original_session_id is not None),
+        safety_status=today.safety_status or today.decision_gate,
+        adjustment_kind=today.adjustment_kind,
+    )
+    return ReadToolResult(
+        "get_today_adjustment_availability",
+        TodayAdjustmentAvailabilityProviderView(**common),
+        TodayAdjustmentAvailabilityDisplayView(**common),
+    )
+
+
+async def adapt_get_weekly_review_summary(
+    db: AsyncSession, actor: ActorContext, week_index: int
+) -> ReadToolResult:
+    try:
+        review = await review_service.get_review(db, actor.user_id, week_index)
+    except AppException as exc:
+        if exc.code != "review_not_generated":
+            raise
+        common = dict(generated=False, week_index=week_index)
+    else:
+        common = dict(
+            generated=True,
+            week_index=week_index,
+            review_version=review.review_version,
+            period_start=review.period_start,
+            period_end=review.period_end,
+            unavailable_count=review.execution.unavailable,
+            proposal_codes=[item.code for item in review.proposals],
+            posture_status=review.posture.status,
+        )
+    return ReadToolResult(
+        "get_weekly_review_summary",
+        WeeklyReviewSummaryProviderView(**common),
+        WeeklyReviewSummaryDisplayView(**common),
+    )
+
+
 def _project_today_training(today: Any) -> ReadToolResult:
     """Project one already-resolved current-day snapshot without re-reading it."""
     session = today.session
@@ -624,6 +674,8 @@ __all__ = [
     "adapt_get_training_draft",
     "adapt_get_active_training_plan",
     "adapt_get_today_training",
+    "adapt_get_today_adjustment_availability",
+    "adapt_get_weekly_review_summary",
     "adapt_get_training_exercise",
     "adapt_calculate_nutrition_targets",
     "adapt_convert_targets_to_portions",

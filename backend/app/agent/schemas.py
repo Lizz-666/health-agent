@@ -120,6 +120,10 @@ class GetTrainingExerciseInput(ToolInput):
     exercise_id: str = Field(..., min_length=1, max_length=60)
 
 
+class WeeklyReviewInput(ToolInput):
+    week_index: int = Field(..., ge=1, le=4)
+
+
 class AuthModel(str, Enum):
     """How a Tool's authorization/identity is bound (server-side only)."""
 
@@ -568,6 +572,42 @@ class NutritionValidationDisplayView(DisplayView):
     payload: Optional[RecommendationPayload] = None
 
 
+class TodayAdjustmentAvailabilityProviderView(ProviderView):
+    state: str
+    can_apply: bool
+    safety_status: Optional[str] = None
+    adjustment_kind: Optional[str] = None
+
+
+class TodayAdjustmentAvailabilityDisplayView(DisplayView):
+    state: str
+    can_apply: bool
+    safety_status: Optional[str] = None
+    adjustment_kind: Optional[str] = None
+
+
+class WeeklyReviewSummaryProviderView(ProviderView):
+    generated: bool
+    week_index: int = Field(..., ge=1, le=4)
+    review_version: Optional[int] = None
+    period_start: Optional[date] = None
+    period_end: Optional[date] = None
+    unavailable_count: Optional[int] = None
+    proposal_codes: List[str] = Field(default_factory=list)
+    posture_status: Optional[str] = None
+
+
+class WeeklyReviewSummaryDisplayView(DisplayView):
+    generated: bool
+    week_index: int = Field(..., ge=1, le=4)
+    review_version: Optional[int] = None
+    period_start: Optional[date] = None
+    period_end: Optional[date] = None
+    unavailable_count: Optional[int] = None
+    proposal_codes: List[str] = Field(default_factory=list)
+    posture_status: Optional[str] = None
+
+
 # --------------------------------------------------------------------------- #
 # Read Tool result + resolved context                                          #
 # --------------------------------------------------------------------------- #
@@ -713,6 +753,11 @@ SUBSTITUTE_TODAY_EXERCISE = "substitute_today_exercise"
 RECORD_TRAINING_FEEDBACK = "record_training_feedback"
 GENERATE_MEAL_PLAN_DRAFT = "generate_meal_plan_draft"
 REPLACE_FOOD = "replace_food"
+GENERATE_WEEKLY_REVIEW = "generate_weekly_review"
+APPLY_TODAY_ADJUSTMENT = "apply_today_adjustment"
+CREATE_REVIEW_TRAINING_DRAFT = "create_review_training_draft"
+CREATE_REVIEW_NUTRITION_DRAFT = "create_review_nutrition_draft"
+DISMISS_POSTURE_RECHECK = "dismiss_posture_recheck"
 WRITE_ACTION_NAMES = (
     UPSERT_TODAY_CHECKIN,
     CREATE_WEIGHT_RECORD,
@@ -721,6 +766,11 @@ WRITE_ACTION_NAMES = (
     RECORD_TRAINING_FEEDBACK,
     GENERATE_MEAL_PLAN_DRAFT,
     REPLACE_FOOD,
+    GENERATE_WEEKLY_REVIEW,
+    APPLY_TODAY_ADJUSTMENT,
+    CREATE_REVIEW_TRAINING_DRAFT,
+    CREATE_REVIEW_NUTRITION_DRAFT,
+    DISMISS_POSTURE_RECHECK,
 )
 
 
@@ -790,6 +840,26 @@ class ReplaceFoodArguments(WriteActionArguments):
     to_food_id: str = Field(..., pattern=r"^[a-z0-9_]{3,60}$")
 
 
+class GenerateWeeklyReviewArguments(WriteActionArguments):
+    week_index: int = Field(..., ge=1, le=4)
+
+
+class ApplyTodayAdjustmentArguments(WriteActionArguments):
+    pass
+
+
+class CreateReviewTrainingDraftArguments(WriteActionArguments):
+    week_index: int = Field(..., ge=1, le=4)
+
+
+class CreateReviewNutritionDraftArguments(WriteActionArguments):
+    week_index: int = Field(..., ge=1, le=4)
+
+
+class DismissPostureRecheckArguments(WriteActionArguments):
+    week_index: int = Field(..., ge=1, le=4)
+
+
 # --- deterministic typed diffs (server-rendered; no provider free text) -----
 
 
@@ -841,6 +911,15 @@ class ReplaceFoodDiff(WriteActionDiff):
     item_index: int
     from_food_id: str
     to_food_id: str
+    requires_confirmation: bool = True
+
+
+class WeeklyReviewActionDiff(WriteActionDiff):
+    week_index: int = Field(..., ge=1, le=4)
+    requires_confirmation: bool = True
+
+
+class ApplyTodayAdjustmentDiff(WriteActionDiff):
     requires_confirmation: bool = True
 
 
@@ -968,6 +1047,7 @@ __all__ = [
     "ListPostureIssuesInput",
     "GetPostureIssueInput",
     "GetTrainingExerciseInput",
+    "WeeklyReviewInput",
     "AuthModel",
     "ProviderView",
     "DisplayView",
@@ -1010,6 +1090,10 @@ __all__ = [
     "NutritionPortionsDisplayView",
     "NutritionValidationProviderView",
     "NutritionValidationDisplayView",
+    "TodayAdjustmentAvailabilityProviderView",
+    "TodayAdjustmentAvailabilityDisplayView",
+    "WeeklyReviewSummaryProviderView",
+    "WeeklyReviewSummaryDisplayView",
     "ReadToolResult",
     "ContextProviderView",
     "ResolvedContext",
@@ -1020,6 +1104,11 @@ __all__ = [
     "RECORD_TRAINING_FEEDBACK",
     "GENERATE_MEAL_PLAN_DRAFT",
     "REPLACE_FOOD",
+    "GENERATE_WEEKLY_REVIEW",
+    "APPLY_TODAY_ADJUSTMENT",
+    "CREATE_REVIEW_TRAINING_DRAFT",
+    "CREATE_REVIEW_NUTRITION_DRAFT",
+    "DISMISS_POSTURE_RECHECK",
     "WRITE_ACTION_NAMES",
     "WriteActionArguments",
     "UpsertTodayCheckinArguments",
@@ -1029,6 +1118,11 @@ __all__ = [
     "RecordTrainingFeedbackArguments",
     "GenerateMealPlanDraftArguments",
     "ReplaceFoodArguments",
+    "GenerateWeeklyReviewArguments",
+    "ApplyTodayAdjustmentArguments",
+    "CreateReviewTrainingDraftArguments",
+    "CreateReviewNutritionDraftArguments",
+    "DismissPostureRecheckArguments",
     "WriteActionDiff",
     "UpsertTodayCheckinDiff",
     "CreateWeightRecordDiff",
@@ -1037,6 +1131,8 @@ __all__ = [
     "RecordTrainingFeedbackDiff",
     "GenerateMealPlanDraftDiff",
     "ReplaceFoodDiff",
+    "WeeklyReviewActionDiff",
+    "ApplyTodayAdjustmentDiff",
     "WriteActionResult",
     "AgentApiModel",
     "AgentDisclosureView",

@@ -100,6 +100,14 @@ async def test_openapi_exposes_training_endpoints_with_security(client):
         ("/api/v1/training/plans/today", "get"),
         ("/api/v1/training/today", "get"),
         ("/api/v1/training/today/adjustments", "post"),
+        ("/api/v1/training/reviews/weeks/{week_index}", "get"),
+        ("/api/v1/training/reviews/weeks/{week_index}", "post"),
+        ("/api/v1/training/reviews/weeks/{week_index}/training-drafts", "post"),
+        ("/api/v1/training/reviews/weeks/{week_index}/nutrition-drafts", "post"),
+        (
+            "/api/v1/training/reviews/weeks/{week_index}/posture-recheck-dismissals",
+            "post",
+        ),
     ]
     for path, method in expected:
         assert path in paths, f"missing path {path}"
@@ -120,6 +128,11 @@ async def test_openapi_exposes_training_endpoints_with_security(client):
     ("get", "/api/v1/training/plans/today?iana_timezone=Asia/Shanghai"),
     ("get", "/api/v1/training/today?iana_timezone=Asia/Shanghai"),
     ("post", "/api/v1/training/today/adjustments"),
+    ("get", "/api/v1/training/reviews/weeks/1"),
+    ("post", "/api/v1/training/reviews/weeks/1"),
+    ("post", "/api/v1/training/reviews/weeks/1/training-drafts"),
+    ("post", "/api/v1/training/reviews/weeks/1/nutrition-drafts"),
+    ("post", "/api/v1/training/reviews/weeks/1/posture-recheck-dismissals"),
 ])
 async def test_endpoints_require_auth(client, method, path):
     fn = getattr(client, method)
@@ -149,6 +162,35 @@ async def test_adjustment_request_is_strict_and_validates_expected_ids(client):
     }
     response = await client.post(
         "/api/v1/training/today/adjustments", json=body, headers=_auth(uid))
+    assert response.status_code == 422
+
+
+async def test_review_requests_are_strict_and_identity_free(client):
+    uid = str(uuid.uuid4())
+    await _seed_user(uid, "13800010032")
+    response = await client.post(
+        "/api/v1/training/reviews/weeks/1",
+        json={
+            "iana_timezone": "Asia/Shanghai",
+            "idempotency_key": "review-invalid",
+            "user_id": uid,
+            "safety_status": "eligible",
+        },
+        headers=_auth(uid),
+    )
+    assert response.status_code == 422
+
+    response = await client.post(
+        "/api/v1/training/reviews/weeks/1/training-drafts",
+        json={
+            "iana_timezone": "Asia/Shanghai",
+            "idempotency_key": "review-draft-invalid",
+            "expected_review_id": str(uuid.uuid4()),
+            "expected_input_fingerprint": "a" * 64,
+            "target_local_date": "2026-08-09",
+        },
+        headers=_auth(uid),
+    )
     assert response.status_code == 422
 
 

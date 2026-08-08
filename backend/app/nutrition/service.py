@@ -218,6 +218,9 @@ def _view(row: NutritionRecommendation) -> RecommendationView:
         source_recommendation_id=(
             str(row.source_recommendation_id) if row.source_recommendation_id else None
         ),
+        origin_weekly_review_id=(
+            str(row.origin_weekly_review_id) if row.origin_weekly_review_id else None
+        ),
         superseded_by_id=str(row.superseded_by_id) if row.superseded_by_id else None,
         payload=payload,
         validation_codes=row.validation_codes,

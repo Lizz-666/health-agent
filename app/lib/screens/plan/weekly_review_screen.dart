@@ -6,8 +6,7 @@
 //  - GET (loadReview) may run on screen open / week selection; it never POSTs.
 //    Generation POST runs only after an explicit button press, never
 //    automatically.
-//  - The review endpoints are NOT implemented on the backend until Codex Task
-//    3. Real 404 / network / unknown-code responses render as an explicit
+//  - Real 404 / network / unknown-code responses render as an explicit
 //    `unavailable` state. We never fabricate a review or count missing data as
 //    zero.
 //  - Facts render before proposals. Active-rest and safety-adjustment are
@@ -246,6 +245,19 @@ class _FactsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('本周执行事实', style: Theme.of(context).textTheme.titleMedium),
+          if (snapshot.safety.blocked) ...[
+            const SizedBox(height: 8),
+            Container(
+              key: const Key('review-snapshot-safety'),
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              color: Colors.orange.withValues(alpha: 0.12),
+              child: Text(
+                '安全校验已阻止普通训练建议：${snapshot.safety.reasonCodes.join("、")}',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           _row('计划场次', '${e.scheduled}'),
           _row('有效场次', '${e.effective}'),
@@ -328,7 +340,10 @@ class _FactsSection extends StatelessWidget {
   String _nutritionLabel(NutritionReviewState n) {
     final age = n.ageDays == null ? '' : '（已 ${n.ageDays} 天）';
     final refresh = n.refreshAvailable ? '；可请求刷新草案' : '';
-    return '${n.state.name}$age$refresh';
+    final unavailable = n.unavailableReason == null
+        ? ''
+        : ' (${n.unavailableReason})';
+    return '${n.state.name}$age$refresh$unavailable';
   }
 
   String _postureLabel(PostureRecheckInfo p) {

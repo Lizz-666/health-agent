@@ -46,6 +46,7 @@ class RecommendationView(ApiModel):
     status: str
     change_reason: str
     source_recommendation_id: Optional[str] = None
+    origin_weekly_review_id: Optional[str] = None
     superseded_by_id: Optional[str] = None
     payload: RecommendationPayload
     validation_codes: List[str]

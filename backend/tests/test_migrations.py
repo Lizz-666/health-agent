@@ -108,12 +108,12 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0011_adaptive_reviews。"""
+    """Alembic 只有一个 head，且为 0012_review_draft_origins。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0011_adaptive_reviews", head_lines[0]
+    assert head_lines[0].split()[0] == "0012_review_draft_origins", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():

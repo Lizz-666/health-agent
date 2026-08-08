@@ -7,8 +7,7 @@
 //  - GET (loadReview) is read-only and may load an existing snapshot; it never
 //    POSTs. POST generation (generateReview) runs only after an explicit user
 //    action and never automatically.
-//  - The review endpoints are NOT implemented on the backend until Codex Task
-//    3. Any real 404 / network failure / unknown stable code is treated as
+//  - Any real 404 / network failure / unknown stable code is treated as
 //    `unavailable`. We never invent a local success payload, cached fallback,
 //    fake review, or backend compatibility behavior.
 //  - A 2xx that fails to parse, an unknown enum, or a missing required field

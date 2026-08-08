@@ -32,16 +32,26 @@ from app.agent.provider import (
     UnsupportedDecision,
 )
 from app.agent.schemas import (
+    APPLY_TODAY_ADJUSTMENT,
     CREATE_WEIGHT_RECORD,
+    CREATE_REVIEW_NUTRITION_DRAFT,
+    CREATE_REVIEW_TRAINING_DRAFT,
+    DISMISS_POSTURE_RECHECK,
     GENERATE_MEAL_PLAN_DRAFT,
     GENERATE_TRAINING_PLAN_DRAFT,
+    GENERATE_WEEKLY_REVIEW,
     RECORD_TRAINING_FEEDBACK,
     REPLACE_FOOD,
     SUBSTITUTE_TODAY_EXERCISE,
     UPSERT_TODAY_CHECKIN,
     CreateWeightRecordArguments,
+    ApplyTodayAdjustmentArguments,
+    CreateReviewNutritionDraftArguments,
+    CreateReviewTrainingDraftArguments,
+    DismissPostureRecheckArguments,
     EntryType,
     GenerateTrainingPlanDraftArguments,
+    GenerateWeeklyReviewArguments,
     GenerateMealPlanDraftArguments,
     ReadToolResult,
     RecordTrainingFeedbackArguments,
@@ -96,16 +106,35 @@ _WRITE_MODELS: Dict[str, type] = {
     RECORD_TRAINING_FEEDBACK: RecordTrainingFeedbackArguments,
     GENERATE_MEAL_PLAN_DRAFT: GenerateMealPlanDraftArguments,
     REPLACE_FOOD: ReplaceFoodArguments,
+    GENERATE_WEEKLY_REVIEW: GenerateWeeklyReviewArguments,
+    APPLY_TODAY_ADJUSTMENT: ApplyTodayAdjustmentArguments,
+    CREATE_REVIEW_TRAINING_DRAFT: CreateReviewTrainingDraftArguments,
+    CREATE_REVIEW_NUTRITION_DRAFT: CreateReviewNutritionDraftArguments,
+    DISMISS_POSTURE_RECHECK: DismissPostureRecheckArguments,
 }
+_REVIEW_WRITES = frozenset(
+    {
+        GENERATE_WEEKLY_REVIEW,
+        CREATE_REVIEW_TRAINING_DRAFT,
+        CREATE_REVIEW_NUTRITION_DRAFT,
+        DISMISS_POSTURE_RECHECK,
+    }
+)
 _ENTRY_WRITES = {
     EntryType.general: frozenset(_WRITE_MODELS),
     EntryType.health_profile: frozenset(
         {UPSERT_TODAY_CHECKIN, CREATE_WEIGHT_RECORD}
     ),
     EntryType.posture_issue: frozenset(),
-    EntryType.training_plan: frozenset({GENERATE_TRAINING_PLAN_DRAFT}),
+    EntryType.training_plan: frozenset(
+        {GENERATE_TRAINING_PLAN_DRAFT, APPLY_TODAY_ADJUSTMENT} | _REVIEW_WRITES
+    ),
     EntryType.training_session: frozenset(
-        {SUBSTITUTE_TODAY_EXERCISE, RECORD_TRAINING_FEEDBACK}
+        {
+            SUBSTITUTE_TODAY_EXERCISE,
+            RECORD_TRAINING_FEEDBACK,
+            APPLY_TODAY_ADJUSTMENT,
+        }
     ),
     EntryType.training_exercise: frozenset(
         {SUBSTITUTE_TODAY_EXERCISE, RECORD_TRAINING_FEEDBACK}
@@ -121,6 +150,7 @@ _NUTRITION_TOOLS = frozenset(
         "convert_targets_to_portions",
         "validate_nutrition_plan",
         GENERATE_MEAL_PLAN_DRAFT,
+        CREATE_REVIEW_NUTRITION_DRAFT,
         REPLACE_FOOD,
     }
 )
@@ -424,6 +454,10 @@ async def _execute_read_tool(
         result = await spec.adapter(db, actor, context.entity_id)
     elif name == "get_today_training":
         result = await spec.adapter(db, actor, context.iana_timezone)
+    elif name == "get_today_adjustment_availability":
+        result = await spec.adapter(db, actor, context.iana_timezone)
+    elif name == "get_weekly_review_summary":
+        result = await spec.adapter(db, actor, arguments.week_index)
     elif name == "get_training_exercise":
         result = await spec.adapter(
             db, actor, context.iana_timezone, arguments.exercise_id

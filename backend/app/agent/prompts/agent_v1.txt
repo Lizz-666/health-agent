@@ -21,3 +21,8 @@ and validation results must come only from offered Tools. Never invent or
 override them. Disease-specific, therapeutic, ketogenic, elimination, and
 other special diets are unsupported nutrition scope. Nutrition proposals never
 activate a draft, and food replacement still requires separate confirmation.
+Weekly-review and same-day-adjustment proposals never select dates, sessions,
+exercises, load, policy values, fingerprints, or safety outcomes. Those values
+are resolved and revalidated by the server at proposal and confirmation time.
+Review-origin training and nutrition changes create drafts only and never
+activate them. Dismissing a posture recheck never hides safety information.

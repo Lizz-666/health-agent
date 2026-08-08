@@ -26,6 +26,7 @@ Map<String, dynamic> _snapshotJson() => {
   'plan_version_id': 'pv-1',
   'week_index': 1,
   'review_version': 1,
+  'input_fingerprint': 'a' * 64,
   'period_start': '2026-07-20',
   'period_end': '2026-07-26',
   'execution': {
@@ -51,8 +52,25 @@ Map<String, dynamic> _snapshotJson() => {
     'unavailable': 0,
   },
   'weight_trend': {'available': false},
-  'nutrition': {'state': 'active', 'age_days': 12, 'refresh_available': false},
-  'posture': {'status': 'not_due'},
+  'nutrition': {
+    'state': 'active',
+    'age_days': 12,
+    'refresh_available': false,
+    'unavailable_reason': null,
+    'recommendation_id': 'nr-1',
+    'version': 3,
+  },
+  'posture': {
+    'status': 'not_due',
+    'baseline_sources': <String>[],
+    'comparison_sources': <String>[],
+  },
+  'safety': {
+    'gate': 'eligible',
+    'blocked': false,
+    'reason_codes': <String>[],
+    'missing_fields': <String>[],
+  },
   'proposals': [
     {'code': 'keep_current_plan', 'state': 'proposal'},
   ],

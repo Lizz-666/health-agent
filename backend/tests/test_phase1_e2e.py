@@ -153,14 +153,14 @@ def test_e2e_migration_head_is_current():
     """Point 1: Alembic has exactly one head, at the current chain tip.
 
     This tracks the live migration head; it advances with each new migration.
-    Currently ``0011_adaptive_reviews`` (Phase 7), advanced from
+    Currently ``0012_review_draft_origins`` (Phase 7), advanced from
     ``0010_nutrition_recommendations`` (Phase 6).
     """
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(lines) == 1, f"expected exactly one head, got: {lines}"
-    assert lines[0].split()[0] == "0011_adaptive_reviews", lines[0]
+    assert lines[0].split()[0] == "0012_review_draft_origins", lines[0]
 
 
 def test_e2e_schema_source_lifecycle_not_null_severity_nullable():

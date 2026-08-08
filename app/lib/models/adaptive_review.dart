@@ -3,13 +3,10 @@
 // Typed models for the Phase 7 weekly review snapshot
 // (/api/v1/training/reviews/weeks/{week_index}).
 //
-// Contract note: the review endpoints are owned by Codex Task 3 and are not
-// yet implemented on the backend (only the DB foundation exists). The field
-// names below are a spec-aligned, snake_case proposal used by mock-backed
-// provider/widget tests. Any real response that does not match — including a
-// 404 / network failure / unknown enum / missing required field — must fail
-// closed as a parse error or an explicit unavailable state, never a fabricated
-// review or "all-zero" facts.
+// The backend response is strict snake_case. Any response that does not match,
+// including a 404 / network failure / unknown enum / missing required field,
+// must fail closed as a parse error or an explicit unavailable state, never a
+// fabricated review or "all-zero" facts.
 //
 // Safety contract (mirrors plan.dart):
 //  - Unknown enum values surface as FormatException.
@@ -45,6 +42,14 @@ String _readString(Map<String, dynamic> json, String key) {
   throw FormatException('missing or invalid field: $key');
 }
 
+String _readFingerprint(Map<String, dynamic> json, String key) {
+  final value = _readString(json, key);
+  if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(value)) {
+    throw FormatException('invalid fingerprint field: $key');
+  }
+  return value;
+}
+
 String? _readOptionalString(Map<String, dynamic> json, String key) {
   final v = json[key];
   if (v == null) return null;
@@ -75,6 +80,14 @@ bool _readBool(Map<String, dynamic> json, String key) {
   final v = json[key];
   if (v is bool) return v;
   throw FormatException('missing or invalid bool field: $key');
+}
+
+List<String> _readStringList(Map<String, dynamic> json, String key) {
+  final value = json[key];
+  if (value is List && value.every((item) => item is String)) {
+    return List<String>.unmodifiable(value.cast<String>());
+  }
+  throw FormatException('missing or invalid string list field: $key');
 }
 
 Map<String, dynamic> _readObject(Map<String, dynamic> json, String key) {
@@ -126,7 +139,8 @@ enum WeightTrendDirection {
 enum NutritionRecommendationState {
   none,
   active,
-  stale;
+  stale,
+  unavailable;
 
   static NutritionRecommendationState tryParse(Object? raw) {
     if (raw is String) {
@@ -137,6 +151,8 @@ enum NutritionRecommendationState {
           return NutritionRecommendationState.active;
         case 'stale':
           return NutritionRecommendationState.stale;
+        case 'unavailable':
+          return NutritionRecommendationState.unavailable;
       }
     }
     throw FormatException('unknown nutrition recommendation state: $raw');
@@ -401,11 +417,17 @@ class NutritionReviewState {
   final NutritionRecommendationState state;
   final int? ageDays;
   final bool refreshAvailable;
+  final String? unavailableReason;
+  final String? recommendationId;
+  final int? version;
 
   const NutritionReviewState({
     required this.state,
     required this.ageDays,
     required this.refreshAvailable,
+    required this.unavailableReason,
+    required this.recommendationId,
+    required this.version,
   });
 
   factory NutritionReviewState.fromJson(Map<String, dynamic> json) {
@@ -413,12 +435,53 @@ class NutritionReviewState {
     if (ageDays != null && ageDays < 0) {
       throw const FormatException('nutrition age_days cannot be negative');
     }
+    final state = NutritionRecommendationState.tryParse(json['state']);
+    final refreshAvailable = _readBool(json, 'refresh_available');
+    final unavailableReason = _readOptionalString(json, 'unavailable_reason');
+    final recommendationId = _readOptionalString(json, 'recommendation_id');
+    final version = _readOptionalInt(json, 'version');
+    final hasIdentity = recommendationId != null && version != null;
+    if ((recommendationId == null) != (version == null) ||
+        (version != null && version < 1)) {
+      throw const FormatException('nutrition identity must be complete');
+    }
+    if (state == NutritionRecommendationState.unavailable &&
+        (refreshAvailable ||
+            unavailableReason == null ||
+            unavailableReason.trim().isEmpty)) {
+      throw const FormatException(
+        'unavailable nutrition state requires a reason and no refresh',
+      );
+    }
+    if (state != NutritionRecommendationState.unavailable &&
+        unavailableReason != null) {
+      throw const FormatException(
+        'only unavailable nutrition state has a reason',
+      );
+    }
+    if (state == NutritionRecommendationState.none &&
+        (hasIdentity || ageDays != null || !refreshAvailable)) {
+      throw const FormatException(
+        'none nutrition state must offer an initial draft',
+      );
+    }
+    if (state == NutritionRecommendationState.active &&
+        (!hasIdentity || refreshAvailable)) {
+      throw const FormatException(
+        'active nutrition state cannot offer refresh',
+      );
+    }
+    if (state == NutritionRecommendationState.stale &&
+        (!hasIdentity || !refreshAvailable)) {
+      throw const FormatException('stale nutrition state must offer refresh');
+    }
     return NutritionReviewState(
-      state: NutritionRecommendationState.tryParse(json['state']),
+      state: state,
       ageDays: ageDays,
-      refreshAvailable: json['refresh_available'] == null
-          ? false
-          : _readBool(json, 'refresh_available'),
+      refreshAvailable: refreshAvailable,
+      unavailableReason: unavailableReason,
+      recommendationId: recommendationId,
+      version: version,
     );
   }
 }
@@ -431,6 +494,8 @@ class PostureRecheckInfo {
   final PostureComparisonSignal? comparisonSignal;
   final DateTime? baselineAt;
   final DateTime? comparisonAt;
+  final List<PostureAssessmentSource> baselineSources;
+  final List<PostureAssessmentSource> comparisonSources;
   final String? reason;
 
   const PostureRecheckInfo({
@@ -438,6 +503,8 @@ class PostureRecheckInfo {
     required this.comparisonSignal,
     required this.baselineAt,
     required this.comparisonAt,
+    required this.baselineSources,
+    required this.comparisonSources,
     required this.reason,
   });
 
@@ -448,6 +515,15 @@ class PostureRecheckInfo {
         : PostureComparisonSignal.tryParse(json['comparison_signal']);
     final baselineAt = _readOptionalDate(json, 'baseline_at');
     final comparisonAt = _readOptionalDate(json, 'comparison_at');
+    final reason = _readOptionalString(json, 'reason');
+    final baselineSources = _readStringList(
+      json,
+      'baseline_sources',
+    ).map(PostureAssessmentSource.tryParse).toList(growable: false);
+    final comparisonSources = _readStringList(
+      json,
+      'comparison_sources',
+    ).map(PostureAssessmentSource.tryParse).toList(growable: false);
     if (status == PostureRecheckStatus.comparisonAvailable &&
         (comparisonSignal == null ||
             baselineAt == null ||
@@ -456,12 +532,69 @@ class PostureRecheckInfo {
         'posture comparison requires signal and both anchors',
       );
     }
+    if (status != PostureRecheckStatus.comparisonAvailable &&
+        (comparisonSignal != null || comparisonAt != null)) {
+      throw const FormatException(
+        'posture comparison fields require comparison status',
+      );
+    }
+    if (status == PostureRecheckStatus.due && baselineAt == null) {
+      throw const FormatException('posture due state requires baseline anchor');
+    }
+    if (status == PostureRecheckStatus.unavailable &&
+        (reason == null || reason.trim().isEmpty)) {
+      throw const FormatException(
+        'posture unavailable state requires a reason',
+      );
+    }
     return PostureRecheckInfo(
       status: status,
       comparisonSignal: comparisonSignal,
       baselineAt: baselineAt,
       comparisonAt: comparisonAt,
-      reason: _readOptionalString(json, 'reason'),
+      baselineSources: baselineSources,
+      comparisonSources: comparisonSources,
+      reason: reason,
+    );
+  }
+}
+
+enum PostureAssessmentSource {
+  selfTest,
+  aiPhoto;
+
+  static PostureAssessmentSource tryParse(Object? raw) {
+    if (raw is String) {
+      switch (raw) {
+        case 'self_test':
+          return PostureAssessmentSource.selfTest;
+        case 'ai_photo':
+          return PostureAssessmentSource.aiPhoto;
+      }
+    }
+    throw FormatException('unknown posture assessment source: $raw');
+  }
+}
+
+class ReviewSafetyState {
+  final String gate;
+  final bool blocked;
+  final List<String> reasonCodes;
+  final List<String> missingFields;
+
+  const ReviewSafetyState({
+    required this.gate,
+    required this.blocked,
+    required this.reasonCodes,
+    required this.missingFields,
+  });
+
+  factory ReviewSafetyState.fromJson(Map<String, dynamic> json) {
+    return ReviewSafetyState(
+      gate: _readString(json, 'gate'),
+      blocked: _readBool(json, 'blocked'),
+      reasonCodes: _readStringList(json, 'reason_codes'),
+      missingFields: _readStringList(json, 'missing_fields'),
     );
   }
 }
@@ -511,6 +644,7 @@ class WeeklyReviewSnapshot {
   final String planVersionId;
   final int weekIndex;
   final int reviewVersion;
+  final String inputFingerprint;
   final DateTime periodStart;
   final DateTime periodEnd;
   final WeeklyExecutionFacts execution;
@@ -519,6 +653,7 @@ class WeeklyReviewSnapshot {
   final WeightTrend weightTrend;
   final NutritionReviewState nutrition;
   final PostureRecheckInfo posture;
+  final ReviewSafetyState safety;
   final List<ReviewProposal> proposals;
 
   const WeeklyReviewSnapshot({
@@ -526,6 +661,7 @@ class WeeklyReviewSnapshot {
     required this.planVersionId,
     required this.weekIndex,
     required this.reviewVersion,
+    required this.inputFingerprint,
     required this.periodStart,
     required this.periodEnd,
     required this.execution,
@@ -534,6 +670,7 @@ class WeeklyReviewSnapshot {
     required this.weightTrend,
     required this.nutrition,
     required this.posture,
+    required this.safety,
     required this.proposals,
   });
 
@@ -560,6 +697,7 @@ class WeeklyReviewSnapshot {
       planVersionId: _readString(json, 'plan_version_id'),
       weekIndex: weekIndex,
       reviewVersion: reviewVersion,
+      inputFingerprint: _readFingerprint(json, 'input_fingerprint'),
       periodStart: periodStart,
       periodEnd: periodEnd,
       execution: WeeklyExecutionFacts.fromJson(_readObject(json, 'execution')),
@@ -570,6 +708,7 @@ class WeeklyReviewSnapshot {
       weightTrend: WeightTrend.fromJson(_readObject(json, 'weight_trend')),
       nutrition: NutritionReviewState.fromJson(_readObject(json, 'nutrition')),
       posture: PostureRecheckInfo.fromJson(_readObject(json, 'posture')),
+      safety: ReviewSafetyState.fromJson(_readObject(json, 'safety')),
       proposals: proposalsRaw
           .map((e) => ReviewProposal.fromJson(e as Map<String, dynamic>))
           .toList(),

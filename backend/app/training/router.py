@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user
 from app.db.database import get_db
-from app.training import service
+from app.training import review_service, service
 from app.training.schemas_api import (
     ActivePlanResponse,
     AdjustmentRequest,
@@ -26,9 +26,14 @@ from app.training.schemas_api import (
     DraftResponse,
     FeedbackRequest,
     FeedbackResponse,
+    PostureDismissalResponse,
+    ReviewDraftResponse,
+    ReviewGenerateRequest,
+    ReviewMutationRequest,
     SubstitutionRequest,
     SubstitutionResponse,
     TodayResponse,
+    WeeklyReviewResponse,
 )
 
 router = APIRouter(prefix="/api/v1/training", tags=["training"])
@@ -112,6 +117,78 @@ async def post_today_adjustment(
 ):
     """Apply one foreground, deterministic adjustment after fresh safety checks."""
     return await service.apply_today_adjustment(db, user_id, request)
+
+
+@router.get(
+    "/reviews/weeks/{week_index}",
+    response_model=WeeklyReviewResponse,
+)
+async def get_weekly_review(
+    week_index: int,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read the latest owned immutable review; never generates one."""
+    return await review_service.get_review(db, user_id, week_index)
+
+
+@router.post(
+    "/reviews/weeks/{week_index}",
+    response_model=WeeklyReviewResponse,
+)
+async def post_weekly_review(
+    week_index: int,
+    request: ReviewGenerateRequest,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Explicitly generate/replay one deterministic ended-week snapshot."""
+    return await review_service.generate_review(db, user_id, week_index, request)
+
+
+@router.post(
+    "/reviews/weeks/{week_index}/training-drafts",
+    response_model=ReviewDraftResponse,
+)
+async def post_review_training_draft(
+    week_index: int,
+    request: ReviewMutationRequest,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await review_service.create_training_draft(
+        db, user_id, week_index, request
+    )
+
+
+@router.post(
+    "/reviews/weeks/{week_index}/nutrition-drafts",
+    response_model=ReviewDraftResponse,
+)
+async def post_review_nutrition_draft(
+    week_index: int,
+    request: ReviewMutationRequest,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await review_service.create_nutrition_draft(
+        db, user_id, week_index, request
+    )
+
+
+@router.post(
+    "/reviews/weeks/{week_index}/posture-recheck-dismissals",
+    response_model=PostureDismissalResponse,
+)
+async def post_posture_recheck_dismissal(
+    week_index: int,
+    request: ReviewMutationRequest,
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await review_service.dismiss_posture_recheck(
+        db, user_id, week_index, request
+    )
 
 
 @router.post("/plans/sessions/{session_id}:substitute", response_model=SubstitutionResponse)

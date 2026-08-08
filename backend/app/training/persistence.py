@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
@@ -58,6 +58,10 @@ OP_PLAN_CONFIRM = "plan_confirm"
 OP_SESSION_SUBSTITUTE = "session_substitute"
 OP_SESSION_FEEDBACK = "session_feedback"
 OP_TODAY_ADJUSTMENT = "today_adjustment"
+OP_WEEKLY_REVIEW_GENERATE = "weekly_review_generate"
+OP_REVIEW_TRAINING_DRAFT = "review_training_draft"
+OP_REVIEW_NUTRITION_DRAFT = "review_nutrition_draft"
+OP_POSTURE_RECHECK_DISMISS = "posture_recheck_dismiss"
 
 IDEMPOTENCY_TTL = timedelta(hours=24)
 
@@ -266,6 +270,7 @@ async def _persist_draft_core(
     decision_fingerprint: str,
     generated_at: datetime,
     change_reason: str,
+    origin_weekly_review_id: Optional[uuid.UUID] = None,
 ) -> uuid.UUID:
     """Transaction-neutral side-effect core of ``create_draft``.
 
@@ -284,6 +289,7 @@ async def _persist_draft_core(
 
     version = TrainingPlanVersion(
         user_id=uuid.UUID(user_id),
+        origin_weekly_review_id=origin_weekly_review_id,
         requested_goal=draft.requested_goal,
         source_context_fingerprint=draft.source_context_fingerprint,
         profile_version=draft.profile_version,
@@ -342,6 +348,7 @@ async def create_draft(
     change_reason: str,
     idempotency_key: str,
     request_hash: str,
+    origin_weekly_review_id: Optional[uuid.UUID] = None,
 ) -> DraftResult:
     """Persist a generated draft (idempotent).
 
@@ -377,6 +384,7 @@ async def create_draft(
         decision_fingerprint=decision_fingerprint,
         generated_at=generated_at,
         change_reason=change_reason,
+        origin_weekly_review_id=origin_weekly_review_id,
     )
     await _record_idempotency(
         db, user_id, OP_PLAN_GENERATE, idempotency_key, request_hash,
@@ -1011,9 +1019,78 @@ async def delete_adaptive_data(
     db: AsyncSession, user_id: str, *, commit: bool = True
 ) -> AdaptiveDeletionResult:
     """Delete only Phase 7 derived records for one authenticated owner."""
+    from app.agent.models import AgentActionProposal, AgentToolEvent
+    from app.agent.persistence import (
+        OP_AGENT_ACTION_CONFIRM,
+        _agent_confirm_request_hash,
+    )
+    from app.agent.schemas import (
+        APPLY_TODAY_ADJUSTMENT,
+        CREATE_REVIEW_NUTRITION_DRAFT,
+        CREATE_REVIEW_TRAINING_DRAFT,
+        DISMISS_POSTURE_RECHECK,
+        GENERATE_WEEKLY_REVIEW,
+    )
+    from app.nutrition.models import NutritionRecommendation
+
     owner = uuid.UUID(user_id)
+    adaptive_agent_tools = {
+        GENERATE_WEEKLY_REVIEW,
+        APPLY_TODAY_ADJUSTMENT,
+        CREATE_REVIEW_TRAINING_DRAFT,
+        CREATE_REVIEW_NUTRITION_DRAFT,
+        DISMISS_POSTURE_RECHECK,
+    }
+    proposal_ids = list(
+        (
+            await db.execute(
+                select(AgentActionProposal.proposal_id).where(
+                    AgentActionProposal.user_id == owner,
+                    AgentActionProposal.tool_name.in_(adaptive_agent_tools),
+                )
+            )
+        ).scalars().all()
+    )
+    confirm_hashes = [
+        _agent_confirm_request_hash(proposal_id) for proposal_id in proposal_ids
+    ]
+    agent_idempotency_count = 0
+    if confirm_hashes:
+        agent_idempotency_result = await db.execute(
+            delete(IdempotencyRecord).where(
+                IdempotencyRecord.user_id == owner,
+                IdempotencyRecord.operation == OP_AGENT_ACTION_CONFIRM,
+                IdempotencyRecord.request_hash.in_(confirm_hashes),
+            )
+        )
+        agent_idempotency_count = agent_idempotency_result.rowcount or 0
+    await db.execute(
+        delete(AgentToolEvent).where(
+            AgentToolEvent.user_id == owner,
+            AgentToolEvent.tool_name.in_(adaptive_agent_tools),
+        )
+    )
+    await db.execute(
+        delete(AgentActionProposal).where(
+            AgentActionProposal.user_id == owner,
+            AgentActionProposal.tool_name.in_(adaptive_agent_tools),
+        )
+    )
     adjustment_ids = select(TrainingDayAdjustment.adjustment_id).where(
         TrainingDayAdjustment.user_id == owner
+    )
+    review_ids = select(TrainingWeeklyReview.review_id).where(
+        TrainingWeeklyReview.user_id == owner
+    )
+    await db.execute(
+        update(TrainingPlanVersion)
+        .where(TrainingPlanVersion.origin_weekly_review_id.in_(review_ids))
+        .values(origin_weekly_review_id=None)
+    )
+    await db.execute(
+        update(NutritionRecommendation)
+        .where(NutritionRecommendation.origin_weekly_review_id.in_(review_ids))
+        .values(origin_weekly_review_id=None)
     )
     item_result = await db.execute(
         delete(TrainingDayAdjustmentItem).where(
@@ -1034,7 +1111,15 @@ async def delete_adaptive_data(
     idempotency_result = await db.execute(
         delete(IdempotencyRecord).where(
             IdempotencyRecord.user_id == owner,
-            IdempotencyRecord.operation == OP_TODAY_ADJUSTMENT,
+            IdempotencyRecord.operation.in_(
+                {
+                    OP_TODAY_ADJUSTMENT,
+                    OP_WEEKLY_REVIEW_GENERATE,
+                    OP_REVIEW_TRAINING_DRAFT,
+                    OP_REVIEW_NUTRITION_DRAFT,
+                    OP_POSTURE_RECHECK_DISMISS,
+                }
+            ),
         )
     )
     if commit:
@@ -1044,7 +1129,8 @@ async def delete_adaptive_data(
         adjustment_items=item_result.rowcount or 0,
         weekly_reviews=review_result.rowcount or 0,
         posture_dismissals=dismissal_result.rowcount or 0,
-        idempotency_records=idempotency_result.rowcount or 0,
+        idempotency_records=(idempotency_result.rowcount or 0)
+        + agent_idempotency_count,
     )
 
 

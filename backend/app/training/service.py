@@ -231,6 +231,11 @@ async def _version_to_view(db: AsyncSession, version: TrainingPlanVersion) -> Pl
         ))
     return PlanVersionView(
         plan_version_id=str(version.plan_version_id),
+        origin_weekly_review_id=(
+            str(version.origin_weekly_review_id)
+            if version.origin_weekly_review_id
+            else None
+        ),
         requested_goal=version.requested_goal,
         weekly_frequency=version.weekly_frequency,
         session_duration_minutes=version.session_duration_minutes,

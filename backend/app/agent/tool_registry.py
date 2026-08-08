@@ -54,6 +54,8 @@ from app.agent.schemas import (
     SideEffectClass,
     TodayCheckinDisplayView,
     TodayCheckinProviderView,
+    TodayAdjustmentAvailabilityDisplayView,
+    TodayAdjustmentAvailabilityProviderView,
     TodayTrainingDisplayView,
     TodayTrainingProviderView,
     TrainingDraftDisplayView,
@@ -62,6 +64,9 @@ from app.agent.schemas import (
     TrainingExerciseProviderView,
     WeightTrendDisplayView,
     WeightTrendProviderView,
+    WeeklyReviewInput,
+    WeeklyReviewSummaryDisplayView,
+    WeeklyReviewSummaryProviderView,
 )
 from pydantic import BaseModel, ValidationError
 
@@ -249,6 +254,22 @@ READ_TOOLS: Dict[str, ReadToolSpec] = {
             TodayTrainingProviderView,
             TodayTrainingDisplayView,
             read_tools.adapt_get_today_training,
+        ),
+        _spec(
+            "get_today_adjustment_availability",
+            _TRAINING_TODAY_ENTRIES,
+            EmptyToolInput,
+            TodayAdjustmentAvailabilityProviderView,
+            TodayAdjustmentAvailabilityDisplayView,
+            read_tools.adapt_get_today_adjustment_availability,
+        ),
+        _spec(
+            "get_weekly_review_summary",
+            _PLAN_ENTRIES,
+            WeeklyReviewInput,
+            WeeklyReviewSummaryProviderView,
+            WeeklyReviewSummaryDisplayView,
+            read_tools.adapt_get_weekly_review_summary,
         ),
         _spec(
             "get_training_exercise",

@@ -2,11 +2,8 @@
 //
 // Strict parsing tests for the Phase 7 weekly review snapshot models.
 //
-// The weekly review endpoints are owned by Codex Task 3 and are not yet
-// implemented on the backend. These tests pin the typed client contract
-// (proposed, spec-aligned snake_case) used by mock-backed provider/widget
-// tests; any real response that does not match fails closed rather than
-// fabricating a review. No raw health values are asserted here.
+// These tests pin the strict backend snake_case contract; any real response
+// that does not match fails closed rather than fabricating a review.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posture_app/models/adaptive_review.dart';
 
@@ -15,6 +12,7 @@ Map<String, dynamic> _snapshotJson() => {
   'plan_version_id': 'pv-1',
   'week_index': 1,
   'review_version': 1,
+  'input_fingerprint': 'a' * 64,
   'period_start': '2026-07-20',
   'period_end': '2026-07-26',
   'execution': {
@@ -40,8 +38,26 @@ Map<String, dynamic> _snapshotJson() => {
     'unavailable': 0,
   },
   'weight_trend': {'available': true, 'direction': 'rising'},
-  'nutrition': {'state': 'active', 'age_days': 12, 'refresh_available': true},
-  'posture': {'status': 'due'},
+  'nutrition': {
+    'state': 'active',
+    'age_days': 12,
+    'refresh_available': false,
+    'unavailable_reason': null,
+    'recommendation_id': 'nr-1',
+    'version': 3,
+  },
+  'posture': {
+    'status': 'due',
+    'baseline_at': '2026-07-01T00:00:00Z',
+    'baseline_sources': ['self_test'],
+    'comparison_sources': <String>[],
+  },
+  'safety': {
+    'gate': 'eligible',
+    'blocked': false,
+    'reason_codes': <String>[],
+    'missing_fields': <String>[],
+  },
   'proposals': [
     {'code': 'keep_current_plan', 'state': 'proposal'},
     {
@@ -59,6 +75,7 @@ void main() {
       expect(s.reviewId, 'rv-1');
       expect(s.weekIndex, 1);
       expect(s.reviewVersion, 1);
+      expect(s.inputFingerprint, 'a' * 64);
       expect(s.periodStart, DateTime.parse('2026-07-20'));
       expect(s.periodEnd, DateTime.parse('2026-07-26'));
       expect(s.execution.completed, 2);
@@ -70,8 +87,11 @@ void main() {
       expect(s.weightTrend.direction, WeightTrendDirection.rising);
       expect(s.nutrition.state, NutritionRecommendationState.active);
       expect(s.nutrition.ageDays, 12);
-      expect(s.nutrition.refreshAvailable, isTrue);
+      expect(s.nutrition.refreshAvailable, isFalse);
+      expect(s.nutrition.unavailableReason, isNull);
       expect(s.posture.status, PostureRecheckStatus.due);
+      expect(s.posture.baselineSources, [PostureAssessmentSource.selfTest]);
+      expect(s.safety.blocked, isFalse);
       expect(s.proposals.length, 2);
       expect(s.proposals[0].code, ReviewProposalCode.keepCurrentPlan);
       expect(s.proposals[1].code, ReviewProposalCode.offerTrainingDraft);
@@ -80,6 +100,22 @@ void main() {
 
     test('missing required field fails closed', () {
       final json = _snapshotJson()..remove('review_id');
+      expect(() => WeeklyReviewSnapshot.fromJson(json), throwsFormatException);
+    });
+
+    test('malformed input fingerprint fails closed', () {
+      final json = _snapshotJson()..['input_fingerprint'] = 'not-a-sha256';
+      expect(() => WeeklyReviewSnapshot.fromJson(json), throwsFormatException);
+    });
+
+    test('malformed safety codes fail closed', () {
+      final json = _snapshotJson()
+        ..['safety'] = {
+          'gate': 'eligible',
+          'blocked': true,
+          'reason_codes': 'red_flag',
+          'missing_fields': <String>[],
+        };
       expect(() => WeeklyReviewSnapshot.fromJson(json), throwsFormatException);
     });
 
@@ -118,13 +154,25 @@ void main() {
     });
 
     test('unknown posture status fails closed', () {
-      final json = _snapshotJson()..['posture'] = {'status': 'overdue'};
+      final json = _snapshotJson()
+        ..['posture'] = {
+          'status': 'overdue',
+          'baseline_sources': <String>[],
+          'comparison_sources': <String>[],
+        };
       expect(() => WeeklyReviewSnapshot.fromJson(json), throwsFormatException);
     });
 
     test('unknown nutrition state fails closed', () {
       final json = _snapshotJson()
-        ..['nutrition'] = {'state': 'expired', 'age_days': 1};
+        ..['nutrition'] = {
+          'state': 'expired',
+          'age_days': 1,
+          'refresh_available': false,
+          'unavailable_reason': null,
+          'recommendation_id': 'nr-1',
+          'version': 3,
+        };
       expect(() => WeeklyReviewSnapshot.fromJson(json), throwsFormatException);
     });
 
@@ -163,7 +211,12 @@ void main() {
 
     test('posture unavailable with reason parses', () {
       final json = _snapshotJson()
-        ..['posture'] = {'status': 'unavailable', 'reason': 'no_baseline'};
+        ..['posture'] = {
+          'status': 'unavailable',
+          'reason': 'no_baseline',
+          'baseline_sources': <String>[],
+          'comparison_sources': <String>[],
+        };
       final s = WeeklyReviewSnapshot.fromJson(json);
       expect(s.posture.status, PostureRecheckStatus.unavailable);
       expect(s.posture.reason, 'no_baseline');
@@ -176,10 +229,56 @@ void main() {
           'comparison_signal': 'changed',
           'baseline_at': '2026-06-01',
           'comparison_at': '2026-08-01',
+          'baseline_sources': ['self_test'],
+          'comparison_sources': ['self_test', 'ai_photo'],
         };
       final s = WeeklyReviewSnapshot.fromJson(json);
       expect(s.posture.status, PostureRecheckStatus.comparisonAvailable);
       expect(s.posture.comparisonSignal, PostureComparisonSignal.changed);
+      expect(s.posture.comparisonSources, [
+        PostureAssessmentSource.selfTest,
+        PostureAssessmentSource.aiPhoto,
+      ]);
+    });
+
+    test('nutrition unavailable requires a reason and disables refresh', () {
+      final json = _snapshotJson()
+        ..['nutrition'] = {
+          'state': 'unavailable',
+          'age_days': 3,
+          'refresh_available': false,
+          'unavailable_reason': 'nutrition_runtime_disabled',
+          'recommendation_id': 'nr-1',
+          'version': 3,
+        };
+      final snapshot = WeeklyReviewSnapshot.fromJson(json);
+      expect(
+        snapshot.nutrition.state,
+        NutritionRecommendationState.unavailable,
+      );
+      expect(
+        snapshot.nutrition.unavailableReason,
+        'nutrition_runtime_disabled',
+      );
+    });
+
+    test('nutrition state and identity combinations fail closed', () {
+      final refreshActive = _snapshotJson();
+      (refreshActive['nutrition']
+              as Map<String, dynamic>)['refresh_available'] =
+          true;
+      expect(
+        () => WeeklyReviewSnapshot.fromJson(refreshActive),
+        throwsFormatException,
+      );
+      final partialIdentity = _snapshotJson();
+      (partialIdentity['nutrition']
+              as Map<String, dynamic>)['recommendation_id'] =
+          null;
+      expect(
+        () => WeeklyReviewSnapshot.fromJson(partialIdentity),
+        throwsFormatException,
+      );
     });
 
     test('malformed counts fail closed (not silently coerced to zero)', () {

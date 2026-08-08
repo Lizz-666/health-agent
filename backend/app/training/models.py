@@ -67,6 +67,10 @@ class TrainingPlanVersion(Base):
             "user_id",
             "status",
         ),
+        Index(
+            "ix_training_plan_versions_origin_weekly_review_id",
+            "origin_weekly_review_id",
+        ),
     )
 
     plan_version_id: Mapped[uuid.UUID] = mapped_column(
@@ -74,6 +78,16 @@ class TrainingPlanVersion(Base):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    origin_weekly_review_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "training_weekly_reviews.review_id",
+            name="fk_training_plan_versions_origin_weekly_review_id",
+            ondelete="SET NULL",
+            use_alter=True,
+        ),
+        nullable=True,
     )
 
     requested_goal: Mapped[str] = mapped_column(String(30), nullable=False)

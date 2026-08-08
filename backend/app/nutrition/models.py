@@ -37,6 +37,10 @@ class NutritionRecommendation(Base):
         ),
         Index("ix_nutrition_recommendations_user_status", "user_id", "status"),
         Index(
+            "ix_nutrition_recommendations_origin_weekly_review_id",
+            "origin_weekly_review_id",
+        ),
+        Index(
             "uq_nutrition_recommendations_one_draft",
             "user_id",
             unique=True,
@@ -64,6 +68,15 @@ class NutritionRecommendation(Base):
     source_recommendation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("nutrition_recommendations.recommendation_id"),
+        nullable=True,
+    )
+    origin_weekly_review_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "training_weekly_reviews.review_id",
+            name="fk_nutrition_recommendations_origin_weekly_review_id",
+            ondelete="SET NULL",
+        ),
         nullable=True,
     )
     superseded_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -111,6 +124,7 @@ _IMMUTABLE_FIELDS = (
     "user_id",
     "version",
     "source_recommendation_id",
+    "origin_weekly_review_id",
     "source_context_fingerprint",
     "profile_version",
     "training_plan_version_id",
