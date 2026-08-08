@@ -946,6 +946,12 @@ async def _delete_oss_objects(
     # an expired-lease worker cannot execute the same live operation in parallel.
     if op.user_id is not None:
         await acquire_user_transaction_lock(db, str(op.user_id))
+        # A retry worker may have completed while this caller waited for the
+        # lock. Refresh before touching OSS so stale ORM state cannot replay
+        # an already completed external deletion.
+        await db.refresh(op)
+        if op.status in TERMINAL_STATUSES or op.user_id is None:
+            return True
     try:
         for key in photo_keys:
             await object_store.delete_object(key)
