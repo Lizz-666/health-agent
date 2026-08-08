@@ -1,6 +1,6 @@
 # Active Agent Tasks
 
-> 当前开发协调账本，不是产品规格。最后核对：2026-08-08。
+> 当前开发协调账本，不是产品规格。最后核对：2026-08-09。
 > 所有会话先遵守根目录 `AGENTS.md` 的“开发总纲”，再读取本文件中与当前 Task 对应的行和链接。
 
 ## Current Initiative
@@ -55,7 +55,7 @@
 | Phase 7 Task 1 | Codex sole high-risk backend writer and Gate 1 acceptor | `codex/phase7-implementation` / `health-worktrees/phase7-implementation` | `5edfa0fcaced135fd434629945f60c49095e6665` | `verified` | 接受实现 `a27dddc944973d25e1c974f709068c67ae6f2d00`；本地 Full 1615/0/0、PostgreSQL 25/25，CI `30744694166` 的 Fast/Flutter/Full 全绿；审查报告 `docs/reports/phase7-gate1-review-2026-08-02.md`。 |
 | Phase 7 Task 2 | One OpenCode + Claude Flutter writer; Codex review/fixes/integration | `codex/phase7-flutter` / `health-worktrees/phase7-flutter` | `fbf96d389de1eb36689411fb13eaf2ce91ad34fd` | `verified` | OpenCode 交接后由 Codex 接管修复和冷审；Task 分支提交 `2fa6c3fc9e4badc84b9519e823a6674b64561e89`，接受的集成实现为 `52057d102941de3b3a66361ee07b895bee64ada7`。本地 Flutter analyze、122 个目标测试和 468 个全量测试通过；CI `30752998183` 三项全绿，P0/P1/P2 为零。 |
 | Phase 7 Task 3 | Codex sole cross-domain writer and Gate 3 acceptor | `codex/phase7-implementation` / `health-worktrees/phase7-implementation` | Gate 2 closure `6b0e3b1e9fea2f65e0a1790cabdaba5c2cd69a84` | `verified` | 接受实现 `6c69f9ee07de732f3adda73cecf4e9591e0252d0`：周复盘聚合、训练/营养草案来源、体态复查状态/对比、Agent allowlist/确认/隐私与跨域删除完成；本地 Full 1617/38 条件 PG skips、Flutter 472，严格 CI `31267141017` 为 1655/0/0、PostgreSQL 27/27，P0/P1/P2 为零。 |
-| Phase 7 Task 4 | Codex sole E2E writer, cold reviewer, CI operator, and final acceptor | same implementation branch/worktree | accepted Gate 3 SHA `6c69f9ee07de732f3adda73cecf4e9591e0252d0` | `planned` | 完整合成 E2E、Android enabled/disabled、严格 Full/PostgreSQL、exact-SHA CI、退出审计；不得 merge/deploy/write main。 |
+| Phase 7 Task 4 | Codex sole E2E writer, cold reviewer, CI operator, and final acceptor | same implementation branch/worktree | accepted Gate 3 SHA `6c69f9ee07de732f3adda73cecf4e9591e0252d0` | `in_progress` | 从 Gate 3 closure `936c5751c3f95c4247bd9fb0844ff9b61d8ec167` 开始完整合成 E2E、Android enabled/disabled、严格 Full/PostgreSQL、exact-SHA CI、退出审计；不得 merge/deploy/write main。 |
 
 ## Integration Order
 
