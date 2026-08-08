@@ -445,6 +445,14 @@ analyze 无问题且 384 tests，Android API 34 上启用/禁用营养流程 2/2
 
 ## 11. 阶段 7：弹性闭环与综合复盘
 
+> 状态（2026-08-09）：**阶段 7 已完成并通过 Gate 4 独立验收**。
+> 接受实现 SHA 为 `56058591cb970c5bfa0627bb0d5effadbaa8fcc3`；本地 Full
+> `1627 passed / 38` 个条件 PostgreSQL skips、Flutter `472`、Android API 34
+> enabled/unavailable `2/2`，严格 exact-SHA CI run `31271328357` 为
+> `1665 passed / 0 skipped`、PostgreSQL `27/27`，Fast/Flutter/Full 全通过。
+> 该状态仅覆盖合成数据个人开发版，不授权 merge、部署、真实健康数据处理或公开发布。
+> 逐条证据见 `docs/reports/phase7-codex-exit-audit-2026-08-09.md`。
+
 ### 目标
 
 让系统根据现实执行情况做出保守、可解释的调整。
