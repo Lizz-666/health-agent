@@ -146,3 +146,7 @@ def test_0011_postgresql_downgrade_and_upgrade(pg_dsn):
     assert downgrade.returncode == 0, downgrade.stderr
     upgrade = _alembic("upgrade", "0011_adaptive_reviews", database_url=pg_dsn)
     assert upgrade.returncode == 0, upgrade.stderr
+    # This fixture database is shared across PostgreSQL tests. Verify 0011 at
+    # its own boundary, then restore the current schema for later ORM tests.
+    restore = _alembic("upgrade", "head", database_url=pg_dsn)
+    assert restore.returncode == 0, restore.stderr
