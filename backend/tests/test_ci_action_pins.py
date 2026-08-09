@@ -122,8 +122,16 @@ def test_flutter_test_pipeline_propagates_failures_through_tee():
     assert "flutter test 2>&1 | tee ../flutter-test.log" in step
 
 
-def test_phase8_acceptance_log_is_written_outside_the_worktree():
+def test_ci_summary_logs_are_written_outside_the_worktree():
     text = CI_PATH.read_text(encoding="utf-8")
+    for name in ("fast", "full"):
+        assert (
+            f"VERIFY_SUMMARY_FILE: ${{{{ runner.temp }}}}/{name}-summary.txt"
+            in text
+        )
+        assert f"path: ${{{{ runner.temp }}}}/{name}-summary.txt" in text
+        assert f"VERIFY_SUMMARY_FILE: {name}-summary.txt" not in text
+
     start = text.index("- name: Run isolated real-HTTP and evaluation acceptance")
     end = text.index("\n      - name:", start + 1)
     step = text[start:end]

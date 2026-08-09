@@ -88,7 +88,7 @@ jobs:
           # The default GITHUB_TOKEN lets test_ci_action_pins authoritatively
           # verify each pinned action SHA resolves to its declared tag.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERIFY_SUMMARY_FILE: fast-summary.txt
+          VERIFY_SUMMARY_FILE: ${{ runner.temp }}/fast-summary.txt
           VERIFY_ARTIFACT_NAME: ci-fast-summary
           VERIFY_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: python scripts/verify.py fast
@@ -98,7 +98,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-fast-summary
-          path: fast-summary.txt
+          path: ${{ runner.temp }}/fast-summary.txt
           if-no-files-found: warn
           retention-days: 14
 
@@ -185,7 +185,7 @@ jobs:
       # Full CI contract: ANY skipped test is a hard failure, proving the
       # PostgreSQL-backed tests actually ran (zero PG skips).
       VERIFY_REQUIRE_PG: "1"
-      VERIFY_SUMMARY_FILE: full-summary.txt
+      VERIFY_SUMMARY_FILE: ${{ runner.temp }}/full-summary.txt
       VERIFY_ARTIFACT_NAME: ci-full-summary
       VERIFY_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
     steps:
@@ -226,7 +226,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-full-summary
-          path: full-summary.txt
+          path: ${{ runner.temp }}/full-summary.txt
           if-no-files-found: warn
           retention-days: 30
 
