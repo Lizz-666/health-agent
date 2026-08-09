@@ -185,7 +185,6 @@ jobs:
       # Full CI contract: ANY skipped test is a hard failure, proving the
       # PostgreSQL-backed tests actually ran (zero PG skips).
       VERIFY_REQUIRE_PG: "1"
-      VERIFY_SUMMARY_FILE: ${{ runner.temp }}/full-summary.txt
       VERIFY_ARTIFACT_NAME: ci-full-summary
       VERIFY_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
     steps:
@@ -220,6 +219,7 @@ jobs:
           # Authenticate action-pin checks so Full's zero-skip contract is not
           # affected by the shared unauthenticated GitHub API rate limit.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERIFY_SUMMARY_FILE: ${{ runner.temp }}/full-summary.txt
         run: python scripts/verify.py full
       - name: Upload summary artifact
         if: always()

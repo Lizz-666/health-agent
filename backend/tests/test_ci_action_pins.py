@@ -132,6 +132,18 @@ def test_ci_summary_logs_are_written_outside_the_worktree():
         assert f"path: ${{{{ runner.temp }}}}/{name}-summary.txt" in text
         assert f"VERIFY_SUMMARY_FILE: {name}-summary.txt" not in text
 
+    full_job_start = text.index("  full:")
+    full_steps_start = text.index("\n    steps:", full_job_start)
+    assert "runner.temp" not in text[full_job_start:full_steps_start]
+    full_verify_start = text.index(
+        "- name: Full verify (lint + complete tests + PostgreSQL 16 + git diff)"
+    )
+    full_verify_end = text.index("\n      - name:", full_verify_start + 1)
+    assert (
+        "VERIFY_SUMMARY_FILE: ${{ runner.temp }}/full-summary.txt"
+        in text[full_verify_start:full_verify_end]
+    )
+
     start = text.index("- name: Run isolated real-HTTP and evaluation acceptance")
     end = text.index("\n      - name:", start + 1)
     step = text[start:end]
