@@ -624,6 +624,26 @@ async def _has_purgeable_data(db: AsyncSession, user_id: UUID) -> bool:
         ).first()
         if adaptive is not None:
             return True
+    # Phase 8 closes the historical account-deletion gap: independently owned
+    # base health/training/nutrition rows must make the broad scope non-empty.
+    from app.health.models import DailyCheckIn, HealthProfile, WeightRecord
+    from app.nutrition.models import NutritionRecommendation
+    from app.training.models import TrainingPlanVersion
+
+    for domain_model, pk_col in (
+        (HealthProfile, HealthProfile.id),
+        (DailyCheckIn, DailyCheckIn.id),
+        (WeightRecord, WeightRecord.id),
+        (TrainingPlanVersion, TrainingPlanVersion.plan_version_id),
+        (NutritionRecommendation, NutritionRecommendation.recommendation_id),
+    ):
+        domain_row = (
+            await db.execute(
+                select(pk_col).where(domain_model.user_id == user_id).limit(1)
+            )
+        ).first()
+        if domain_row is not None:
+            return True
     return False
 
 
@@ -725,22 +745,20 @@ async def _delete_db_health_data(db: AsyncSession, user_id: UUID) -> List[str]:
         delete(PostureSafetySignal).where(PostureSafetySignal.user_id == user_id)
     )
     done.append("delete_safety_signals")
-    from app.training.persistence import delete_adaptive_data
+    from app.training.persistence import delete_all_training_data
 
-    await delete_adaptive_data(db, str(user_id), commit=False)
-    done.append("delete_training_adaptive_data")
-    await db.execute(
-        delete(IdempotencyRecord).where(IdempotencyRecord.user_id == user_id)
-    )
-    done.append("delete_idempotency_records")
-    # Phase 5 reviewed cross-domain extension (spec Persistence; ADR-0004):
-    # account_deletion also removes the four Agent-owned tables. Delete
-    # proposals + tool_events before runs (FKs reference runs); consents have no
-    # such dependency. This does NOT repair the pre-existing platform gap of
-    # independently owned health/training domain-row deletion, and the
-    # idempotency delete above already covers the three Agent namespaces
-    # (agent_action_confirm / agent_consent_grant / agent_consent_withdraw) by
-    # user_id, alongside all other operations' rows.
+    await delete_all_training_data(db, str(user_id), commit=False)
+    done.append("delete_training_data")
+    from app.nutrition.persistence import delete_all_nutrition_data
+
+    await delete_all_nutrition_data(db, str(user_id), commit=False)
+    done.append("delete_nutrition_data")
+    from app.health.service import delete_all_health_data
+
+    await delete_all_health_data(db, str(user_id))
+    done.append("delete_health_data")
+    # Delete Agent children before their runs. Shared idempotency is removed
+    # after every domain helper so no later helper can recreate or depend on it.
     await db.execute(
         delete(AgentToolEvent).where(AgentToolEvent.user_id == user_id)
     )
@@ -755,6 +773,10 @@ async def _delete_db_health_data(db: AsyncSession, user_id: UUID) -> List[str]:
         delete(AgentCloudConsent).where(AgentCloudConsent.user_id == user_id)
     )
     done.append("delete_agent_cloud_consents")
+    await db.execute(
+        delete(IdempotencyRecord).where(IdempotencyRecord.user_id == user_id)
+    )
+    done.append("delete_idempotency_records")
     return done
 
 

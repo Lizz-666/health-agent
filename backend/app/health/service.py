@@ -24,7 +24,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, NotFound
@@ -53,6 +53,18 @@ WEIGHT_SOURCE_MANUAL = "manual"
 
 # Activity grid default window / cap (inclusive days).
 ACTIVITY_GRID_DEFAULT_DAYS = 28
+
+
+async def delete_all_health_data(db: AsyncSession, user_id: str) -> None:
+    """Delete every health-domain row for an account purge without committing.
+
+    Public scoped deletion keeps its existing narrower behavior. The purge
+    orchestrator owns the surrounding user lock, transaction, and commit.
+    """
+    owner = _to_uuid(user_id)
+    await db.execute(delete(DailyCheckIn).where(DailyCheckIn.user_id == owner))
+    await db.execute(delete(WeightRecord).where(WeightRecord.user_id == owner))
+    await db.execute(delete(HealthProfile).where(HealthProfile.user_id == owner))
 ACTIVITY_GRID_MAX_DAYS = 366
 
 

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.models import AgentActionProposal, AgentRun, AgentToolEvent
@@ -601,6 +601,31 @@ async def delete_nutrition_data(
         raise
 
 
+async def delete_all_nutrition_data(
+    db: AsyncSession, user_id: str, *, commit: bool = True
+) -> int:
+    """Delete all owned recommendation versions for an account purge.
+
+    Agent references and shared idempotency are removed by the outer account
+    purge. Self-references are cleared first for identical SQLite/PostgreSQL FK
+    behavior. This helper never mutates the health profile.
+    """
+    owner = uuid.UUID(user_id)
+    await db.execute(
+        update(NutritionRecommendation)
+        .where(NutritionRecommendation.user_id == owner)
+        .values(source_recommendation_id=None, superseded_by_id=None)
+    )
+    result = await db.execute(
+        delete(NutritionRecommendation).where(
+            NutritionRecommendation.user_id == owner
+        )
+    )
+    if commit:
+        await db.commit()
+    return result.rowcount or 0
+
+
 __all__ = [
     "OP_DRAFT_GENERATE",
     "OP_DRAFT_CONFIRM",
@@ -620,4 +645,5 @@ __all__ = [
     "create_replacement_active",
     "create_replacement_active_core",
     "delete_nutrition_data",
+    "delete_all_nutrition_data",
 ]

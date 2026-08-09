@@ -1134,6 +1134,49 @@ async def delete_adaptive_data(
     )
 
 
+async def delete_all_training_data(
+    db: AsyncSession, user_id: str, *, commit: bool = True
+) -> None:
+    """Delete the complete owned training graph for an account purge.
+
+    Adaptive rows go first because they reference plans, sessions, and
+    prescriptions and because their review origins must be unlinked from
+    training/nutrition versions before review deletion. The caller owns the
+    user lock; this helper performs no independent locking.
+    """
+    owner = uuid.UUID(user_id)
+    await delete_adaptive_data(db, user_id, commit=False)
+    plan_ids = select(TrainingPlanVersion.plan_version_id).where(
+        TrainingPlanVersion.user_id == owner
+    )
+    session_ids = select(TrainingSession.session_id).where(
+        TrainingSession.plan_version_id.in_(plan_ids)
+    )
+    await db.execute(
+        delete(TrainingSessionFeedback).where(
+            TrainingSessionFeedback.user_id == owner
+        )
+    )
+    await db.execute(
+        delete(TrainingSessionSubstitution).where(
+            TrainingSessionSubstitution.user_id == owner
+        )
+    )
+    await db.execute(
+        delete(TrainingPrescription).where(
+            TrainingPrescription.session_id.in_(session_ids)
+        )
+    )
+    await db.execute(
+        delete(TrainingSession).where(TrainingSession.plan_version_id.in_(plan_ids))
+    )
+    await db.execute(
+        delete(TrainingPlanVersion).where(TrainingPlanVersion.user_id == owner)
+    )
+    if commit:
+        await db.commit()
+
+
 async def load_sessions(
     db: AsyncSession, plan_version_id: uuid.UUID
 ) -> list[TrainingSession]:
@@ -1200,6 +1243,7 @@ __all__ = [
     "list_effective_plan_adjustments",
     "load_adjustment_items",
     "delete_adaptive_data",
+    "delete_all_training_data",
     "load_sessions",
     "load_prescriptions",
 ]
