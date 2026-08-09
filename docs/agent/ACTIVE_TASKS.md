@@ -5,6 +5,10 @@
 
 ## Current Initiative
 
+- 阶段：Phase 8 个人开发版验收，状态 `in_progress`。Gate 0 精确基线为 Phase 7 closure `36be9a0f0cd989f32c8f4f7f7b9e2bc5fb4c66e6`；当前只允许在 `codex/phase8-spec-plan` / `health-worktrees/phase8-spec-plan` 写规格、计划、ADR、账本和 Gate 0 审查报告，不写业务代码。
+- Phase 8 已批准边界：图示自测为硬门、照片仅为另行同意的可选合成 smoke；脚本化 provider 为硬门、live 云模型不作为门；Android 模拟器为硬门、实体机可选；离线只要求明确失败/安全重试而非完整离线业务；reset 清除完整合成账户的全部域数据。
+- Phase 8 采用混合单写入者模式：Gate 0、测试隔离、跨域删除、真实 HTTP、评测、CI、最终 Android/E2E 和冷审由 Codex；只有 Gate 2 合约冻结后的 Flutter 自动化锚点与驱动 Task 3 可交给一个 OpenCode + Claude 会话。其提示词由 Codex 在 accepted Gate 2 exact SHA 后提供，当前不得提前实现。
+- Phase 8 当前契约位于 `docs/specs/platform/2026-08-09-personal-development-acceptance.md`、`docs/plans/platform/2026-08-09-personal-development-acceptance.md` 和 ADR-0008。现有 `FakeDio` Android tests 不是 Phase 8 真实链路证据；内部 `account_deletion` 对基础 health/training/nutrition 的覆盖缺口必须在 Gate 1 由 Codex 关闭。
 - 阶段：Phase 7 弹性闭环与综合复盘，状态 `verified`。Gate 4 接受实现 SHA `7bee078b3456c71ea902446e3d92a8cd9d6c1e06`；本地 Full 1627 passed/38 个条件 PG skips、Flutter analyze clean + 472 tests、Android API 34 enabled/unavailable 2/2，严格 exact-SHA CI run `31273365507` 为 1665 passed/0 failed/0 skipped、PostgreSQL 27/27，Fast/Flutter/Full 全绿。退出审计见 `docs/reports/phase7-codex-exit-audit-2026-08-09.md`。
 - Phase 7 已批准的产品边界：前台按钮可在最新确定性安全复核后直接应用同日小调整；Agent 写入仍为提案加独立确认；长期训练/营养变化只生成草案且不自动激活；体重趋势不参与训练决策；体态复查提醒仅为应用内每周期状态，不引入调度或系统通知。
 - Phase 7 采用有门禁的混合单写入者模式：Gate 0、后端状态机/迁移/安全契约、跨域复盘/Agent 权限和最终 E2E 由 Codex；Gate 1 后仅 Flutter Today/Plan/周复盘局部纵切可交给一个 OpenCode + Claude 会话，严格使用计划内 allowlist，Codex 在其写入期间只读。
@@ -42,6 +46,7 @@
 
 | Task | Executor | Branch / worktree | Base SHA | Status | Scope and coordination note |
 | --- | --- | --- | --- | --- | --- |
+| Phase 8 Task 0 | Codex specification, architecture, safety/privacy audit, task split, cold review, CI, and Gate 0 closure | `codex/phase8-spec-plan` / `health-worktrees/phase8-spec-plan` | `36be9a0f0cd989f32c8f4f7f7b9e2bc5fb4c66e6` | `in_progress` | 仅文档；收敛真实 HTTP、测试隔离、全域 reset/生产删除分离、失败矩阵、Android 边界和 Gates。Gate 0 关闭前不得写业务代码，也不启动 OpenCode。 |
 | Phase 3 Task 0 | Codex coordinator | `codex/phase3-spec-plan` / root worktree | `1818e74` | `committed` | 规格、来源/许可 pin、workout.cool 对照矩阵、Tasks 0-7 charters、CI 分层和实验评价口径；独立复核的 4 P1、5 P2、2 P3 已全部关闭；commit `2ed211a`。 |
 | Phase 3 Tasks 1-7 | OpenCode + Claude implementation; Codex final acceptance and fixes | `codex/phase3-opencode-implementation` / `health-worktrees/phase3-opencode-implementation` | `c49eb618759ff85d7235f515b57c9d3fad38d6cb` | `merged` | OpenCode handoff `9ccaa35` failed first-pass acceptance. Codex closed findings in `423bf55`; local Full `989 passed`, PostgreSQL `13/13`; integration closure `e7fd6d9` and CI dependency test fix `8459384`. PR #1 remote Fast/Full both pass at `8459384`; draft remains unmerged. |
 | Phase 4 Tasks 0-7 | OpenCode + selected Claude model; Codex final acceptance and fixes | `codex/phase4-opencode-implementation` plus review worktree `health-worktrees/phase4-codex-review` | `b7f8391e17a2adbb4ae52d012b360d17ff4550fd` | `verified` | OpenCode handoff `2a409e8` failed first-pass acceptance. Codex closed week progression, current-plan validation, substitution safety, full idempotency, duration, profile-equality, SVG, and execution-state findings in `c308189`; audit commit `dd31d21`; status commit `e560552`. Local Full: 1074 passed/0 failed/0 skipped, PostgreSQL 18/18; Flutter analyze clean + 322 tests. Exact-SHA CI run `30272758915` on `e560552`: Fast/Flutter/Full all success. Audit: `docs/reports/phase4-codex-exit-audit-2026-07-27.md`. PR #2 remains draft and unmerged. |
