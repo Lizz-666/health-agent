@@ -627,6 +627,7 @@ class DraftInput {
 }
 
 class ConfirmInput {
+  final String expectedPlanVersionId;
   final String fitnessGoal;
   final int weeklyFrequency;
   final int sessionDurationMinutes;
@@ -636,6 +637,7 @@ class ConfirmInput {
   final String idempotencyKey;
 
   const ConfirmInput({
+    required this.expectedPlanVersionId,
     required this.fitnessGoal,
     required this.weeklyFrequency,
     required this.sessionDurationMinutes,
@@ -646,6 +648,7 @@ class ConfirmInput {
   });
 
   Map<String, dynamic> toJson() => {
+    'expected_plan_version_id': expectedPlanVersionId,
     'fitness_goal': fitnessGoal,
     'weekly_frequency': weeklyFrequency,
     'session_duration_minutes': sessionDurationMinutes,

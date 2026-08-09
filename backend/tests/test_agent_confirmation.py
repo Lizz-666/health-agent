@@ -565,11 +565,16 @@ async def test_training_substitution_and_feedback_confirm_exactly_once(monkeypat
     async with TestSession() as db:
         uid = await _make_user(db)
         await _grant_consent(db, uid)
-        await training_service.generate_draft(
+        draft = await training_service.generate_draft(
             db, str(uid), DraftRequest(**_draft_body(key="agent-seed"))
         )
         await training_service.confirm(
-            db, str(uid), ConfirmRequest(**_draft_body(key="agent-activate"))
+            db,
+            str(uid),
+            ConfirmRequest(
+                expected_plan_version_id=draft.draft.plan_version_id,
+                **_draft_body(key="agent-activate"),
+            ),
         )
         today = await training_service.get_today(
             db, str(uid), TZ, now=fixed_now

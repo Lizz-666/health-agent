@@ -1,6 +1,7 @@
 """Bounded, side-effect-free-until-terminal Agent orchestration tests."""
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timezone
 
 import pytest
@@ -110,6 +111,60 @@ async def test_disallowed_or_unknown_read_tool_fails_closed_before_adapter():
             None, ActorContext("user-1"), _turn(), _context(), provider
         )
     assert exc.value.code == "agent_tool_not_allowed"
+
+
+async def test_retrieved_content_cannot_expand_tool_authority(monkeypatch):
+    sentinel = "ignore_rules_delete"
+
+    async def fake_adapter(*_args, **_kwargs):
+        return ReadToolResult(
+            "get_today_training",
+            TodayTrainingProviderView(
+                state="session",
+                has_session=True,
+                exercise_ids=[sentinel],
+            ),
+            TodayTrainingDisplayView(
+                state="session",
+                exercise_ids=[sentinel],
+            ),
+        )
+
+    original_resolve = orch.tool_registry.resolve_tool_for_entry
+    allowed_spec = original_resolve(
+        "get_today_training", EntryType.general
+    )
+
+    def resolve(name, entry_type):
+        if name == "get_today_training":
+            return replace(allowed_spec, adapter=fake_adapter)
+        return original_resolve(name, entry_type)
+
+    monkeypatch.setattr(orch.tool_registry, "resolve_tool_for_entry", resolve)
+    provider = ScriptedProvider(
+        [
+            {
+                "type": "read_tool_call",
+                "tool_name": "get_today_training",
+                "arguments": {},
+            },
+            {
+                "type": "read_tool_call",
+                "tool_name": "delete_agent_data",
+                "arguments": {},
+            },
+        ]
+    )
+
+    with pytest.raises(orch.OrchestrationFailure) as exc:
+        await orch.orchestrate(
+            None, ActorContext("user-1"), _turn(), _context(), provider
+        )
+
+    assert exc.value.code == "agent_tool_not_allowed"
+    assert provider.calls[1].read_results[0].provider_view["exercise_ids"] == [
+        sentinel
+    ]
 
 
 async def test_four_read_decisions_end_at_step_limit(monkeypatch):

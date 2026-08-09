@@ -246,7 +246,12 @@ async def test_phase6_full_authenticated_lifecycle_and_scoped_delete(
         )
         assert draft.has_draft
         active_plan = await training_service.confirm(
-            db, user_id, ConfirmRequest(**_plan_request("phase6-training-confirm"))
+            db,
+            user_id,
+            ConfirmRequest(
+                expected_plan_version_id=draft.draft.plan_version_id,
+                **_plan_request("phase6-training-confirm"),
+            ),
     )
     assert active_plan.plan.plan_version_id
 

@@ -111,7 +111,14 @@ async def test_phase4_e2e_generate_confirm_today_substitute_feedback(eligible_us
                 assert p.exercise is not None
 
         # 2. Explicit confirm -> active, single active plan, version recorded.
-        confirmed = await service.confirm(db, uid, ConfirmRequest(**_draft_body(key="conf")))
+        confirmed = await service.confirm(
+            db,
+            uid,
+            ConfirmRequest(
+                expected_plan_version_id=draft.draft.plan_version_id,
+                **_draft_body(key="conf"),
+            ),
+        )
         assert confirmed.plan.status == "active"
         active = await service.get_active(db, uid)
         assert active.has_active is True

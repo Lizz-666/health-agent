@@ -742,7 +742,7 @@ async def test_review_training_draft_records_origin_without_activation(monkeypat
         )
         monkeypatch.setattr(
             review_service.training_service,
-            "evaluate_draft_request",
+            "evaluate_review_draft_request",
             lambda *_args, **_kwargs: _async_value(
                 SimpleNamespace(
                     draft=draft,

@@ -1,8 +1,8 @@
 """Explicit synthetic backend for Phase 8 real-device acceptance.
 
-Launch only from ``backend`` with::
+Launch only through the bounded repository runner::
 
-    python -m uvicorn tests.phase8_device_server:app --host 0.0.0.0 --port 8000
+    python scripts/phase8.py serve --host 127.0.0.1 --port 8000
 
 Production code never imports this module and has no selector for it.
 """
@@ -32,6 +32,7 @@ from tests.phase8_fixtures import (  # noqa: E402
     SYNTHETIC_PASSWORD,
     SYNTHETIC_PHONE,
 )
+from tests.phase8_loopback import install_loopback_guard  # noqa: E402
 
 
 settings.DEV_MODE = True
@@ -40,12 +41,12 @@ settings.DEV_ADMIN_PASSWORD = SYNTHETIC_PASSWORD
 settings.PHOTO_ANALYSIS_ENABLED = False
 settings.NUTRITION_RUNTIME_ENABLED = True
 settings.AGENT_RUNTIME_ENABLED = True
-settings.AGENT_PROVIDER_ID = "scripted-phase8"
+settings.AGENT_PROVIDER_ID = "dashscope"
 settings.AGENT_MODEL_ID = "synthetic-phase8"
-settings.AGENT_DISCLOSURE_VERSION = "synthetic-phase8-v1"
-settings.AGENT_AUDIT_HMAC_KEY = "phase8-synthetic-audit-key-only"
+settings.AGENT_DISCLOSURE_VERSION = "agent-cloud-v1"
+settings.AGENT_AUDIT_HMAC_KEY = "phase8-synthetic-audit-key-never-live"
 settings.AGENT_AUDIT_HMAC_KEY_VERSION = "phase8-v1"
-settings.DASHSCOPE_API_KEY = ""
+settings.DASHSCOPE_API_KEY = "synthetic-phase8-key-never-sent"
 settings.PURGE_ENCRYPTION_KEY = "8" * 64
 
 provider_controller = ProviderController()
@@ -74,6 +75,7 @@ app = create_phase8_test_app(
     control=control,
     lifespan=_device_lifespan,
 )
+install_loopback_guard(app)
 
 
 __all__ = ["PHASE8_DB_PATH", "PHASE8_DB_URL", "app", "control"]

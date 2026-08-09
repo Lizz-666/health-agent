@@ -146,9 +146,6 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   }
 
   Widget _body(BuildContext context, PlanState plan) {
-    if (plan.activeStatus == LoadStatus.data && plan.activePlan != null) {
-      return _ActiveView(plan: plan);
-    }
     if (plan.draftStatus == LoadStatus.data && plan.draft != null) {
       if (!_profileReady) return _profileRequired();
       return _DraftReview(
@@ -160,6 +157,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         onConfirm: _confirm,
         onRegenerate: _generate,
       );
+    }
+    if (plan.activeStatus == LoadStatus.data && plan.activePlan != null) {
+      return _ActiveView(plan: plan);
     }
     if (plan.draftStatus == LoadStatus.loading ||
         plan.activeStatus == LoadStatus.loading ||
@@ -221,13 +221,16 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   }
 
   Future<void> _confirm() async {
+    final draft = ref.read(planProvider).draft;
+    if (draft == null) return;
     final ok = await ref
         .read(planProvider.notifier)
         .confirm(
           ConfirmInput(
-            fitnessGoal: _goal,
-            weeklyFrequency: _frequency,
-            sessionDurationMinutes: _duration,
+            expectedPlanVersionId: draft.planVersionId,
+            fitnessGoal: draft.requestedGoal,
+            weeklyFrequency: draft.weeklyFrequency,
+            sessionDurationMinutes: draft.sessionDurationMinutes,
             equipmentBodyweight: _bodyweight,
             equipmentResistanceBand: _resistanceBand,
             ianaTimezone: _kDefaultTimezone,

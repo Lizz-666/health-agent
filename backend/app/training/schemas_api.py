@@ -36,6 +36,7 @@ class ConfirmRequest(_Idempotent):
     # The generation params are re-supplied so the server can rebuild the exact
     # request snapshot and recompute the decision fingerprint; a changed
     # profile / check-in / posture signal / version yields ``stale_context``.
+    expected_plan_version_id: UUID
     fitness_goal: str = Field(..., min_length=1, max_length=30)
     weekly_frequency: int = Field(..., ge=2, le=5)
     session_duration_minutes: Literal[15, 30, 45, 60]

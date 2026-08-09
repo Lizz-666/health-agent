@@ -217,6 +217,13 @@ plan version. Creating a nutrition draft records the same origin on the
 immutable nutrition recommendation version. Review proposal, draft, and active
 version remain distinct states.
 
+Training-plan confirmation requires `expected_plan_version_id` and rejects a
+different current pending draft as stale. When the draft has a weekly-review
+origin, confirmation rebuilds the latest owned review inputs and requires the
+origin review fingerprint, active plan, training proposal strategy, and bounded
+frequency/duration result to remain unchanged before running the current safety
+gate and activating the draft.
+
 `posture_recheck_dismissals` is an append-only per-owner/per-plan-cycle ordinary
 reminder event. It never hides safety or red-flag UI. Posture comparison is
 derived from the latest owned completed structured assessment at or before plan

@@ -128,7 +128,10 @@ jobs:
       - name: Flutter test
         id: flutter_test
         working-directory: app
-        run: flutter test 2>&1 | tee ../flutter-test.log
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter test 2>&1 | tee ../flutter-test.log
       - name: Build concise summary
         if: always()
         working-directory: app
@@ -225,4 +228,40 @@ jobs:
           name: ci-full-summary
           path: full-summary.txt
           if-no-files-found: warn
+          retention-days: 30
+
+  phase8-acceptance:
+    name: Phase 8 acceptance (synthetic HTTP + eval)
+    # This explicit, non-live acceptance surface is run for exact-SHA manual
+    # gates. It has no services, production credentials, photos, or cloud AI.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: Run isolated real-HTTP and evaluation acceptance
+        run: |
+          set -o pipefail
+          python scripts/phase8.py verify --surface all 2>&1 | tee "$RUNNER_TEMP/phase8-summary.txt"
+      - name: Upload sanitized acceptance summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-phase8-summary
+          path: ${{ runner.temp }}/phase8-summary.txt
+          if-no-files-found: error
           retention-days: 30

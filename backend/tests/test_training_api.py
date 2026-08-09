@@ -86,6 +86,13 @@ def _draft_body(*, goal="basic_strength", freq=3, key="k1", tz="Asia/Shanghai"):
     }
 
 
+def _confirm_body(plan_id, **kwargs):
+    return {
+        **_draft_body(**kwargs),
+        "expected_plan_version_id": str(plan_id),
+    }
+
+
 # === HTTP contract / auth / validation =====================================
 
 
@@ -211,7 +218,7 @@ async def test_confirm_without_pending_draft_is_409(client):
     uid = str(uuid.uuid4())
     await _seed_user(uid, "13800010003")
     resp = await client.post("/api/v1/training/plans:confirm",
-                             json={**_draft_body(key="c1")}, headers=_auth(uid))
+                             json=_confirm_body(uuid.uuid4(), key="c1"), headers=_auth(uid))
     assert resp.status_code == 409
     assert resp.json()["code"] == "no_pending_draft"
 
@@ -274,7 +281,7 @@ async def test_cross_user_isolation(client):
         "has_draft"] is False
     # Confirming as B yields no_pending_draft, not A's data.
     resp = await client.post("/api/v1/training/plans:confirm",
-                             json={**_draft_body(key="c")}, headers=hb)
+                             json=_confirm_body(uuid.uuid4(), key="c"), headers=hb)
     assert resp.status_code == 409
 
 
@@ -317,8 +324,13 @@ async def _active_today_for_adjustment(
 
     body = _draft_body(goal=goal, freq=freq, key="adaptive-generate")
     body["equipment_resistance_band"] = band
-    await service.generate_draft(db, uid, DraftRequest(**body))
-    confirm_body = _draft_body(goal=goal, freq=freq, key="adaptive-confirm")
+    draft = await service.generate_draft(db, uid, DraftRequest(**body))
+    confirm_body = _confirm_body(
+        draft.draft.plan_version_id,
+        goal=goal,
+        freq=freq,
+        key="adaptive-confirm",
+    )
     confirm_body["equipment_resistance_band"] = band
     confirmed = await service.confirm(db, uid, ConfirmRequest(**confirm_body))
     today = await service.get_today(db, uid, "Asia/Shanghai")
@@ -572,7 +584,7 @@ async def test_service_generate_confirm_active_today_feedback_substitute(
         assert replay.draft.plan_version_id == pending_id
 
         confirmed = await svc.confirm(db, uid, ConfirmRequest(
-            **{**_draft_body(key="conf1")}))
+            **_confirm_body(pending_id, key="conf1")))
         assert confirmed.plan.status == "active"
         assert confirmed.plan.plan_version_id == pending_id
 
@@ -582,7 +594,7 @@ async def test_service_generate_confirm_active_today_feedback_substitute(
 
         # Confirm replay is idempotent.
         replay_confirm = await svc.confirm(db, uid, ConfirmRequest(
-            **{**_draft_body(key="conf1")}))
+            **_confirm_body(pending_id, key="conf1")))
         assert replay_confirm.plan.plan_version_id == pending_id
 
         # Today: deterministic weekday lookup against the server-derived date.
@@ -661,7 +673,9 @@ async def test_service_confirm_rejects_stale_context(monkeypatch):
         async def fake(db, user_id, request, now=None):
             return ctx, decision
         monkeypatch.setattr(svc, "_classify", fake)
-        await svc.generate_draft(db, uid, DraftRequest(**{**_draft_body(key="g")}))
+        draft = await svc.generate_draft(
+            db, uid, DraftRequest(**_draft_body(key="g"))
+        )
         # Now change the context: a different profile_version makes the fingerprint
         # diverge, so confirm must reject as stale.
         stale_ctx = ctx.model_copy(update={
@@ -672,7 +686,13 @@ async def test_service_confirm_rejects_stale_context(monkeypatch):
         monkeypatch.setattr(svc, "_classify", fake_stale)
         from app.core.exceptions import AppException
         with pytest.raises(AppException) as exc:
-            await svc.confirm(db, uid, ConfirmRequest(**{**_draft_body(key="c")}))
+            await svc.confirm(
+                db,
+                uid,
+                ConfirmRequest(
+                    **_confirm_body(draft.draft.plan_version_id, key="c")
+                ),
+            )
         assert exc.value.code == "stale_context"
 
 
@@ -684,8 +704,16 @@ async def test_today_advances_by_confirmation_week_and_then_completes(
     confirmed_at = datetime(2026, 7, 27, 0, 30, tzinfo=timezone.utc)
     monkeypatch.setattr(service, "_utc_now", lambda: confirmed_at)
     async with TestSession() as db:
-        await service.generate_draft(db, uid, DraftRequest(**_draft_body(key="g-weeks")))
-        await service.confirm(db, uid, ConfirmRequest(**_draft_body(key="c-weeks")))
+        draft = await service.generate_draft(
+            db, uid, DraftRequest(**_draft_body(key="g-weeks"))
+        )
+        await service.confirm(
+            db,
+            uid,
+            ConfirmRequest(
+                **_confirm_body(draft.draft.plan_version_id, key="c-weeks")
+            ),
+        )
 
         for expected_week in (1, 2, 3, 4):
             current = confirmed_at + timedelta(days=7 * (expected_week - 1))
@@ -711,9 +739,14 @@ async def test_execution_writes_only_target_the_actual_local_day(
     now = datetime(2026, 7, 27, 0, 30, tzinfo=timezone.utc)
     monkeypatch.setattr(service, "_utc_now", lambda: now)
     async with TestSession() as db:
-        await service.generate_draft(db, uid, DraftRequest(**_draft_body(key="g-day")))
+        draft = await service.generate_draft(
+            db, uid, DraftRequest(**_draft_body(key="g-day"))
+        )
         confirmed = await service.confirm(
-            db, uid, ConfirmRequest(**_draft_body(key="c-day")))
+            db,
+            uid,
+            ConfirmRequest(**_confirm_body(draft.draft.plan_version_id, key="c-day")),
+        )
         sessions = await persistence.load_sessions(
             db, uuid.UUID(confirmed.plan.plan_version_id))
         future_session = next(
@@ -755,9 +788,14 @@ async def test_confirm_idempotency_covers_the_complete_request(eligible_user):
 
     uid, _ctx, _decision = eligible_user
     async with TestSession() as db:
-        await service.generate_draft(db, uid, DraftRequest(**_draft_body(key="g-hash")))
-        await service.confirm(db, uid, ConfirmRequest(**_draft_body(key="same-confirm")))
-        changed = _draft_body(key="same-confirm")
+        draft = await service.generate_draft(
+            db, uid, DraftRequest(**_draft_body(key="g-hash"))
+        )
+        plan_id = draft.draft.plan_version_id
+        await service.confirm(
+            db, uid, ConfirmRequest(**_confirm_body(plan_id, key="same-confirm"))
+        )
+        changed = _confirm_body(plan_id, key="same-confirm")
         changed["session_duration_minutes"] = 45
         with pytest.raises(AppException) as exc:
             await service.confirm(db, uid, ConfirmRequest(**changed))
@@ -771,7 +809,9 @@ async def test_confirm_revalidates_the_stored_draft(eligible_user, monkeypatch):
 
     uid, _ctx, _decision = eligible_user
     async with TestSession() as db:
-        await service.generate_draft(db, uid, DraftRequest(**_draft_body(key="g-validate")))
+        draft = await service.generate_draft(
+            db, uid, DraftRequest(**_draft_body(key="g-validate"))
+        )
 
         def reject(*_args, **_kwargs):
             return PlanValidationResult(
@@ -788,7 +828,12 @@ async def test_confirm_revalidates_the_stored_draft(eligible_user, monkeypatch):
         monkeypatch.setattr(service, "validate_plan", reject)
         with pytest.raises(AppException) as exc:
             await service.confirm(
-                db, uid, ConfirmRequest(**_draft_body(key="c-validate")))
+                db,
+                uid,
+                ConfirmRequest(
+                    **_confirm_body(draft.draft.plan_version_id, key="c-validate")
+                ),
+            )
         assert exc.value.code == "stored_draft_invalid"
 
 
@@ -801,10 +846,18 @@ async def test_today_blocks_when_current_plan_validation_fails(
     now = datetime(2026, 7, 27, 1, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(service, "_utc_now", lambda: now)
     async with TestSession() as db:
-        await service.generate_draft(
+        draft = await service.generate_draft(
             db, uid, DraftRequest(**_draft_body(key="g-today-validate")))
         await service.confirm(
-            db, uid, ConfirmRequest(**_draft_body(key="c-today-validate")))
+            db,
+            uid,
+            ConfirmRequest(
+                **_confirm_body(
+                    draft.draft.plan_version_id,
+                    key="c-today-validate",
+                )
+            ),
+        )
 
         def reject(*_args, **_kwargs):
             return PlanValidationResult(

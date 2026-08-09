@@ -187,13 +187,46 @@ void main() {
     await tester.tap(find.byKey(const Key('plan-confirm-button')));
     await tester.pumpAndSettle();
     // Confirm hit the endpoint.
-    expect(
-      adapter.calls.where((c) => c.path.contains('plans:confirm')).toList(),
-      isNotEmpty,
+    final confirm = adapter.calls.singleWhere(
+      (call) => call.path.contains('plans:confirm'),
     );
+    expect(confirm.data['expected_plan_version_id'], 'pv-1');
     // Active view shows a rest day honestly (no fake session).
     expect(find.text('今天是休息日'), findsOneWidget);
   });
+
+  testWidgets(
+    'pending draft is reviewable while an older plan remains active',
+    (tester) async {
+      final active = _draftPlanJson()
+        ..['plan_version_id'] = 'pv-active'
+        ..['status'] = 'active'
+        ..['confirmed_at'] = '2026-07-27T09:00:00Z';
+      final adapter = FakeDioAdapter()
+        ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+        ..registerJson(
+          'GET',
+          '/training/plans/active',
+          (_) => {'has_active': true, 'plan': active},
+        )
+        ..registerJson(
+          'GET',
+          '/training/plans/draft',
+          (_) => {
+            'has_draft': true,
+            'draft': _draftPlanJson(),
+            'decision_gate': 'eligible',
+          },
+        );
+
+      await tester.pumpWidget(_wrap(_apiWith(adapter)));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('plan-confirm-button')), findsOneWidget);
+      expect(find.textContaining('计划草案'), findsOneWidget);
+      expect(find.textContaining('生效计划'), findsNothing);
+    },
+  );
 
   testWidgets('missing health profile blocks generation defaults', (
     tester,

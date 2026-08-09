@@ -41,6 +41,13 @@ draft or nutrition-refresh draft, but draft creation and activation are separate
 states. New versions carry a nullable review-origin reference and continue
 through their existing explicit confirmation state machines.
 
+Every training confirmation binds the exact reviewed draft through
+`expected_plan_version_id`. For a review-origin draft, confirmation also
+reassembles the owned source week from current records and requires the stored
+review fingerprint, proposal strategy, active-plan identity, and resulting
+bounded preference change to remain identical. Any mismatch is stale and never
+activates the draft.
+
 The dedicated button command is a foreground user action and may atomically
 apply a validated same-day overlay without a second dialog. Agent always creates
 a short-lived typed proposal and requires a separate confirmation that invokes

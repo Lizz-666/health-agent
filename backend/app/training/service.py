@@ -43,6 +43,7 @@ from app.training.candidates import select_candidates
 from app.training.generator import generate_plan_draft
 from app.training.knowledge import build_index
 from app.training.models import TrainingPlanVersion
+from app.posture.user_lock import acquire_user_transaction_lock
 from app.training.policy import TrainingPolicy, load_training_policy
 from app.training.safety import SafetyPolicy, classify_safety, load_safety_policy
 from app.training.schemas import (
@@ -102,6 +103,7 @@ def _index():
 def _confirm_request_hash(req) -> str:
     return P.hash_request({
         "op": "confirm",
+        "expected_plan_version_id": str(req.expected_plan_version_id),
         "fitness_goal": req.fitness_goal,
         "weekly_frequency": req.weekly_frequency,
         "session_duration_minutes": req.session_duration_minutes,
@@ -413,6 +415,7 @@ async def get_draft(db: AsyncSession, user_id: str) -> DraftResponse:
 
 async def confirm(db: AsyncSession, user_id: str, req) -> ConfirmResponse:
     now = _utc_now()
+    await acquire_user_transaction_lock(db, user_id)
     confirm_hash = _confirm_request_hash(req)
     # Replay takes precedence over the pending-draft precondition: a replay of an
     # already-completed confirm returns the active plan even though no pending
@@ -430,12 +433,45 @@ async def confirm(db: AsyncSession, user_id: str, req) -> ConfirmResponse:
     pending = await P.get_pending_draft(db, user_id)
     if pending is None:
         raise AppException(409, "没有待确认的计划草案", "no_pending_draft")
+    if pending.plan_version_id != req.expected_plan_version_id:
+        raise AppException(409, "待确认草案已变化", "stale_context")
 
-    request = _request_snapshot(
-        req.fitness_goal, req.weekly_frequency, req.session_duration_minutes,
-        req.equipment_bodyweight, req.equipment_resistance_band, req.iana_timezone, now,
-    )
-    ctx, decision = await _classify(db, user_id, request, now)
+    if pending.origin_weekly_review_id is not None:
+        from app.training import review_service
+
+        active = await P.get_active_version(db, user_id)
+        if active is None:
+            raise AppException(409, "回顾上下文已变化", "stale_context")
+        ctx, decision = await _review_draft_context(
+            db,
+            user_id,
+            base_fitness_goal=active.requested_goal,
+            base_weekly_frequency=active.weekly_frequency,
+            base_session_duration_minutes=active.session_duration_minutes,
+            fitness_goal=req.fitness_goal,
+            weekly_frequency=req.weekly_frequency,
+            session_duration_minutes=req.session_duration_minutes,
+            equipment_bodyweight=req.equipment_bodyweight,
+            equipment_resistance_band=req.equipment_resistance_band,
+            iana_timezone=req.iana_timezone,
+            now=now,
+        )
+        validated_active = await review_service.validate_training_draft_confirmation(
+            db,
+            user_id,
+            pending,
+            iana_timezone=req.iana_timezone,
+            now=now,
+        )
+        if validated_active.plan_version_id != active.plan_version_id:
+            raise AppException(409, "回顾上下文已变化", "stale_context")
+    else:
+        request = _request_snapshot(
+            req.fitness_goal, req.weekly_frequency, req.session_duration_minutes,
+            req.equipment_bodyweight, req.equipment_resistance_band,
+            req.iana_timezone, now,
+        )
+        ctx, decision = await _classify(db, user_id, request, now)
     gate = decision.gate_status.value
     if gate in ("clarification_required", "restricted", "red_flag"):
         code = {"clarification_required": "clarification_required",
@@ -1547,6 +1583,171 @@ class DraftEvaluation:
     request_hash: str
 
 
+_REVIEW_DURATION_STEPS = (15, 30, 45, 60)
+
+
+def _is_bounded_review_adaptation(
+    *,
+    base_weekly_frequency: int,
+    base_session_duration_minutes: int,
+    weekly_frequency: int,
+    session_duration_minutes: int,
+) -> bool:
+    frequency_changed = weekly_frequency != base_weekly_frequency
+    duration_changed = session_duration_minutes != base_session_duration_minutes
+    if frequency_changed == duration_changed:
+        return False
+    if frequency_changed:
+        return (
+            session_duration_minutes == base_session_duration_minutes
+            and abs(weekly_frequency - base_weekly_frequency) == 1
+        )
+    try:
+        base_index = _REVIEW_DURATION_STEPS.index(base_session_duration_minutes)
+        requested_index = _REVIEW_DURATION_STEPS.index(session_duration_minutes)
+    except ValueError:
+        return False
+    return weekly_frequency == base_weekly_frequency and abs(requested_index - base_index) == 1
+
+
+async def _review_draft_context(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    base_fitness_goal: str,
+    base_weekly_frequency: int,
+    base_session_duration_minutes: int,
+    fitness_goal: str,
+    weekly_frequency: int,
+    session_duration_minutes: int,
+    equipment_bodyweight: bool,
+    equipment_resistance_band: bool,
+    iana_timezone: str,
+    now: datetime,
+):
+    if fitness_goal != base_fitness_goal or not _is_bounded_review_adaptation(
+        base_weekly_frequency=base_weekly_frequency,
+        base_session_duration_minutes=base_session_duration_minutes,
+        weekly_frequency=weekly_frequency,
+        session_duration_minutes=session_duration_minutes,
+    ):
+        raise AppException(409, "Weekly review proposal changed", "stale_context")
+
+    current_bodyweight, current_band = await _profile_equipment(db, user_id)
+    if (
+        equipment_bodyweight != current_bodyweight
+        or equipment_resistance_band != current_band
+    ):
+        raise AppException(409, _gate_message("clarification_required"), "clarification_required")
+
+    base_request = _request_snapshot(
+        base_fitness_goal,
+        base_weekly_frequency,
+        base_session_duration_minutes,
+        current_bodyweight,
+        current_band,
+        iana_timezone,
+        now,
+    )
+    base_context, base_decision = await _classify(db, user_id, base_request, now)
+    base_gate = base_decision.gate_status.value
+    if base_gate in ("clarification_required", "restricted", "red_flag"):
+        code = {
+            "clarification_required": "clarification_required",
+            "restricted": "restricted_no_plan",
+            "red_flag": "red_flag_stop",
+        }[base_gate]
+        raise AppException(409, _gate_message(code), code)
+
+    proposed_request = _request_snapshot(
+        fitness_goal,
+        weekly_frequency,
+        session_duration_minutes,
+        current_bodyweight,
+        current_band,
+        iana_timezone,
+        now,
+    )
+    # Frequency and duration are planning preferences, not health facts. A
+    # server-authored review may evaluate one bounded adjacent step while all
+    # health fields, source versions, and freshness tokens remain current.
+    proposed_health = base_context.health.model_copy(
+        update={
+            "weekly_frequency": weekly_frequency,
+            "session_duration_minutes": session_duration_minutes,
+        }
+    )
+    proposed_context = base_context.model_copy(
+        update={"health": proposed_health, "request": proposed_request}
+    )
+    proposed_decision = classify_safety(proposed_context, SAFETY_POLICY)
+    if proposed_decision.gate_status.value not in {
+        "eligible",
+        "eligible_conservative",
+    }:
+        raise AppException(409, _gate_message("clarification_required"), "clarification_required")
+    return proposed_context, proposed_decision
+
+
+async def evaluate_review_draft_request(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    base_fitness_goal: str,
+    base_weekly_frequency: int,
+    base_session_duration_minutes: int,
+    fitness_goal: str,
+    weekly_frequency: int,
+    session_duration_minutes: int,
+    equipment_bodyweight: bool,
+    equipment_resistance_band: bool,
+    iana_timezone: str,
+    now: Optional[datetime] = None,
+) -> DraftEvaluation:
+    """Evaluate one server-authored, bounded weekly-review plan adaptation."""
+    current = now or _utc_now()
+    ctx, decision = await _review_draft_context(
+        db,
+        user_id,
+        base_fitness_goal=base_fitness_goal,
+        base_weekly_frequency=base_weekly_frequency,
+        base_session_duration_minutes=base_session_duration_minutes,
+        fitness_goal=fitness_goal,
+        weekly_frequency=weekly_frequency,
+        session_duration_minutes=session_duration_minutes,
+        equipment_bodyweight=equipment_bodyweight,
+        equipment_resistance_band=equipment_resistance_band,
+        iana_timezone=iana_timezone,
+        now=current,
+    )
+    cat = catalog()
+    candidates = select_candidates(ctx, decision, cat, TRAINING_POLICY, SAFETY_POLICY)
+    result = generate_plan_draft(
+        ctx, decision, candidates, cat, TRAINING_POLICY, SAFETY_POLICY
+    )
+    if not result.ok:
+        _raise_from_reason(result.reason_codes[0])
+        raise AssertionError
+    return DraftEvaluation(
+        draft=result.draft,
+        weekly_frequency=weekly_frequency,
+        session_duration_minutes=session_duration_minutes,
+        decision_gate=decision.gate_status.value,
+        decision_fingerprint=decision.fingerprint,
+        request_hash=P.hash_request(
+            {
+                "op": "review_draft",
+                "fitness_goal": fitness_goal,
+                "weekly_frequency": weekly_frequency,
+                "session_duration_minutes": session_duration_minutes,
+                "equipment_bodyweight": equipment_bodyweight,
+                "equipment_resistance_band": equipment_resistance_band,
+                "iana_timezone": iana_timezone,
+            }
+        ),
+    )
+
+
 async def evaluate_draft_request(
     db: AsyncSession,
     user_id: str,
@@ -1815,6 +2016,7 @@ __all__ = [
     "TRAINING_POLICY",
     "ADAPTIVE_POLICY",
     "evaluate_draft_request",
+    "evaluate_review_draft_request",
     "evaluate_feedback",
     "evaluate_substitution",
     "evaluate_adjustment",

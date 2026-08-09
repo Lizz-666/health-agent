@@ -378,4 +378,22 @@ void main() {
       expect(j['idempotency_key'], 'k1');
     });
   });
+
+  group('ConfirmInput', () {
+    test('toJson binds confirmation to the reviewed draft', () {
+      final json = const ConfirmInput(
+        expectedPlanVersionId: 'pv-1',
+        fitnessGoal: 'basic_strength',
+        weeklyFrequency: 3,
+        sessionDurationMinutes: 30,
+        equipmentBodyweight: true,
+        equipmentResistanceBand: false,
+        ianaTimezone: 'Asia/Shanghai',
+        idempotencyKey: 'confirm-1',
+      ).toJson();
+
+      expect(json['expected_plan_version_id'], 'pv-1');
+      expect(json.keys, contains('idempotency_key'));
+    });
+  });
 }

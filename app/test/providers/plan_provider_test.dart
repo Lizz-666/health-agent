@@ -211,6 +211,7 @@ void main() {
         .read(planProvider.notifier)
         .confirm(
           ConfirmInput(
+            expectedPlanVersionId: 'pv-1',
             fitnessGoal: 'basic_strength',
             weeklyFrequency: 3,
             sessionDurationMinutes: 30,
@@ -241,6 +242,7 @@ void main() {
 
     final ok = await notifier.confirm(
       const ConfirmInput(
+        expectedPlanVersionId: 'pv-1',
         fitnessGoal: 'basic_strength',
         weeklyFrequency: 3,
         sessionDurationMinutes: 30,

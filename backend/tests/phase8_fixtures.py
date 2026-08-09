@@ -257,6 +257,7 @@ class Phase8Control:
             db,
             str(SYNTHETIC_USER_ID),
             ConfirmRequest(
+                expected_plan_version_id=draft.draft.plan_version_id,
                 **request_values,
                 idempotency_key="phase8-cycle-confirm",
             ),
@@ -283,11 +284,11 @@ class Phase8Control:
             local_date = plan_start + timedelta(
                 days=(session.week_index - 1) * 7 + session.day_of_week - 1
             )
-            outcome = (
-                "too_busy"
-                if session.week_index == 4 and session.session_order == 1
-                else "completed"
-            )
+            outcome = "completed"
+            if session.week_index == 4 and session.session_order == 1:
+                outcome = "too_busy"
+            elif session.week_index == 4 and session.session_order == 2:
+                outcome = "intentional_rest"
             db.add(
                 TrainingSessionFeedback(
                     user_id=SYNTHETIC_USER_ID,

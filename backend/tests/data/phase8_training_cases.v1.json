@@ -1,0 +1,94 @@
+{
+  "schema_version": "phase8-training-eval-v1",
+  "synthetic_only": true,
+  "required_categories": [
+    "supported",
+    "missing_input",
+    "equipment_schedule_conflict",
+    "pain",
+    "restricted",
+    "red_flag",
+    "stale",
+    "replay",
+    "adjustment_safety"
+  ],
+  "cases": [
+    {
+      "id": "supported-bodyweight",
+      "category": "supported",
+      "evaluator": "safety_candidates",
+      "overrides": {},
+      "expected": {"gate": "eligible", "candidate_gate": "eligible", "min_candidates": 1, "candidate_ids_hidden": false}
+    },
+    {
+      "id": "missing-current-checkin",
+      "category": "missing_input",
+      "evaluator": "safety_candidates",
+      "overrides": {"checkin": {"present": false}},
+      "expected": {"gate": "clarification_required", "candidate_gate": "clarification_required", "min_candidates": 0, "candidate_ids_hidden": true}
+    },
+    {
+      "id": "no-supported-equipment",
+      "category": "equipment_schedule_conflict",
+      "evaluator": "safety_candidates",
+      "overrides": {
+        "health": {"equipment_bodyweight": false, "equipment_resistance_band": false},
+        "request": {"equipment_bodyweight": false, "equipment_resistance_band": false}
+      },
+      "expected": {"gate": "clarification_required", "candidate_gate": "clarification_required", "min_candidates": 0, "candidate_ids_hidden": true}
+    },
+    {
+      "id": "knee-pain-conservative",
+      "category": "pain",
+      "evaluator": "safety_candidates",
+      "overrides": {
+        "health": {
+          "pain_limitations": [
+            {
+              "body_area_raw": "knee",
+              "status_raw": "aching",
+              "body_area_canonical": "knee",
+              "status_canonical": "aching"
+            }
+          ]
+        }
+      },
+      "expected": {"gate": "eligible_conservative", "candidate_gate": "eligible_conservative", "min_candidates": 1, "candidate_ids_hidden": false, "excluded_reason": "contraindicated_body_region"}
+    },
+    {
+      "id": "restricted-qualifier",
+      "category": "restricted",
+      "evaluator": "safety_candidates",
+      "overrides": {"health": {"risk_screen": {"underage": "yes"}}},
+      "expected": {"gate": "restricted", "candidate_gate": "restricted", "min_candidates": 0, "candidate_ids_hidden": true}
+    },
+    {
+      "id": "red-current-checkin",
+      "category": "red_flag",
+      "evaluator": "safety_candidates",
+      "overrides": {"checkin": {"recomputed_risk": "red_flag"}},
+      "expected": {"gate": "red_flag", "candidate_gate": "red_flag", "min_candidates": 0, "candidate_ids_hidden": true}
+    },
+    {
+      "id": "changed-checkin-stales-overlay",
+      "category": "stale",
+      "evaluator": "linked_pytest",
+      "nodeid": "tests/test_phase7_e2e.py::test_changed_checkin_makes_overlay_stale_until_explicit_refresh",
+      "expected": {"pytest_cases": 1}
+    },
+    {
+      "id": "adjustment-replay-is-stable",
+      "category": "replay",
+      "evaluator": "linked_pytest",
+      "nodeid": "tests/test_phase7_e2e.py::test_adjustment_matrix_uses_authenticated_api_and_replays",
+      "expected": {"pytest_cases": 3}
+    },
+    {
+      "id": "latest-safety-blocks-adjustment",
+      "category": "adjustment_safety",
+      "evaluator": "linked_pytest",
+      "nodeid": "tests/test_phase7_e2e.py::test_pain_restricted_and_red_flag_make_zero_adjustment_writes",
+      "expected": {"pytest_cases": 3}
+    }
+  ]
+}

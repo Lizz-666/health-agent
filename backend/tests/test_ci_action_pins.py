@@ -112,6 +112,26 @@ def test_fast_and_full_pin_checks_use_the_read_only_workflow_token():
     assert text.count(token_line) == 2
 
 
+def test_flutter_test_pipeline_propagates_failures_through_tee():
+    text = CI_PATH.read_text(encoding="utf-8")
+    start = text.index("- name: Flutter test")
+    end = text.index("\n      - name:", start + 1)
+    step = text[start:end]
+    assert "shell: bash" in step
+    assert "set -o pipefail" in step
+    assert "flutter test 2>&1 | tee ../flutter-test.log" in step
+
+
+def test_phase8_acceptance_log_is_written_outside_the_worktree():
+    text = CI_PATH.read_text(encoding="utf-8")
+    start = text.index("- name: Run isolated real-HTTP and evaluation acceptance")
+    end = text.index("\n      - name:", start + 1)
+    step = text[start:end]
+    assert 'tee "$RUNNER_TEMP/phase8-summary.txt"' in step
+    assert "tee phase8-summary.txt" not in step
+    assert "path: ${{ runner.temp }}/phase8-summary.txt" in text
+
+
 def _resolve_tag_commit(owner: str, repo: str, tag: str, token: str | None):
     """Resolve ``tag`` to its commit SHA via the GitHub git refs API.
 

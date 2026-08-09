@@ -1079,6 +1079,70 @@ async def _require_fresh_review(
     return review, assembly
 
 
+def training_draft_preferences(
+    plan: TrainingPlanVersion, strategy: str
+) -> tuple[int, int]:
+    """Map one persisted review strategy to one bounded adjacent preference."""
+    frequency = plan.weekly_frequency
+    duration = plan.session_duration_minutes
+    if strategy == "lower_frequency" and frequency > 2:
+        frequency -= 1
+    elif strategy == "progression":
+        if duration < 60:
+            duration = {15: 30, 30: 45, 45: 60}[duration]
+        elif frequency < 5:
+            frequency += 1
+        else:
+            raise AppException(409, "回顾提案已变化", "stale_context")
+    elif strategy in {"conservative_duration", "regression"} and duration > 15:
+        duration = {60: 45, 45: 30, 30: 15}[duration]
+    else:
+        raise AppException(409, "回顾提案已变化", "stale_context")
+    return frequency, duration
+
+
+async def validate_training_draft_confirmation(
+    db: AsyncSession,
+    user_id: str,
+    draft: TrainingPlanVersion,
+    *,
+    iana_timezone: str,
+    now: datetime,
+) -> TrainingPlanVersion:
+    """Rebind a review-origin draft to the latest immutable review inputs."""
+    if draft.origin_weekly_review_id is None:
+        raise AppException(409, "回顾来源缺失", "stale_context")
+    review = await _review_by_id(db, user_id, draft.origin_weekly_review_id)
+    if review is None:
+        raise AppException(409, "回顾来源已变化", "stale_context")
+    assembly = await _assemble(db, user_id, review.week_index, iana_timezone, now)
+    if (
+        review.plan_version_id != assembly.plan.plan_version_id
+        or review.input_fingerprint != assembly.fingerprint
+    ):
+        raise AppException(409, "回顾输入已变化", "stale_context")
+    proposal = next(
+        (
+            item
+            for item in assembly.proposals
+            if item["code"] == "offer_training_draft"
+        ),
+        None,
+    )
+    if proposal is None:
+        raise AppException(409, "回顾提案已变化", "stale_context")
+    frequency, duration = training_draft_preferences(
+        assembly.plan, proposal["strategy"]
+    )
+    if (
+        draft.requested_goal != assembly.plan.requested_goal
+        or draft.weekly_frequency != frequency
+        or draft.session_duration_minutes != duration
+    ):
+        raise AppException(409, "回顾草案已变化", "stale_context")
+    return assembly.plan
+
+
 async def _prepare_mutation(
     db: AsyncSession,
     user_id: str,
@@ -1144,21 +1208,14 @@ async def create_training_draft(
     if proposal is None:
         raise AppException(409, "该回顾没有训练草案提案", "review_action_unavailable")
     strategy = proposal["strategy"]
-    frequency = assembly.plan.weekly_frequency
-    duration = assembly.plan.session_duration_minutes
-    if strategy == "lower_frequency":
-        frequency = max(2, frequency - 1)
-    elif strategy == "progression":
-        if duration < 60:
-            duration = {15: 30, 30: 45, 45: 60}[duration]
-        else:
-            frequency = min(5, frequency + 1)
-    else:
-        duration = {60: 45, 45: 30, 30: 15}.get(duration, duration)
+    frequency, duration = training_draft_preferences(assembly.plan, strategy)
     bodyweight, band = await training_service._profile_equipment(db, user_id)
-    evaluation = await training_service.evaluate_draft_request(
+    evaluation = await training_service.evaluate_review_draft_request(
         db,
         user_id,
+        base_fitness_goal=assembly.plan.requested_goal,
+        base_weekly_frequency=assembly.plan.weekly_frequency,
+        base_session_duration_minutes=assembly.plan.session_duration_minutes,
         fitness_goal=assembly.plan.requested_goal,
         weekly_frequency=frequency,
         session_duration_minutes=duration,

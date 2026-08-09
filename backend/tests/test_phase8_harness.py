@@ -8,6 +8,7 @@ import subprocess
 import sys
 from types import SimpleNamespace
 from typing import Optional
+import uuid
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -16,10 +17,16 @@ from sqlalchemy import func, select
 from app.agent.provider import ScriptedProvider
 from app.auth.models import User, VerificationCode
 from app.core.exceptions import AppException
+from app.health.models import HealthProfile
 from app.main import app as production_app
 from app.training import review_service, service as training_service
-from app.training.models import TrainingPlanVersion
-from app.training.schemas_api import DraftRequest, ReviewGenerateRequest
+from app.training.models import TrainingPlanVersion, TrainingSessionFeedback
+from app.training.schemas_api import (
+    ConfirmRequest,
+    DraftRequest,
+    ReviewGenerateRequest,
+    ReviewMutationRequest,
+)
 from tests.conftest import TestSession, override_get_db, test_engine
 from tests.phase8_app_factory import create_phase8_test_app
 from tests.phase8_fixtures import (
@@ -50,6 +57,34 @@ def _control(*, expected_path: Optional[Path] = None):
 
 def _headers(token: str = SYNTHETIC_CONTROL_TOKEN) -> dict[str, str]:
     return {CONTROL_HEADER: token}
+
+
+@pytest.mark.parametrize(
+    ("base_frequency", "base_duration", "frequency", "duration", "expected"),
+    [
+        (3, 30, 2, 30, True),
+        (3, 30, 4, 30, True),
+        (3, 30, 3, 15, True),
+        (3, 30, 3, 45, True),
+        (3, 30, 3, 30, False),
+        (3, 30, 2, 15, False),
+        (3, 30, 5, 30, False),
+        (3, 30, 3, 60, False),
+    ],
+)
+def test_weekly_review_adaptation_is_one_adjacent_preference_step(
+    base_frequency: int,
+    base_duration: int,
+    frequency: int,
+    duration: int,
+    expected: bool,
+):
+    assert training_service._is_bounded_review_adaptation(
+        base_weekly_frequency=base_frequency,
+        base_session_duration_minutes=base_duration,
+        weekly_frequency=frequency,
+        session_duration_minutes=duration,
+    ) is expected
 
 
 def test_full_test_app_has_all_production_surfaces_and_private_control_routes():
@@ -343,7 +378,177 @@ async def test_cycle_due_is_service_generated_and_week_four_review_is_due():
     assert review.week_index == 4
     assert review.execution.scheduled == 2
     assert review.execution.too_busy == 1
+    assert review.execution.intentional_rest == 1
     assert review.posture.status == "due"
+    proposals = {proposal.code: proposal for proposal in review.proposals}
+    assert proposals["offer_training_draft"].strategy == "conservative_duration"
+
+    async with TestSession() as db:
+        created = await review_service.create_training_draft(
+            db,
+            str(SYNTHETIC_USER_ID),
+            4,
+            ReviewMutationRequest(
+                idempotency_key="phase8-cycle-training-draft",
+                expected_review_id=review.review_id,
+                expected_input_fingerprint=review.input_fingerprint,
+                iana_timezone="Asia/Shanghai",
+            ),
+        )
+        before_confirmation = await training_service.get_active(
+            db, str(SYNTHETIC_USER_ID)
+        )
+        with pytest.raises(AppException) as mismatched:
+            await training_service.confirm(
+                db,
+                str(SYNTHETIC_USER_ID),
+                ConfirmRequest(
+                    expected_plan_version_id=uuid.uuid4(),
+                    fitness_goal="basic_strength",
+                    weekly_frequency=2,
+                    session_duration_minutes=15,
+                    equipment_bodyweight=True,
+                    equipment_resistance_band=False,
+                    iana_timezone="Asia/Shanghai",
+                    idempotency_key="phase8-cycle-wrong-draft",
+                ),
+            )
+        confirmed = await training_service.confirm(
+            db,
+            str(SYNTHETIC_USER_ID),
+            ConfirmRequest(
+                expected_plan_version_id=created.draft_id,
+                fitness_goal="basic_strength",
+                weekly_frequency=2,
+                session_duration_minutes=15,
+                equipment_bodyweight=True,
+                equipment_resistance_band=False,
+                iana_timezone="Asia/Shanghai",
+                idempotency_key="phase8-cycle-training-confirm",
+            ),
+        )
+
+    assert created.status == "created"
+    assert before_confirmation.plan is not None
+    assert before_confirmation.plan.plan_version_id != created.draft_id
+    assert confirmed.plan.plan_version_id == created.draft_id
+    assert confirmed.plan.session_duration_minutes == 15
+    assert confirmed.superseded_prior is True
+    assert mismatched.value.code == "stale_context"
+
+
+@pytest.mark.asyncio
+async def test_review_draft_confirmation_rejects_changed_review_inputs():
+    _app, control, _provider = _control()
+    await control.reset(Checkpoint.cycle_due)
+
+    async with TestSession() as db:
+        review = await review_service.generate_review(
+            db,
+            str(SYNTHETIC_USER_ID),
+            4,
+            ReviewGenerateRequest(
+                idempotency_key="phase8-stale-review",
+                iana_timezone="Asia/Shanghai",
+            ),
+        )
+        created = await review_service.create_training_draft(
+            db,
+            str(SYNTHETIC_USER_ID),
+            4,
+            ReviewMutationRequest(
+                idempotency_key="phase8-stale-review-draft",
+                expected_review_id=review.review_id,
+                expected_input_fingerprint=review.input_fingerprint,
+                iana_timezone="Asia/Shanghai",
+            ),
+        )
+        feedback = await db.scalar(
+            select(TrainingSessionFeedback).where(
+                TrainingSessionFeedback.outcome_state == "intentional_rest"
+            )
+        )
+        assert feedback is not None
+        feedback.outcome_state = "completed"
+        await db.commit()
+
+        with pytest.raises(AppException) as stale:
+            await training_service.confirm(
+                db,
+                str(SYNTHETIC_USER_ID),
+                ConfirmRequest(
+                    expected_plan_version_id=created.draft_id,
+                    fitness_goal="basic_strength",
+                    weekly_frequency=2,
+                    session_duration_minutes=15,
+                    equipment_bodyweight=True,
+                    equipment_resistance_band=False,
+                    iana_timezone="Asia/Shanghai",
+                    idempotency_key="phase8-stale-review-confirm",
+                ),
+            )
+        pending = await db.get(TrainingPlanVersion, uuid.UUID(created.draft_id))
+        active = await training_service.get_active(db, str(SYNTHETIC_USER_ID))
+
+    assert stale.value.code == "stale_context"
+    assert pending is not None and pending.status == "draft"
+    assert active.plan is not None
+    assert active.plan.plan_version_id != created.draft_id
+
+
+@pytest.mark.asyncio
+async def test_review_draft_confirmation_reruns_latest_safety_gate():
+    _app, control, _provider = _control()
+    await control.reset(Checkpoint.cycle_due)
+
+    async with TestSession() as db:
+        review = await review_service.generate_review(
+            db,
+            str(SYNTHETIC_USER_ID),
+            4,
+            ReviewGenerateRequest(
+                idempotency_key="phase8-review-safety",
+                iana_timezone="Asia/Shanghai",
+            ),
+        )
+        created = await review_service.create_training_draft(
+            db,
+            str(SYNTHETIC_USER_ID),
+            4,
+            ReviewMutationRequest(
+                idempotency_key="phase8-review-safety-draft",
+                expected_review_id=review.review_id,
+                expected_input_fingerprint=review.input_fingerprint,
+                iana_timezone="Asia/Shanghai",
+            ),
+        )
+        profile = await db.scalar(
+            select(HealthProfile).where(HealthProfile.user_id == SYNTHETIC_USER_ID)
+        )
+        assert profile is not None and profile.risk_screen is not None
+        profile.risk_screen = {**profile.risk_screen, "underage": "yes"}
+        profile.version += 1
+        await db.commit()
+
+        with pytest.raises(AppException) as blocked:
+            await training_service.confirm(
+                db,
+                str(SYNTHETIC_USER_ID),
+                ConfirmRequest(
+                    expected_plan_version_id=created.draft_id,
+                    fitness_goal="basic_strength",
+                    weekly_frequency=2,
+                    session_duration_minutes=15,
+                    equipment_bodyweight=True,
+                    equipment_resistance_band=False,
+                    iana_timezone="Asia/Shanghai",
+                    idempotency_key="phase8-review-safety-confirm",
+                ),
+            )
+        pending = await db.get(TrainingPlanVersion, uuid.UUID(created.draft_id))
+
+    assert blocked.value.code == "restricted_no_plan"
+    assert pending is not None and pending.status == "draft"
 
 
 @pytest.mark.asyncio

@@ -126,6 +126,11 @@ FAST_TEST_TARGETS = [
     "tests/test_phase6_e2e.py",
     # Phase 7 Gate 4: adaptive execution, safety blockers, and weekly closure.
     "tests/test_phase7_e2e.py",
+    # Phase 8 Gates 1-2: isolated harness, complete deletion, real HTTP, evals.
+    "tests/test_phase8_harness.py",
+    "tests/test_phase8_deletion.py",
+    "tests/test_phase8_http_journey.py",
+    "tests/test_phase8_evaluations.py",
 ]
 
 

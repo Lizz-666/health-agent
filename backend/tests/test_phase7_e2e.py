@@ -240,6 +240,7 @@ async def _activate(client, headers, *, goal: str, frequency: int) -> dict:
     assert draft.status_code == 200, draft.text
     confirm_body = {
         **draft_body,
+        "expected_plan_version_id": draft.json()["draft"]["plan_version_id"],
         "idempotency_key": f"phase7-confirm-{uuid.uuid4().hex[:8]}",
     }
     confirmed = await client.post(

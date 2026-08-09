@@ -787,21 +787,16 @@ async def _prepare_create_review_training_draft(
     )
     if proposal is None:
         raise AppException(409, "该回顾没有训练草案提案", "review_action_unavailable")
-    frequency = assembly.plan.weekly_frequency
-    duration = assembly.plan.session_duration_minutes
-    if proposal["strategy"] == "lower_frequency":
-        frequency = max(2, frequency - 1)
-    elif proposal["strategy"] == "progression":
-        if duration < 60:
-            duration = {15: 30, 30: 45, 45: 60}[duration]
-        else:
-            frequency = min(5, frequency + 1)
-    else:
-        duration = {60: 45, 45: 30, 30: 15}.get(duration, duration)
+    frequency, duration = review_service.training_draft_preferences(
+        assembly.plan, proposal["strategy"]
+    )
     bodyweight, band = await training_service._profile_equipment(db, user_id)
-    evaluation = await training_service.evaluate_draft_request(
+    evaluation = await training_service.evaluate_review_draft_request(
         db,
         user_id,
+        base_fitness_goal=assembly.plan.requested_goal,
+        base_weekly_frequency=assembly.plan.weekly_frequency,
+        base_session_duration_minutes=assembly.plan.session_duration_minutes,
         fitness_goal=assembly.plan.requested_goal,
         weekly_frequency=frequency,
         session_duration_minutes=duration,
