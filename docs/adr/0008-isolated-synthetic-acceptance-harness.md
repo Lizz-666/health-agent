@@ -2,7 +2,10 @@
 
 ## Status
 
-Proposed for Phase 8 Gate 0 on 2026-08-09.
+Accepted at Phase 8 Gate 0 on 2026-08-09. Contract candidate
+`02229fa566d5765d75ef45a379b6800fef84ae53`; review metadata
+`1e18a03998c16dbf95f77d0519be271a20c98c0f`; exact-SHA GitHub
+Fast/Flutter/Full run `31295975430` passed.
 
 ## Context
 

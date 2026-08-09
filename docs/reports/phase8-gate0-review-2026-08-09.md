@@ -7,7 +7,7 @@
 
 ## Result
 
-Local Gate 0 candidate review: **PASS, pending exact-SHA GitHub CI**.
+Gate 0 review: **PASS**.
 
 There are no unresolved P0, P1, or P2 findings in the Gate 0 contract. The
 candidate does not authorize merge, deployment, `main`, real health data or
@@ -81,13 +81,21 @@ process was allowed to exit, the exact workspace `backend/test.db` was removed,
 Flutter-generated registrants were restored, and the suite was rerun alone to
 the clean result above. No business file was changed to make tests pass.
 
-## Pending Remote Gate
+## Exact-SHA GitHub CI
 
-The candidate report/metadata commit will be pushed to the named Phase 8 branch
-and run through exact-SHA GitHub Fast, Flutter, and strict Full. Full must report
-zero skips and PostgreSQL expected/actual parity. A later closure metadata commit
-must itself receive exact-SHA CI before Gate 0 becomes `committed` and the Gate 1
-implementation worktree is created.
+Run `31295975430` checked out review metadata SHA
+`1e18a03998c16dbf95f77d0519be271a20c98c0f` in every job:
+
+- Fast: success; `936 passed / 0 failed / 10 expected skips`; diff clean.
+- Flutter: success; analyze clean; `472 tests passed`.
+- Full: success; `1665 passed / 0 failed / 0 skipped`;
+  `VERIFY_REQUIRE_PG=1`; PostgreSQL expected `27`, actual `27`, version evidence
+  present.
+
+The final documentation-only closure commit that records these facts must also
+pass exact-SHA GitHub Fast, Flutter, and strict Full before Gate 1 starts. Its
+run is closure evidence, while `31295975430` remains the evidence for the
+reviewed contract/report content.
 
 No OpenCode prompt is authorized at Gate 0. The only delegated Task begins after
 Gate 2 freezes its backend/control contracts.

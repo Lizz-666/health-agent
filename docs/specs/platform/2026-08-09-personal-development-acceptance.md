@@ -1,6 +1,9 @@
 # Phase 8 Personal Development Acceptance
 
-> Status: Gate 0 candidate, 2026-08-09. Baseline
+> Status: accepted at Phase 8 Gate 0, 2026-08-09. Contract candidate
+> `02229fa566d5765d75ef45a379b6800fef84ae53` and review metadata
+> `1e18a03998c16dbf95f77d0519be271a20c98c0f` passed local exact-SHA gates
+> and GitHub Fast/Flutter/Full run `31295975430`. Baseline
 > `36be9a0f0cd989f32c8f4f7f7b9e2bc5fb4c66e6` is the verified Phase 7 closure.
 > This specification authorizes synthetic-data local development only. It does
 > not authorize deployment, merging to `main`, real health data or photos,
