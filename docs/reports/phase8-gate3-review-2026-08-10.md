@@ -59,12 +59,25 @@ After Android verification, the localhost synthetic server was stopped,
 restored. No real health data, photo, production credential, or live provider
 was used.
 
+## Exact-SHA CI
+
+GitHub Actions workflow-dispatch run `31334065045` checked out exact closure
+SHA `0a027b35ccffa7c92944cac0eb6be9557f687923`:
+
+- Fast: success; 1015 passed, 0 failed, 11 conditional skips.
+- Flutter: success; analyze clean; 492 tests passed.
+- Full: success; 1745 passed, 0 failed, 0 skipped; PostgreSQL expected 28,
+  actual 28, with version evidence present.
+- Phase 8 acceptance: success; HTTP 11/11 with zero residual tables; eval 13/13
+  with zero skipped; evidence SHA matched the checkout.
+
 ## Gate Decision
 
-The implementation SHA is locally accepted for Gate 3 with no unresolved
-P0-P3 finding. Push and exact-SHA GitHub CI remain required before Gate 3 is
-remotely verified. This gate does not merge, deploy, write `main`, or complete
-the separate Gate 4 visual/privacy acceptance.
+The implementation and closure SHA are accepted for Gate 3 with no unresolved
+P0-P3 finding and exact-SHA CI green. This gate does not merge, deploy, write
+`main`, or complete the separate Gate 4 visual/privacy acceptance. The final
+documentation-only metadata commit containing this CI result must itself pass
+exact-SHA CI before Gate 4 starts.
 
 Rollback is the single implementation commit plus this report/metadata commit;
 there is no migration or production configuration rollback.
