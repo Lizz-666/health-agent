@@ -278,6 +278,7 @@ async def test_account_deletion_rolls_back_prior_domain_deletes_on_late_failure(
 
 
 @requires_pg
+@pytest.mark.requires_pg
 async def test_pg_account_deletion_removes_base_cross_domain_rows(pg_session):
     owner = await _add_user(pg_session, phone="13800001006")
     pg_session.add(HealthProfile(user_id=owner, version=1))
