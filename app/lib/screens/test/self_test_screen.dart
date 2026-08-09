@@ -88,6 +88,7 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
         content: const Text(SelfTestScreen.photoDialogDescription),
         actions: [
           TextButton(
+            key: const Key('self-test-photo-defer'),
             onPressed: () {
               Navigator.pop(ctx);
               _goToResult(
@@ -203,6 +204,7 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
           ),
           Expanded(
             child: PageView.builder(
+              key: const Key('self-test-pages'),
               controller: _pageController,
               itemCount: tests.length + 1,
               onPageChanged: (i) {
@@ -426,6 +428,7 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
+              key: const Key('self-test-answer-negative'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(AppConstants.normalColor),
               ),
@@ -438,6 +441,7 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
+              key: const Key('self-test-answer-positive'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(AppConstants.moderateColor),
               ),
@@ -450,6 +454,7 @@ class _SelfTestScreenState extends ConsumerState<SelfTestScreen> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
+              key: const Key('self-test-answer-uncertain'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(AppConstants.surfaceDark),
               ),

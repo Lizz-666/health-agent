@@ -144,11 +144,13 @@ required:
    through `/auth/dev-login` using build-time synthetic credentials.
 2. Select a body area and issue, complete the illustrated self-test, inspect the
    result and posture profile, and confirm an allowed posture goal.
-3. Generate and explicitly confirm a four-week plan. Confirm that no draft is
-   shown as active before confirmation.
-4. Save today's check-in, inspect effective Today, explicitly request any legal
+3. Save today's check-in, then generate and explicitly confirm a four-week
+   plan. The current-day check-in is a deterministic safety prerequisite;
+   confirm that no draft is shown as active before confirmation.
+4. Inspect effective Today, explicitly request any legal
    same-day adjustment, and record session feedback or a substitution where the
-   fixture permits it.
+   fixture permits it. Existing schedules have no Saturday session, so Saturday
+   is asserted as an honest `rest_day` rather than changing production policy.
 5. Add a synthetic manual weight through the UI, then inspect the activity grid
    and weight trend. Evidence records presence and state, never raw values.
 6. Ask Agent for a bounded explanation. If an Agent write proposal is exercised,

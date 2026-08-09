@@ -34,6 +34,41 @@ DEV_ADMIN_PHONE=13900000008
 DEV_ADMIN_PASSWORD=synthetic-phase8-only
 ```
 
+The device local timezone must match the app/server contract before launching
+the driver. A UTC emulator can save a different local check-in date and must be
+rejected rather than weakening the safety gate:
+
+```powershell
+adb -s emulator-5554 shell getprop persist.sys.timezone
+adb -s emulator-5554 shell date -Iseconds
+```
+
+Expected timezone is `Asia/Shanghai`. On a disposable root-capable AVD only,
+set it with `adb -s emulator-5554 root` followed by
+`adb -s emulator-5554 shell setprop persist.sys.timezone Asia/Shanghai`, then
+re-run both checks. Do not change a physical/personal device for this gate.
+
+With the synthetic server healthy, run from `app/`:
+
+```powershell
+flutter test integration_test/phase8_core_journey_test.dart -d emulator-5554 `
+  --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1 `
+  --dart-define=DEV_ADMIN_PHONE=13900000008 `
+  --dart-define=DEV_ADMIN_PASSWORD=synthetic-phase8-only
+```
+
+The blank checkpoint selects an existing legal production schedule. Saturday
+has no production session and is therefore asserted as `rest_day`; no test-only
+training day or safety-policy override is introduced. Other supported weekdays
+exercise the foreground adjustment and feedback path.
+
+The Android suite contains eight required scenarios: the supported-adult core
+journey, cycle-due review, safety block, real missing-check-in rejection,
+one-shot stale training-draft rejection, one-shot 503 recovery, malformed Today
+recovery, and final blank reset. Missing-input and stale generation both assert
+the visible fail-closed state and sanitized evidence that no training plan
+version was written.
+
 The Android emulator's `10.0.2.2` alias forwards to the host loopback. The CLI
 refuses non-loopback binds so the fixed synthetic control credential is not
 exposed to the LAN. The server remains test-only and uses the exact disposable
@@ -52,7 +87,10 @@ same IANA fallback on Windows and Linux. Source and release provenance:
 - Reset: `POST /__phase8/reset` with exactly one checkpoint:
   `blank_supported`, `cycle_due`, or `safety_blocked`.
 - Faults: `POST /__phase8/faults` accepts only the allowlisted route/kind enums
-  defined by the test app; faults are one-shot.
+  defined by the test app; faults are one-shot. Task 3 adds only the
+  `POST /api/v1/training/plans:draft` + `stale_context` pair needed to prove the
+  real Flutter mutation surface. It cannot alter a successful payload or any
+  production safety classification.
 - Evidence: `GET /__phase8/evidence` returns synthetic mode, checkpoint,
   generation, provider/object counts, and table counts only.
 - CLI evidence fields: `command`, exact `sha`, `checkpoint`, sanitized

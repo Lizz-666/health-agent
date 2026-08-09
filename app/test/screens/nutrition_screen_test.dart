@@ -18,7 +18,7 @@ Widget _wrap(FakeDioAdapter adapter, Widget child) => ProviderScope(
   child: MaterialApp(home: child),
 );
 
-void _registerActive(FakeDioAdapter adapter) {
+void _registerActive(FakeDioAdapter adapter, {bool withDraft = false}) {
   adapter
     ..registerJson('GET', '/nutrition/eligibility', (_) => eligibilityJson())
     ..registerJson('GET', '/nutrition/foods', (_) => foodListJson())
@@ -26,7 +26,7 @@ void _registerActive(FakeDioAdapter adapter) {
     ..registerJson(
       'GET',
       '/nutrition/recommendations/draft',
-      (_) => recommendationResultJson(),
+      (_) => recommendationResultJson(status: withDraft ? 'draft' : null),
     )
     ..registerJson(
       'GET',
@@ -36,6 +36,24 @@ void _registerActive(FakeDioAdapter adapter) {
 }
 
 void main() {
+  testWidgets('pending draft remains separately confirmable beside active', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter();
+    _registerActive(adapter, withDraft: true);
+    await tester.pumpWidget(_wrap(adapter, const NutritionScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('nutrition-active-tab')), findsOneWidget);
+    expect(find.byKey(const Key('nutrition-active-label')), findsOneWidget);
+    expect(find.byKey(const Key('nutrition-confirm-draft')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('nutrition-draft-tab')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('nutrition-draft-label')), findsOneWidget);
+    expect(find.byKey(const Key('nutrition-confirm-draft')), findsOneWidget);
+  });
+
   testWidgets('renders source notice, day templates, images and attribution', (
     tester,
   ) async {

@@ -184,6 +184,7 @@ class HomeScreen extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: GestureDetector(
+        key: Key('home-posture-category-${cat.key}'),
         onTap: () => context.push(cat.route),
         child: GlassCard(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

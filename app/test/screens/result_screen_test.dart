@@ -140,6 +140,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Phase 8 automation anchor: the result surface is stably keyed.
+    expect(find.byKey(const Key('result-screen')), findsOneWidget);
     expect(find.textContaining('建议纠正头部姿势'), findsOneWidget);
     expect(find.textContaining('不能替代专业医疗诊断'), findsOneWidget);
   });
@@ -319,6 +321,8 @@ void main() {
 
       expect(find.textContaining('档案状态暂不可用'), findsOneWidget);
       expect(find.textContaining('重试'), findsOneWidget);
+      // Phase 8 automation anchor: the retry control is stably keyed.
+      expect(find.byKey(const Key('result-entry-retry')), findsOneWidget);
       // MUST NOT fall back to a normal badge or "正常" text from the entry.
       expect(find.text('正常'), findsNothing);
     },

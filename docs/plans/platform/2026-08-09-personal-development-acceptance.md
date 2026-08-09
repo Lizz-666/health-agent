@@ -168,8 +168,9 @@ synthetic credentials, CLI commands, and stable evidence fields for Task 3.
 
 ### Task 3: Real-app automation anchors and core journey driver
 
-**Writer:** One OpenCode + Claude session. Codex reviews and may later take over
-fixes only after the session stops.
+**Writer:** One OpenCode + Claude session for the frozen allowlist. That session
+ended without commit; Codex then became the sole writer for review fixes,
+cross-layer contract repair, Android execution, and Gate acceptance.
 
 **Dependencies:** Accepted Gate 2 exact SHA and a Codex-issued prompt containing
 the frozen contracts. Do not start from this Gate 0 branch or infer contracts.
@@ -192,6 +193,11 @@ documentation, CI, or older integration-test edits are allowed. Existing keys
 on posture profile, plan, Today, activity grid, weight, Agent, nutrition, and
 weekly review are the frozen anchors; Task 3 must consume rather than rename
 them.
+
+After OpenCode stopped, Codex may expand only to files required by reproduced
+P1/P2 findings: Plan/weekly-review/nutrition models, providers, screens and
+tests; the Phase 8 synthetic fixture/harness; current Phase 8 governance and
+review documents. This is Codex takeover scope, not retroactive OpenCode scope.
 
 **Behavior:** Add semantics-preserving stable keys where absent; drive the real
 `PostureApp` through the required checkpointed journey; use normal ApiClient and

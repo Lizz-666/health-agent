@@ -146,6 +146,21 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   }
 
   Widget _body(BuildContext context, PlanState plan) {
+    if (plan.draftStatus == LoadStatus.data &&
+        plan.draft != null &&
+        plan.activeStatus == LoadStatus.data &&
+        plan.activePlan != null) {
+      return _ActiveAndDraftView(
+        draft: plan.draft!,
+        draftReady: _profileReady,
+        goal: _goal,
+        frequency: _frequency,
+        duration: _duration,
+        bodyweight: _bodyweight,
+        onConfirm: _confirm,
+        onRegenerate: _generate,
+      );
+    }
     if (plan.draftStatus == LoadStatus.data && plan.draft != null) {
       if (!_profileReady) return _profileRequired();
       return _DraftReview(
@@ -159,7 +174,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       );
     }
     if (plan.activeStatus == LoadStatus.data && plan.activePlan != null) {
-      return _ActiveView(plan: plan);
+      return const _ActiveView();
     }
     if (plan.draftStatus == LoadStatus.loading ||
         plan.activeStatus == LoadStatus.loading ||
@@ -167,6 +182,38 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (!_profileReady) return _profileRequired();
+    if (plan.draftStatus == LoadStatus.networkError &&
+        plan.draftFailure != DraftFailureState.none &&
+        plan.draftFailure != DraftFailureState.unavailable) {
+      return switch (plan.draftFailure) {
+        DraftFailureState.safetyBlocked => const _StatusCard(
+          key: Key('plan-status-safety'),
+          icon: Icons.block,
+          title: '当前安全状态不允许生成训练计划',
+          detail: '受限或红旗状态不会被显示为普通失败，也不会创建可确认草案。',
+        ),
+        DraftFailureState.missingInput => const _StatusCard(
+          key: Key('plan-status-missing'),
+          icon: Icons.assignment_late_outlined,
+          title: '缺少生成计划所需信息',
+          detail: '请先补全当前健康档案和安全筛查，再重新生成。',
+        ),
+        DraftFailureState.stale => const _StatusCard(
+          key: Key('plan-status-stale'),
+          icon: Icons.sync_problem,
+          title: '计划上下文已变化',
+          detail: '请刷新当前档案和目标后重新发起，旧请求不会继续执行。',
+        ),
+        DraftFailureState.conflict => const _StatusCard(
+          key: Key('plan-status-conflict'),
+          icon: Icons.warning_amber_outlined,
+          title: '计划请求发生冲突',
+          detail: '请求未被显示为成功，请刷新后重新发起。',
+        ),
+        DraftFailureState.none || DraftFailureState.unavailable =>
+          throw StateError('handled outside typed draft failure branch'),
+      };
+    }
     if (plan.draftStatus == LoadStatus.networkError ||
         plan.activeStatus == LoadStatus.networkError) {
       return _StatusCard(
@@ -240,6 +287,69 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     if (ok && mounted) {
       ref.read(planProvider.notifier).fetchToday(_kDefaultTimezone);
     }
+  }
+}
+
+class _ActiveAndDraftView extends StatelessWidget {
+  final PlanVersion draft;
+  final bool draftReady;
+  final String goal;
+  final int frequency;
+  final int duration;
+  final bool bodyweight;
+  final VoidCallback onConfirm;
+  final VoidCallback onRegenerate;
+
+  const _ActiveAndDraftView({
+    required this.draft,
+    required this.draftReady,
+    required this.goal,
+    required this.frequency,
+    required this.duration,
+    required this.bodyweight,
+    required this.onConfirm,
+    required this.onRegenerate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          const TabBar(
+            tabs: [
+              Tab(key: Key('plan-active-tab'), text: '当前生效'),
+              Tab(key: Key('plan-draft-tab'), text: '待确认草案'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                const _ActiveView(),
+                if (draftReady)
+                  _DraftReview(
+                    draft: draft,
+                    goal: goal,
+                    frequency: frequency,
+                    duration: duration,
+                    bodyweight: bodyweight,
+                    onConfirm: onConfirm,
+                    onRegenerate: onRegenerate,
+                  )
+                else
+                  const _StatusCard(
+                    key: Key('plan-draft-profile-required'),
+                    icon: Icons.assignment_late_outlined,
+                    title: '草稿暂不可确认',
+                    detail: '当前健康档案不可用；已生效计划仍可查看，草稿确认保持关闭。',
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -401,8 +511,7 @@ class _DraftReview extends StatelessWidget {
 }
 
 class _ActiveView extends ConsumerStatefulWidget {
-  final PlanState plan;
-  const _ActiveView({required this.plan});
+  const _ActiveView();
   @override
   ConsumerState<_ActiveView> createState() => _ActiveViewState();
 }
@@ -471,10 +580,14 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
       );
     }
     if (plan.todayStatus == LoadStatus.parseError || plan.today == null) {
-      return const _StatusCard(
+      return _StatusCard(
+        key: const Key('today-status-parse-error'),
         icon: Icons.broken_image_outlined,
         title: '今日数据解析异常',
         detail: '不会显示为可执行的训练。',
+        action: () =>
+            ref.read(planProvider.notifier).fetchToday(_kDefaultTimezone),
+        actionLabel: '重试',
       );
     }
     final today = plan.today!;

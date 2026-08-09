@@ -162,7 +162,15 @@ class _WeeklyReviewScreenState extends ConsumerState<WeeklyReviewScreen> {
           children: [
             _FactsSection(snapshot: s),
             const SizedBox(height: 16),
-            _ProposalsSection(snapshot: s),
+            _ProposalsSection(
+              snapshot: s,
+              mutating: state.mutating,
+              onCreateDraft: (code) async {
+                await ref
+                    .read(adaptiveReviewProvider.notifier)
+                    .createDraft(code);
+              },
+            ),
           ],
         );
     }
@@ -362,7 +370,13 @@ class _FactsSection extends StatelessWidget {
 
 class _ProposalsSection extends StatelessWidget {
   final WeeklyReviewSnapshot snapshot;
-  const _ProposalsSection({required this.snapshot});
+  final bool mutating;
+  final Future<void> Function(ReviewProposalCode code) onCreateDraft;
+  const _ProposalsSection({
+    required this.snapshot,
+    required this.mutating,
+    required this.onCreateDraft,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -430,6 +444,24 @@ class _ProposalsSection extends StatelessWidget {
                 color: Color(AppConstants.textMuted),
               ),
             ),
+          if (p.state == ReviewProposalState.proposal &&
+              (p.code == ReviewProposalCode.offerTrainingDraft ||
+                  p.code == ReviewProposalCode.offerNutritionRefresh)) ...[
+            const SizedBox(height: 6),
+            OutlinedButton(
+              key: Key(
+                p.code == ReviewProposalCode.offerTrainingDraft
+                    ? 'review-create-training-draft'
+                    : 'review-create-nutrition-draft',
+              ),
+              onPressed: mutating ? null : () => onCreateDraft(p.code),
+              child: Text(
+                p.code == ReviewProposalCode.offerTrainingDraft
+                    ? '创建训练草案'
+                    : '创建饮食草案',
+              ),
+            ),
+          ],
         ],
       ),
     );

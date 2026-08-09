@@ -46,6 +46,7 @@ Map<String, dynamic> _planJson({String status = 'draft'}) => {
   'status': status,
   'change_reason': 'initial_generation',
   'decision_gate': 'eligible',
+  'origin_weekly_review_id': null,
   'generated_at': '2026-07-27T08:00:00Z',
   'confirmed_at': null,
   'catalog_version': 'v1',
@@ -62,6 +63,12 @@ void main() {
       expect(p.sessions.length, 2);
       expect(p.sessions[0].prescriptions.first.exercise?.nameZh, '深蹲');
       expect(p.sessions[0].prescriptions.first.reps, 10);
+    });
+
+    test('preserves weekly-review draft provenance', () {
+      final json = _planJson()
+        ..['origin_weekly_review_id'] = 'review-1';
+      expect(PlanVersion.fromJson(json).originWeeklyReviewId, 'review-1');
     });
 
     test('unknown status throws (never coerced to active/normal)', () {

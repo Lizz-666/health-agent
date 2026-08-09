@@ -1,4 +1,5 @@
 """Disposable Phase 8 reset, fault, and sanitized evidence control plane."""
+
 from __future__ import annotations
 
 import asyncio
@@ -12,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import Header, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import func, select
 
 from app.agent.provider import ScriptedProvider
@@ -37,6 +38,13 @@ SYNTHETIC_CONTROL_TOKEN = "phase8-local-control-only"
 CONTROL_HEADER = "X-Phase8-Control-Token"
 
 
+def journey_frequency(now: Optional[datetime] = None) -> int:
+    """Choose a legal schedule; Saturday remains an explicit rest day."""
+    current = now or datetime.now(timezone.utc)
+    weekday = current.astimezone(ZoneInfo("Asia/Shanghai")).isoweekday()
+    return {1: 3, 2: 2, 3: 3, 4: 5, 5: 2, 6: 4, 7: 5}[weekday]
+
+
 class Checkpoint(str, Enum):
     blank_supported = "blank_supported"
     cycle_due = "cycle_due"
@@ -46,12 +54,22 @@ class Checkpoint(str, Enum):
 class FaultKind(str, Enum):
     service_unavailable = "service_unavailable"
     malformed_json = "malformed_json"
+    stale_context = "stale_context"
 
 
 class FaultRoute(str, Enum):
     today = "/api/v1/training/today"
+    training_draft = "/api/v1/training/plans:draft"
     agent = "/api/v1/agent/capabilities"
     nutrition = "/api/v1/nutrition/eligibility"
+
+
+_FAULT_METHODS = {
+    FaultRoute.today: "GET",
+    FaultRoute.training_draft: "POST",
+    FaultRoute.agent: "GET",
+    FaultRoute.nutrition: "GET",
+}
 
 
 class _StrictModel(BaseModel):
@@ -65,6 +83,20 @@ class ResetRequest(_StrictModel):
 class FaultRequest(_StrictModel):
     route: FaultRoute
     kind: FaultKind
+
+    @model_validator(mode="after")
+    def validate_pair(self) -> FaultRequest:
+        is_training_stale = (
+            self.route == FaultRoute.training_draft
+            and self.kind == FaultKind.stale_context
+        )
+        uses_training_only_member = (
+            self.route == FaultRoute.training_draft
+            or self.kind == FaultKind.stale_context
+        )
+        if uses_training_only_member and not is_training_stale:
+            raise ValueError("unsupported Phase 8 fault route/kind pair")
+        return self
 
 
 class ProviderController:
@@ -109,7 +141,7 @@ class Phase8Control:
         self.reset_generation = 0
         self.checkpoint: Optional[Checkpoint] = None
         self._reset_lock = asyncio.Lock()
-        self._faults: dict[str, FaultKind] = {}
+        self._faults: dict[tuple[str, str], FaultKind] = {}
         self.synthetic_object_keys: set[str] = set()
 
     def _require_disposable_db(self) -> None:
@@ -166,7 +198,11 @@ class Phase8Control:
                     user_id=SYNTHETIC_USER_ID,
                     fitness_goal="basic_strength",
                     training_experience="beginner",
-                    weekly_frequency=2,
+                    weekly_frequency=(
+                        journey_frequency()
+                        if checkpoint == Checkpoint.blank_supported
+                        else 2
+                    ),
                     session_duration_minutes=30,
                     equipment={"bodyweight": True, "resistance_band": False},
                     pain_injury_limitations=[],
@@ -190,9 +226,9 @@ class Phase8Control:
                 await self._seed_cycle_due(db)
 
     async def _seed_cycle_due(self, db) -> None:
-        current_local_date = datetime.now(timezone.utc).astimezone(
-            ZoneInfo("Asia/Shanghai")
-        ).date()
+        current_local_date = (
+            datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai")).date()
+        )
         db.add(
             DailyCheckIn(
                 user_id=SYNTHETIC_USER_ID,
@@ -223,8 +259,7 @@ class Phase8Control:
             str(SYNTHETIC_USER_ID),
         )
         if not any(
-            item["issue_id"] == "LL-18"
-            for item in suggestions["normal_candidates"]
+            item["issue_id"] == "LL-18" for item in suggestions["normal_candidates"]
         ):
             raise RuntimeError("Phase 8 cycle fixture goal is not eligible")
         await posture_service.confirm_posture_goals(
@@ -262,18 +297,14 @@ class Phase8Control:
                 idempotency_key="phase8-cycle-confirm",
             ),
         )
-        plan = await training_persistence.get_active_version(
-            db, str(SYNTHETIC_USER_ID)
-        )
+        plan = await training_persistence.get_active_version(db, str(SYNTHETIC_USER_ID))
         if plan is None:
             raise RuntimeError("Phase 8 cycle fixture failed to activate the plan")
 
         confirmed_at = datetime.now(timezone.utc) - timedelta(days=35)
         plan.generated_at = confirmed_at - timedelta(minutes=1)
         plan.confirmed_at = confirmed_at
-        sessions = await training_persistence.load_sessions(
-            db, plan.plan_version_id
-        )
+        sessions = await training_persistence.load_sessions(db, plan.plan_version_id)
         confirmed_local_date = training_service.derive_local_date(
             confirmed_at, "Asia/Shanghai"
         )
@@ -342,7 +373,7 @@ class Phase8Control:
     def install(self, app) -> None:
         @app.middleware("http")
         async def one_shot_fault(request: Request, call_next: Callable):
-            kind = self._faults.pop(request.url.path, None)
+            kind = self._faults.pop((request.method, request.url.path), None)
             if kind == FaultKind.service_unavailable:
                 return JSONResponse(
                     status_code=503,
@@ -356,6 +387,14 @@ class Phase8Control:
                     status_code=200,
                     content=b'{"truncated":',
                     media_type="application/json",
+                )
+            if kind == FaultKind.stale_context:
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "detail": "Synthetic stale context fault",
+                        "code": "stale_context",
+                    },
                 )
             return await call_next(request)
 
@@ -373,7 +412,8 @@ class Phase8Control:
             token: str = Header(..., alias=CONTROL_HEADER),
         ):
             self._authorize(token)
-            self._faults[body.route.value] = body.kind
+            method = _FAULT_METHODS[body.route]
+            self._faults[(method, body.route.value)] = body.kind
             return {"status": "installed", "route": body.route, "kind": body.kind}
 
         @app.get("/__phase8/evidence")

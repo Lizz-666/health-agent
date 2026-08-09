@@ -36,6 +36,15 @@ enum AdjustApplyState {
   parseError,
 }
 
+enum DraftFailureState {
+  none,
+  safetyBlocked,
+  missingInput,
+  stale,
+  conflict,
+  unavailable,
+}
+
 class PlanState {
   final LoadStatus draftStatus;
   final LoadStatus activeStatus;
@@ -43,6 +52,7 @@ class PlanState {
   final PlanVersion? draft;
   final PlanVersion? activePlan;
   final TodayResult? today;
+  final DraftFailureState draftFailure;
   final AdjustApplyState adjustState;
   final String? adjustMessage;
   final String? error;
@@ -54,6 +64,7 @@ class PlanState {
     this.draft,
     this.activePlan,
     this.today,
+    this.draftFailure = DraftFailureState.none,
     this.adjustState = AdjustApplyState.idle,
     this.adjustMessage,
     this.error,
@@ -69,6 +80,7 @@ class PlanState {
     bool clearActive = false,
     TodayResult? today,
     bool clearToday = false,
+    DraftFailureState? draftFailure,
     AdjustApplyState? adjustState,
     String? adjustMessage,
     bool clearAdjustMessage = false,
@@ -81,6 +93,7 @@ class PlanState {
     draft: clearDraft ? null : (draft ?? this.draft),
     activePlan: clearActive ? null : (activePlan ?? this.activePlan),
     today: clearToday ? null : (today ?? this.today),
+    draftFailure: draftFailure ?? this.draftFailure,
     adjustState: adjustState ?? this.adjustState,
     adjustMessage: clearAdjustMessage
         ? null
@@ -106,6 +119,7 @@ class PlanNotifier extends StateNotifier<PlanState> {
     final gen = ++_draftGen;
     state = state.copyWith(
       draftStatus: LoadStatus.loading,
+      draftFailure: DraftFailureState.none,
       clearDraft: true,
       clearError: true,
     );
@@ -120,6 +134,7 @@ class PlanNotifier extends StateNotifier<PlanState> {
       state = state.copyWith(
         draft: result.draft,
         draftStatus: result.hasDraft ? LoadStatus.data : LoadStatus.empty,
+        draftFailure: DraftFailureState.none,
       );
       return result.hasDraft;
     } on DioException catch (e) {
@@ -136,7 +151,12 @@ class PlanNotifier extends StateNotifier<PlanState> {
   // GET /training/plans/draft
   Future<void> fetchDraft() async {
     final gen = ++_draftGen;
-    state = state.copyWith(draftStatus: LoadStatus.loading, clearError: true);
+    state = state.copyWith(
+      draftStatus: LoadStatus.loading,
+      draftFailure: DraftFailureState.none,
+      clearDraft: true,
+      clearError: true,
+    );
     try {
       final resp = await _api.dio.get('/training/plans/draft');
       if (!mounted) return;
@@ -144,7 +164,9 @@ class PlanNotifier extends StateNotifier<PlanState> {
       if (gen != _draftGen) return;
       state = state.copyWith(
         draft: result.draft,
+        clearDraft: !result.hasDraft,
         draftStatus: result.hasDraft ? LoadStatus.data : LoadStatus.empty,
+        draftFailure: DraftFailureState.none,
       );
     } on DioException catch (e) {
       _failDraft(e, gen);
@@ -173,6 +195,7 @@ class PlanNotifier extends StateNotifier<PlanState> {
         activeStatus: LoadStatus.data,
         clearDraft: true,
         draftStatus: LoadStatus.empty,
+        draftFailure: DraftFailureState.none,
       );
       _onPlanChanged();
       return true;
@@ -330,9 +353,26 @@ class PlanNotifier extends StateNotifier<PlanState> {
     if (gen != _draftGen) return false;
     state = state.copyWith(
       draftStatus: LoadStatus.networkError,
+      draftFailure: _mapDraftError(e),
+      clearDraft: true,
       error: _dioMessage(e) ?? '生成计划失败',
     );
     return false;
+  }
+
+  DraftFailureState _mapDraftError(DioException e) {
+    final data = e.response?.data;
+    final rawCode = data is Map<String, dynamic> ? data['code'] : null;
+    final code = rawCode is String ? rawCode : null;
+    return switch (code) {
+      'restricted_no_plan' ||
+      'red_flag_stop' => DraftFailureState.safetyBlocked,
+      'clarification_required' => DraftFailureState.missingInput,
+      'stale_context' || 'stale_plan_version' => DraftFailureState.stale,
+      'idempotency_key_conflict' ||
+      'draft_collision' => DraftFailureState.conflict,
+      _ => DraftFailureState.unavailable,
+    };
   }
 
   // POST /training/today/adjustments  (foreground button only).
@@ -408,7 +448,8 @@ class PlanNotifier extends StateNotifier<PlanState> {
   // localized `detail` is display text only.
   AdjustApplyState _mapAdjustError(DioException e) {
     final data = e.response?.data;
-    final code = data is Map<String, dynamic> ? data['code'] as String? : null;
+    final rawCode = data is Map<String, dynamic> ? data['code'] : null;
+    final code = rawCode is String ? rawCode : null;
     switch (code) {
       case 'stale_context':
       case 'stale_plan_version':

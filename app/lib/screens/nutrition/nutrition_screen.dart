@@ -76,6 +76,23 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
     if (!eligibility.gate.allowsRecommendation) {
       return _EligibilityView(eligibility: eligibility);
     }
+    if (state.active != null && state.draft != null) {
+      return _ActiveAndDraftNutritionView(
+        targets: state.targets,
+        active: _RecommendationView(
+          recommendation: state.active!,
+          foods: state.foods,
+          active: true,
+          onAlternative: _previewAlternative,
+        ),
+        draft: _DraftReview(
+          recommendation: state.draft!,
+          foods: state.foods,
+          onConfirm: () => ref.read(nutritionProvider.notifier).confirmDraft(),
+        ),
+        onRefresh: () => ref.read(nutritionProvider.notifier).load(),
+      );
+    }
     return RefreshIndicator(
       onRefresh: () => ref.read(nutritionProvider.notifier).load(),
       child: ListView(
@@ -172,6 +189,61 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
       await ref.read(nutritionProvider.notifier).deleteNutritionData();
     }
   }
+}
+
+class _ActiveAndDraftNutritionView extends StatelessWidget {
+  final NutritionTargetsResponse? targets;
+  final Widget active;
+  final Widget draft;
+  final Future<void> Function() onRefresh;
+
+  const _ActiveAndDraftNutritionView({
+    required this.targets,
+    required this.active,
+    required this.draft,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          const TabBar(
+            tabs: [
+              Tab(key: Key('nutrition-active-tab'), text: '当前生效'),
+              Tab(key: Key('nutrition-draft-tab'), text: '待确认草案'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [_tab(active), _tab(draft)],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab(Widget content) => RefreshIndicator(
+    onRefresh: onRefresh,
+    child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (targets != null) _TargetsCard(response: targets!),
+        if (targets != null) const SizedBox(height: 12),
+        content,
+        const SizedBox(height: 20),
+        const Text(
+          '本功能提供一般健康饮食教育，不用于疾病治疗或特殊饮食处方，也不记录实际饮食。食物图片仅作识别参考。',
+          key: Key('nutrition-scope-notice'),
+          style: TextStyle(fontSize: 12),
+        ),
+      ],
+    ),
+  );
 }
 
 class _TargetsCard extends StatelessWidget {
@@ -561,11 +633,14 @@ class _EligibilityView extends StatelessWidget {
       ),
       _ => ('暂不可用', '当前无法生成饮食建议。'),
     };
-    return _StatusView(
-      icon: Icons.health_and_safety_outlined,
-      title: title,
-      detail:
-          '$detail\n原因：${eligibility.reasonCodes.join('、')}\n缺失：${eligibility.missingFieldCodes.join('、')}',
+    return KeyedSubtree(
+      key: Key('nutrition-status-${eligibility.gate.wire}'),
+      child: _StatusView(
+        icon: Icons.health_and_safety_outlined,
+        title: title,
+        detail:
+            '$detail\n原因：${eligibility.reasonCodes.join('、')}\n缺失：${eligibility.missingFieldCodes.join('、')}',
+      ),
     );
   }
 }

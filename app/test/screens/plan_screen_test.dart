@@ -110,6 +110,113 @@ Widget _wrapWithRouter(ApiClient api, GoRouter router) {
 }
 
 void main() {
+  testWidgets('restricted generation renders an explicit safety block', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': false},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerError('POST', '/training/plans:draft', 409, {
+        'detail': 'restricted',
+        'code': 'restricted_no_plan',
+      });
+
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('plan-generate-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('plan-status-safety')), findsOneWidget);
+    expect(find.byKey(const Key('plan-confirm-button')), findsNothing);
+  });
+
+  testWidgets('pending draft does not hide the current active plan', (
+    tester,
+  ) async {
+    final active = _draftPlanJson()
+      ..['status'] = 'active'
+      ..['confirmed_at'] = '2026-07-27T08:10:00Z';
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': true, 'draft': _draftPlanJson()},
+      )
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {'state': 'plan_complete'},
+      );
+
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('plan-active-tab')), findsOneWidget);
+    expect(find.byKey(const Key('agent-plan-entry')), findsOneWidget);
+    expect(find.byKey(const Key('plan-confirm-button')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('plan-draft-tab')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('plan-confirm-button')), findsOneWidget);
+  });
+
+  testWidgets('profile load failure does not hide an existing active plan', (
+    tester,
+  ) async {
+    final active = _draftPlanJson()
+      ..['status'] = 'active'
+      ..['confirmed_at'] = '2026-07-27T08:10:00Z';
+    final adapter = FakeDioAdapter()
+      ..registerError('GET', '/health/profile', 503, {
+        'detail': 'unavailable',
+        'code': 'service_unavailable',
+      })
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': true, 'draft': _draftPlanJson()},
+      )
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {'state': 'plan_complete'},
+      );
+
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('plan-active-tab')), findsOneWidget);
+    expect(find.byKey(const Key('agent-plan-entry')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('plan-draft-tab')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('plan-draft-profile-required')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('plan-confirm-button')), findsNothing);
+  });
+
   testWidgets('generation form -> draft review on generate', (tester) async {
     final adapter = FakeDioAdapter()
       ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
@@ -194,39 +301,6 @@ void main() {
     // Active view shows a rest day honestly (no fake session).
     expect(find.text('今天是休息日'), findsOneWidget);
   });
-
-  testWidgets(
-    'pending draft is reviewable while an older plan remains active',
-    (tester) async {
-      final active = _draftPlanJson()
-        ..['plan_version_id'] = 'pv-active'
-        ..['status'] = 'active'
-        ..['confirmed_at'] = '2026-07-27T09:00:00Z';
-      final adapter = FakeDioAdapter()
-        ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
-        ..registerJson(
-          'GET',
-          '/training/plans/active',
-          (_) => {'has_active': true, 'plan': active},
-        )
-        ..registerJson(
-          'GET',
-          '/training/plans/draft',
-          (_) => {
-            'has_draft': true,
-            'draft': _draftPlanJson(),
-            'decision_gate': 'eligible',
-          },
-        );
-
-      await tester.pumpWidget(_wrap(_apiWith(adapter)));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('plan-confirm-button')), findsOneWidget);
-      expect(find.textContaining('计划草案'), findsOneWidget);
-      expect(find.textContaining('生效计划'), findsNothing);
-    },
-  );
 
   testWidgets('missing health profile blocks generation defaults', (
     tester,

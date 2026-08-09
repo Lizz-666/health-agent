@@ -154,6 +154,7 @@ Map<String, dynamic> recommendationJson({
   'status': status,
   'change_reason': withDiff ? 'food_replacement' : 'initial_generation',
   'source_recommendation_id': null,
+  'origin_weekly_review_id': null,
   'superseded_by_id': null,
   'payload': {
     'schema_version': 'v1',

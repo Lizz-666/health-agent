@@ -332,6 +332,7 @@ class PlanVersion {
   final PlanStatus status;
   final String changeReason;
   final String decisionGate;
+  final String? originWeeklyReviewId;
   final DateTime generatedAt;
   final DateTime? confirmedAt;
   final String catalogVersion;
@@ -346,6 +347,7 @@ class PlanVersion {
     required this.status,
     required this.changeReason,
     required this.decisionGate,
+    required this.originWeeklyReviewId,
     required this.generatedAt,
     required this.confirmedAt,
     required this.catalogVersion,
@@ -366,6 +368,10 @@ class PlanVersion {
       status: PlanStatus.tryParse(json['status']),
       changeReason: _readString(json, 'change_reason'),
       decisionGate: _readString(json, 'decision_gate'),
+      originWeeklyReviewId: _readOptionalString(
+        json,
+        'origin_weekly_review_id',
+      ),
       generatedAt: _readDateTime(json, 'generated_at'),
       confirmedAt: _readOptionalDateTime(json, 'confirmed_at'),
       catalogVersion: _readString(json, 'catalog_version'),

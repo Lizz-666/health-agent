@@ -1,4 +1,5 @@
 """Isolation, control-plane, and privacy tests for the Phase 8 harness."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -32,10 +33,12 @@ from tests.phase8_app_factory import create_phase8_test_app
 from tests.phase8_fixtures import (
     CONTROL_HEADER,
     Checkpoint,
+    FaultKind,
     Phase8Control,
     ProviderController,
     SYNTHETIC_CONTROL_TOKEN,
     SYNTHETIC_USER_ID,
+    journey_frequency,
 )
 
 
@@ -60,6 +63,15 @@ def _headers(token: str = SYNTHETIC_CONTROL_TOKEN) -> dict[str, str]:
 
 
 @pytest.mark.parametrize(
+    ("day", "expected"),
+    [(10, 3), (11, 2), (12, 3), (13, 5), (14, 2), (15, 4), (16, 5)],
+)
+def test_phase8_ui_frequency_uses_an_existing_legal_schedule(day: int, expected: int):
+    now = datetime(2026, 8, day, 4, tzinfo=timezone.utc)
+    assert journey_frequency(now) == expected
+
+
+@pytest.mark.parametrize(
     ("base_frequency", "base_duration", "frequency", "duration", "expected"),
     [
         (3, 30, 2, 30, True),
@@ -79,12 +91,15 @@ def test_weekly_review_adaptation_is_one_adjacent_preference_step(
     duration: int,
     expected: bool,
 ):
-    assert training_service._is_bounded_review_adaptation(
-        base_weekly_frequency=base_frequency,
-        base_session_duration_minutes=base_duration,
-        weekly_frequency=frequency,
-        session_duration_minutes=duration,
-    ) is expected
+    assert (
+        training_service._is_bounded_review_adaptation(
+            base_weekly_frequency=base_frequency,
+            base_session_duration_minutes=base_duration,
+            weekly_frequency=frequency,
+            session_duration_minutes=duration,
+        )
+        is expected
+    )
 
 
 def test_full_test_app_has_all_production_surfaces_and_private_control_routes():
@@ -110,9 +125,9 @@ def test_production_app_cannot_reach_or_import_phase8_control_plane():
     production_paths = {route.path for route in production_app.routes}
     assert not any(path.startswith("/__phase8") for path in production_paths)
 
-    main_source = (
-        Path(__file__).parents[1] / "app" / "main.py"
-    ).read_text(encoding="utf-8")
+    main_source = (Path(__file__).parents[1] / "app" / "main.py").read_text(
+        encoding="utf-8"
+    )
     assert "phase8" not in main_source.lower()
     app_dir = Path(__file__).parents[1] / "app"
     production_source = "\n".join(
@@ -231,6 +246,22 @@ async def test_control_routes_require_exact_header_and_closed_payloads():
             headers=_headers(),
             json={"route": "/api/v1/users/me", "kind": "timeout"},
         )
+        stale_on_today = await client.post(
+            "/__phase8/faults",
+            headers=_headers(),
+            json={
+                "route": "/api/v1/training/today",
+                "kind": "stale_context",
+            },
+        )
+        unavailable_on_training_draft = await client.post(
+            "/__phase8/faults",
+            headers=_headers(),
+            json={
+                "route": "/api/v1/training/plans:draft",
+                "kind": "service_unavailable",
+            },
+        )
 
     assert missing.status_code == 422
     assert wrong.status_code == 403
@@ -238,6 +269,8 @@ async def test_control_routes_require_exact_header_and_closed_payloads():
     assert unknown_checkpoint.status_code == 422
     assert extra_reset_field.status_code == 422
     assert unknown_fault.status_code == 422
+    assert stale_on_today.status_code == 422
+    assert unavailable_on_training_draft.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -253,7 +286,9 @@ async def test_reset_clears_every_table_provider_fault_and_synthetic_object():
         )
         await db.commit()
     provider.provider.calls.append({"type": "synthetic-call"})
-    control._faults["/api/v1/agent/capabilities"] = "service_unavailable"
+    control._faults[("GET", "/api/v1/agent/capabilities")] = (
+        FaultKind.service_unavailable
+    )
     control.synthetic_object_keys.add("synthetic/phase8/object-1")
 
     async with AsyncClient(
@@ -302,9 +337,12 @@ async def test_wrong_disposable_path_refuses_before_destructive_work(tmp_path):
         await control.reset(Checkpoint.blank_supported)
 
     async with TestSession() as db:
-        assert await db.scalar(
-            select(func.count()).select_from(User).where(User.id == marker_id)
-        ) == 1
+        assert (
+            await db.scalar(
+                select(func.count()).select_from(User).where(User.id == marker_id)
+            )
+            == 1
+        )
 
 
 @pytest.mark.asyncio
@@ -348,6 +386,31 @@ async def test_fault_is_allowlisted_and_consumed_exactly_once():
     assert installed.status_code == 200
     assert first.status_code == 503
     assert first.json()["code"] == "service_unavailable"
+    assert second.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_training_stale_fault_is_allowlisted_and_consumed_exactly_once():
+    app, _control_plane, _provider = _control()
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://phase8.test"
+    ) as client:
+        installed = await client.post(
+            "/__phase8/faults",
+            headers=_headers(),
+            json={
+                "route": "/api/v1/training/plans:draft",
+                "kind": "stale_context",
+            },
+        )
+        wrong_method = await client.get("/api/v1/training/plans:draft")
+        first = await client.post("/api/v1/training/plans:draft")
+        second = await client.post("/api/v1/training/plans:draft")
+
+    assert installed.status_code == 200
+    assert wrong_method.status_code == 405
+    assert first.status_code == 409
+    assert first.json()["code"] == "stale_context"
     assert second.status_code == 401
 
 

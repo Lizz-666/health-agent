@@ -96,6 +96,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 48),
                 TextField(
+                  key: const Key('login-phone-input'),
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   maxLength: 11,
@@ -109,6 +110,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   children: [
                     Expanded(
                       child: TextField(
+                        key: const Key('login-code-input'),
                         controller: _codeController,
                         keyboardType: TextInputType.number,
                         maxLength: 6,
@@ -123,6 +125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       width: 120,
                       height: 48,
                       child: ElevatedButton(
+                        key: const Key('login-send-code'),
                         onPressed: state.countdown > 0 || state.isLoading
                             ? null
                             : _sendCode,
@@ -149,6 +152,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
+                    key: const Key('login-submit'),
                     onPressed: state.isLoading ? null : _login,
                     child: state.isLoading
                         ? const SizedBox(
@@ -178,6 +182,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     width: double.infinity,
                     height: 44,
                     child: OutlinedButton(
+                      key: const Key('login-dev-submit'),
                       onPressed: state.isLoading ? null : _devLogin,
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Color(0xFF0F3460)),

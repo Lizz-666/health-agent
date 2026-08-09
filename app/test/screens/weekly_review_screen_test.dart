@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posture_app/core/api_client.dart';
+import 'package:posture_app/providers/adaptive_review_provider.dart';
 import 'package:posture_app/screens/plan/weekly_review_screen.dart';
 
 import '../providers/_test_dio.dart';
@@ -21,7 +22,15 @@ ApiClient _apiWith(FakeDioAdapter adapter) {
 }
 
 Widget _wrap(ApiClient api) => ProviderScope(
-  overrides: [apiClientProvider.overrideWithValue(api)],
+  overrides: [
+    apiClientProvider.overrideWithValue(api),
+    adaptiveReviewProvider.overrideWith(
+      (ref) => AdaptiveReviewNotifier(
+        api,
+        onDraftCreated: (_, _, _) async => true,
+      ),
+    ),
+  ],
   child: const MaterialApp(home: WeeklyReviewScreen()),
 );
 
@@ -163,6 +172,47 @@ void main() {
       expect(find.textContaining('单独确认'), findsOneWidget);
     },
   );
+
+  testWidgets('proposal action creates a draft without activating it', (
+    tester,
+  ) async {
+    var created = false;
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/training/reviews/weeks/1', (_) {
+        final snapshot = _snapshotJson();
+        snapshot['proposals'] = [
+          {
+            'code': 'offer_training_draft',
+            'strategy': 'conservative_duration',
+            'state': created ? 'draft' : 'proposal',
+            if (created) 'origin_weekly_review_id': 'rv-1',
+          },
+        ];
+        return snapshot;
+      })
+      ..registerJson('POST', '/training/reviews/weeks/1/training-drafts', (_) {
+        created = true;
+        return {
+          'review_id': 'rv-1',
+          'draft_id': 'draft-1',
+          'status': 'created',
+          'origin_weekly_review_id': 'rv-1',
+        };
+      });
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('review-create-training-draft')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('review-create-training-draft')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('草案（尚未生效）'), findsOneWidget);
+    expect(find.textContaining('单独确认'), findsOneWidget);
+    expect(find.byKey(const Key('review-create-training-draft')), findsNothing);
+  });
 
   testWidgets('generate button POSTs exactly once on explicit tap', (
     tester,

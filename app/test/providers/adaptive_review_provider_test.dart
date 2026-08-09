@@ -11,6 +11,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posture_app/core/api_client.dart';
+import 'package:posture_app/models/adaptive_review.dart';
 import 'package:posture_app/providers/adaptive_review_provider.dart';
 
 import '_test_dio.dart';
@@ -202,6 +203,154 @@ void main() {
     expect(post.data['idempotency_key'], isNotEmpty);
   });
 
+  test(
+    'explicit review proposal creates only a draft then reloads state',
+    () async {
+      var created = false;
+      final adapter = FakeDioAdapter()
+        ..registerJson('GET', '/training/reviews/weeks/1', (_) {
+          final snapshot = _snapshotJson();
+          snapshot['proposals'] = [
+            {
+              'code': 'offer_training_draft',
+              'strategy': 'conservative_duration',
+              'state': created ? 'draft' : 'proposal',
+              if (created) 'origin_weekly_review_id': 'rv-1',
+            },
+          ];
+          return snapshot;
+        })
+        ..registerJson('POST', '/training/reviews/weeks/1/training-drafts', (
+          _,
+        ) {
+          created = true;
+          return {
+            'review_id': 'rv-1',
+            'draft_id': 'draft-1',
+            'status': 'created',
+            'origin_weekly_review_id': 'rv-1',
+          };
+        });
+      final notifier = AdaptiveReviewNotifier(
+        _apiWith(adapter),
+        onDraftCreated: (_, draftId, reviewId) async =>
+            draftId == 'draft-1' && reviewId == 'rv-1',
+      );
+      addTearDown(notifier.dispose);
+
+      await notifier.loadReview(1);
+      final ok = await notifier.createDraft(
+        ReviewProposalCode.offerTrainingDraft,
+      );
+
+      expect(ok, isTrue);
+      expect(notifier.state.phase, ReviewPhase.data);
+      expect(
+        notifier.state.snapshot!.proposals.single.state,
+        ReviewProposalState.draft,
+      );
+      final post = adapter.calls.singleWhere(
+        (call) => call.path.endsWith('/training-drafts'),
+      );
+      expect((post.data as Map<String, dynamic>).keys.toSet(), {
+        'expected_review_id',
+        'expected_input_fingerprint',
+        'iana_timezone',
+        'idempotency_key',
+      });
+    },
+  );
+
+  test(
+    'successful review draft refreshes its owning domain provider',
+    () async {
+      var created = false;
+      ReviewProposalCode? refreshed;
+      final adapter = FakeDioAdapter()
+        ..registerJson('GET', '/training/reviews/weeks/1', (_) {
+          final snapshot = _snapshotJson();
+          snapshot['proposals'] = [
+            {
+              'code': 'offer_training_draft',
+              'strategy': 'conservative_duration',
+              'state': created ? 'draft' : 'proposal',
+              if (created) 'origin_weekly_review_id': 'rv-1',
+            },
+          ];
+          return snapshot;
+        })
+        ..registerJson('POST', '/training/reviews/weeks/1/training-drafts', (
+          _,
+        ) {
+          created = true;
+          return {
+            'review_id': 'rv-1',
+            'draft_id': 'draft-1',
+            'status': 'created',
+            'origin_weekly_review_id': 'rv-1',
+          };
+        });
+      final notifier = AdaptiveReviewNotifier(
+        _apiWith(adapter),
+        onDraftCreated: (code, draftId, reviewId) async {
+          refreshed = code;
+          return draftId == 'draft-1' && reviewId == 'rv-1';
+        },
+      );
+      addTearDown(notifier.dispose);
+
+      await notifier.loadReview(1);
+      expect(
+        await notifier.createDraft(ReviewProposalCode.offerTrainingDraft),
+        isTrue,
+      );
+      expect(refreshed, ReviewProposalCode.offerTrainingDraft);
+    },
+  );
+
+  test(
+    'mismatched authoritative draft identity fails closed as stale',
+    () async {
+      var created = false;
+      final adapter = FakeDioAdapter()
+        ..registerJson('GET', '/training/reviews/weeks/1', (_) {
+          final snapshot = _snapshotJson();
+          snapshot['proposals'] = [
+            {
+              'code': 'offer_training_draft',
+              'strategy': 'conservative_duration',
+              'state': created ? 'draft' : 'proposal',
+              if (created) 'origin_weekly_review_id': 'rv-1',
+            },
+          ];
+          return snapshot;
+        })
+        ..registerJson('POST', '/training/reviews/weeks/1/training-drafts', (
+          _,
+        ) {
+          created = true;
+          return {
+            'review_id': 'rv-1',
+            'draft_id': 'draft-1',
+            'status': 'created',
+            'origin_weekly_review_id': 'rv-1',
+          };
+        });
+      final notifier = AdaptiveReviewNotifier(
+        _apiWith(adapter),
+        onDraftCreated: (_, _, _) async => false,
+      );
+      addTearDown(notifier.dispose);
+
+      await notifier.loadReview(1);
+      expect(
+        await notifier.createDraft(ReviewProposalCode.offerTrainingDraft),
+        isFalse,
+      );
+      expect(notifier.state.phase, ReviewPhase.stale);
+    },
+  );
+
   test('out-of-range week fails closed without a request', () async {
     final adapter = FakeDioAdapter();
     final c = ProviderContainer(
@@ -263,6 +412,20 @@ void main() {
       ..registerError('POST', '/training/reviews/weeks/1', 500, {
         'detail': 'x',
         'code': 'explosion',
+      });
+    final c = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(_apiWith(adapter))],
+    );
+    addTearDown(c.dispose);
+    await c.read(adaptiveReviewProvider.notifier).generateReview(1);
+    expect(c.read(adaptiveReviewProvider).phase, ReviewPhase.unavailable);
+  });
+
+  test('generateReview non-string code -> unavailable (fail closed)', () async {
+    final adapter = FakeDioAdapter()
+      ..registerError('POST', '/training/reviews/weeks/1', 500, {
+        'detail': 'invalid code type',
+        'code': 7,
       });
     final c = ProviderContainer(
       overrides: [apiClientProvider.overrideWithValue(_apiWith(adapter))],

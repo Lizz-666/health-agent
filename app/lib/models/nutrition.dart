@@ -771,6 +771,7 @@ class NutritionRecommendation {
   final int version;
   final RecommendationStatus status;
   final String changeReason;
+  final String? originWeeklyReviewId;
   final RecommendationPayload payload;
   final List<String> validationCodes;
   final DateTime generatedAt;
@@ -780,6 +781,7 @@ class NutritionRecommendation {
     required this.version,
     required this.status,
     required this.changeReason,
+    required this.originWeeklyReviewId,
     required this.payload,
     required this.validationCodes,
     required this.generatedAt,
@@ -792,6 +794,7 @@ class NutritionRecommendation {
       'status',
       'change_reason',
       'source_recommendation_id',
+      'origin_weekly_review_id',
       'superseded_by_id',
       'payload',
       'validation_codes',
@@ -825,6 +828,10 @@ class NutritionRecommendation {
       version: _integer(json, 'version', 'NutritionRecommendation'),
       status: status,
       changeReason: _string(json, 'change_reason', 'NutritionRecommendation'),
+      originWeeklyReviewId: _nullableString(
+        json['origin_weekly_review_id'],
+        'origin_weekly_review_id',
+      ),
       payload: payload,
       validationCodes: _stringList(
         json['validation_codes'],

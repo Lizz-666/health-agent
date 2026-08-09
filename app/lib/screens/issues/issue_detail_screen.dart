@@ -228,6 +228,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
+              key: const Key('issue-detail-start-self-test'),
               onPressed: () => context.push('/issue/${detail.id}/test'),
               child: const Text('开始自测', style: TextStyle(fontSize: 18)),
             ),

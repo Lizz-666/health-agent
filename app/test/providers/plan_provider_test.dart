@@ -100,8 +100,68 @@ void main() {
     expect(container.read(planProvider).draft?.planVersionId, 'pv-1');
   });
 
+  test(
+    'restricted draft generation preserves a typed safety failure',
+    () async {
+      final adapter = FakeDioAdapter()
+        ..registerError('POST', '/training/plans:draft', 409, {
+          'detail': 'restricted',
+          'code': 'restricted_no_plan',
+        });
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWithValue(_apiWith(adapter))],
+      );
+      addTearDown(container.dispose);
+
+      final ok = await container
+          .read(planProvider.notifier)
+          .generateDraft(_draftInput());
+
+      expect(ok, isFalse);
+      expect(container.read(planProvider).draftStatus, LoadStatus.networkError);
+      expect(
+        container.read(planProvider).draftFailure,
+        DraftFailureState.safetyBlocked,
+      );
+      expect(container.read(planProvider).draft, isNull);
+    },
+  );
+
+  test('non-string draft error code fails closed to unavailable', () async {
+    final adapter = FakeDioAdapter()
+      ..registerError('POST', '/training/plans:draft', 409, {
+        'detail': 'invalid code type',
+        'code': 7,
+      });
+    final container = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(_apiWith(adapter))],
+    );
+    addTearDown(container.dispose);
+
+    final ok = await container
+        .read(planProvider.notifier)
+        .generateDraft(_draftInput());
+
+    expect(ok, isFalse);
+    expect(container.read(planProvider).draftStatus, LoadStatus.networkError);
+    expect(
+      container.read(planProvider).draftFailure,
+      DraftFailureState.unavailable,
+    );
+    expect(container.read(planProvider).draft, isNull);
+  });
+
   test('fetchDraft surfaces an explicit empty state', () async {
     final adapter = FakeDioAdapter()
+      ..registerJson(
+        'POST',
+        '/training/plans:draft',
+        (_) => {
+          'has_draft': true,
+          'draft': _planJson(),
+          'decision_gate': 'eligible',
+        },
+      )
       ..registerJson(
         'GET',
         '/training/plans/draft',
@@ -111,8 +171,38 @@ void main() {
       overrides: [apiClientProvider.overrideWithValue(_apiWith(adapter))],
     );
     addTearDown(container.dispose);
+    await container.read(planProvider.notifier).generateDraft(_draftInput());
+    expect(container.read(planProvider).draft, isNotNull);
+
     await container.read(planProvider.notifier).fetchDraft();
     expect(container.read(planProvider).draftStatus, LoadStatus.empty);
+    expect(container.read(planProvider).draft, isNull);
+  });
+
+  test('fetchDraft network failure clears a stale cached draft', () async {
+    final adapter = FakeDioAdapter()
+      ..registerJson(
+        'POST',
+        '/training/plans:draft',
+        (_) => {
+          'has_draft': true,
+          'draft': _planJson(),
+          'decision_gate': 'eligible',
+        },
+      );
+    final container = ProviderContainer(
+      overrides: [apiClientProvider.overrideWithValue(_apiWith(adapter))],
+    );
+    addTearDown(container.dispose);
+    await container.read(planProvider.notifier).generateDraft(_draftInput());
+    expect(container.read(planProvider).draft, isNotNull);
+
+    adapter.registerError('GET', '/training/plans/draft', 503, {
+      'detail': 'temporarily unavailable',
+    });
+    await container.read(planProvider.notifier).fetchDraft();
+
+    expect(container.read(planProvider).draftStatus, LoadStatus.networkError);
     expect(container.read(planProvider).draft, isNull);
   });
 
@@ -463,6 +553,37 @@ void main() {
               idempotencyKey: 'k',
             ),
           );
+      expect(
+        container.read(planProvider).adjustState,
+        AdjustApplyState.unavailable,
+      );
+    },
+  );
+
+  test(
+    'non-string adjustment error code fails closed to unavailable',
+    () async {
+      final adapter = FakeDioAdapter()
+        ..registerError('POST', '/training/today/adjustments', 409, {
+          'detail': 'invalid code type',
+          'code': 7,
+        });
+      final container = ProviderContainer(
+        overrides: [apiClientProvider.overrideWithValue(_apiWith(adapter))],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(planProvider.notifier)
+          .applyTodayAdjustment(
+            const AdjustmentRequestInput(
+              expectedPlanVersionId: 'pv-1',
+              expectedSessionId: 's-1',
+              ianaTimezone: 'Asia/Shanghai',
+              idempotencyKey: 'k',
+            ),
+          );
+
       expect(
         container.read(planProvider).adjustState,
         AdjustApplyState.unavailable,
