@@ -38,6 +38,12 @@ import 'package:posture_app/providers/assessment_provider.dart' show LoadStatus;
 import 'package:posture_app/providers/nutrition_provider.dart';
 import 'package:posture_app/providers/plan_provider.dart';
 
+const bool _kCaptureScreenshots = bool.fromEnvironment(
+  'PHASE8_CAPTURE_SCREENSHOTS',
+);
+late final IntegrationTestWidgetsFlutterBinding _binding;
+bool _surfaceConvertedForScreenshots = false;
+
 // --- Frozen Gate 2 control-plane contract -----------------------------------
 const String _kControlHeaderName = 'X-Phase8-Control-Token';
 const String _kControlHeaderValue = 'phase8-local-control-only';
@@ -421,10 +427,21 @@ Future<void> _devLogin(WidgetTester tester) async {
   await _pumpUntil(tester, find.byKey(const Key('today-training-card')));
 }
 
+Future<void> _captureScreenshot(WidgetTester tester, String name) async {
+  if (!_kCaptureScreenshots) return;
+  await tester.pumpAndSettle();
+  if (!_surfaceConvertedForScreenshots) {
+    await _binding.convertFlutterSurfaceToImage();
+    _surfaceConvertedForScreenshots = true;
+    await tester.pumpAndSettle();
+  }
+  await _binding.takeScreenshot(name);
+}
+
 // --- Journey ----------------------------------------------------------------
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  _binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   final control = _ControlPlane();
 
@@ -442,6 +459,7 @@ void main() {
 
     // 1. Real dev-login.
     await _devLogin(tester);
+    await _captureScreenshot(tester, '01-login-complete');
 
     // 2. Posture home -> category -> issue -> illustrated self-test -> result.
     _navigate(container, '/posture');
@@ -457,12 +475,14 @@ void main() {
     await _tap(tester, find.byKey(const Key('self-test-answer-positive')));
     // Result + server posture-profile entry must render.
     await _pumpUntil(tester, find.byKey(const Key('result-screen')));
+    await _captureScreenshot(tester, '02-posture-result');
 
     // 3. Confirm an allowed posture goal.
     _navigate(container, '/profile/posture');
     await _tap(tester, _keyStartsWith('candidate-'));
     await _tap(tester, find.byKey(const Key('confirm-goals-button')));
     await _pumpUntil(tester, find.text('已确认目标'));
+    await _captureScreenshot(tester, '03-posture-profile');
 
     // 4. The deterministic training gate requires today's current safety input
     //    before generation. Save the normal synthetic check-in first.
@@ -486,12 +506,14 @@ void main() {
     expect(find.byKey(const Key('agent-plan-entry')), findsNothing);
     await _tap(tester, find.byKey(const Key('plan-confirm-button')));
     await _pumpUntil(tester, find.byKey(const Key('agent-plan-entry')));
+    await _captureScreenshot(tester, '04-active-plan');
 
     // 6. Return to Today and prove the saved check-in plus training projection
     //    are both visible. Merely revisiting must not issue another save.
     _navigate(container, '/today');
     await _pumpUntil(tester, find.text('今日已签到'));
     await _pumpUntil(tester, find.byKey(const Key('today-training-card')));
+    await _captureScreenshot(tester, '05-active-today');
 
     // 7. Inspect effective Today and request a legal same-day adjustment.
     _navigate(container, '/plan');
@@ -551,6 +573,7 @@ void main() {
     }
     expect(conversationCards, findsAtLeastNWidgets(2));
     expect(find.byKey(const Key('agent-proposal-card')), findsNothing);
+    await _captureScreenshot(tester, '06-agent-bounded-explanation');
 
     // 10. Nutrition draft -> explicit confirm; source/uncertainty rendered.
     _navigate(container, '/plan/nutrition');
@@ -565,6 +588,7 @@ void main() {
     expect(find.byKey(const Key('nutrition-active-label')), findsNothing);
     await _tap(tester, find.byKey(const Key('nutrition-confirm-draft')));
     await _pumpUntil(tester, find.byKey(const Key('nutrition-active-label')));
+    await _captureScreenshot(tester, '07-active-nutrition');
   });
 
   testWidgets(
@@ -594,6 +618,7 @@ void main() {
         find.byKey(const Key('review-proposal-posture_recheck_due')),
         findsOneWidget,
       );
+      await _captureScreenshot(tester, '08-weekly-review');
 
       // Materialize exactly one offered domain draft. Review generation alone
       // did not create it, and this action still must not activate it.
@@ -634,6 +659,7 @@ void main() {
     await _pumpUntil(tester, find.byKey(const Key('plan-status-safety')));
     expect(find.byKey(const Key('plan-confirm-button')), findsNothing);
     expect(find.byKey(const Key('adjust-status-applied')), findsNothing);
+    await _captureScreenshot(tester, '09-training-safety-blocked');
 
     // Nutrition must not offer an activate-able draft under a safety block.
     _navigate(container, '/plan/nutrition');
@@ -710,6 +736,7 @@ void main() {
         find.byKey(const Key('today-status-unavailable')),
       );
       expect(find.byKey(const Key('today-adjust-button')), findsNothing);
+      await _captureScreenshot(tester, '10-today-unavailable');
 
       // Explicit retry performs a fresh request; the one-shot fault is spent and
       // the effective Today projection recovers.
