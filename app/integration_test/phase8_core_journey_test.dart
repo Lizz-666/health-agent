@@ -42,7 +42,6 @@ const bool _kCaptureScreenshots = bool.fromEnvironment(
   'PHASE8_CAPTURE_SCREENSHOTS',
 );
 late final IntegrationTestWidgetsFlutterBinding _binding;
-bool _surfaceConvertedForScreenshots = false;
 
 // --- Frozen Gate 2 control-plane contract -----------------------------------
 const String _kControlHeaderName = 'X-Phase8-Control-Token';
@@ -430,11 +429,9 @@ Future<void> _devLogin(WidgetTester tester) async {
 Future<void> _captureScreenshot(WidgetTester tester, String name) async {
   if (!_kCaptureScreenshots) return;
   await tester.pumpAndSettle();
-  if (!_surfaceConvertedForScreenshots) {
-    await _binding.convertFlutterSurfaceToImage();
-    _surfaceConvertedForScreenshots = true;
-    await tester.pumpAndSettle();
-  }
+  // Flutter resets the platform screenshot callback between testWidgets cases.
+  await _binding.convertFlutterSurfaceToImage();
+  await tester.pumpAndSettle();
   await _binding.takeScreenshot(name);
 }
 
