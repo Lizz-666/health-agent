@@ -25,10 +25,8 @@ Widget _wrap(ApiClient api) => ProviderScope(
   overrides: [
     apiClientProvider.overrideWithValue(api),
     adaptiveReviewProvider.overrideWith(
-      (ref) => AdaptiveReviewNotifier(
-        api,
-        onDraftCreated: (_, _, _) async => true,
-      ),
+      (ref) =>
+          AdaptiveReviewNotifier(api, onDraftCreated: (_, _, _) async => true),
     ),
   ],
   child: const MaterialApp(home: WeeklyReviewScreen()),
@@ -121,6 +119,11 @@ void main() {
       expect(find.textContaining('主动休息'), findsWidgets);
       // Proposals exist after facts.
       expect(find.byKey(const Key('review-proposals')), findsOneWidget);
+      expect(find.textContaining('执行改善'), findsOneWidget);
+      expect(find.textContaining('营养建议已生效'), findsOneWidget);
+      expect(find.textContaining('保守缩短单次时长'), findsOneWidget);
+      expect(find.textContaining('improving'), findsNothing);
+      expect(find.textContaining('conservativeDuration'), findsNothing);
       // Facts appear above proposals in the tree.
       final factsBox = tester.getCenter(find.byKey(const Key('review-facts')));
       final proposalsBox = tester.getCenter(

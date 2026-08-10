@@ -287,7 +287,7 @@ class _FactsSection extends StatelessWidget {
           _row(
             '执行趋势',
             snapshot.executionTrend.available
-                ? (snapshot.executionTrend.direction?.name ?? '未知')
+                ? _executionTrendLabel(snapshot.executionTrend.direction)
                 : '数据不足',
           ),
           Padding(
@@ -296,7 +296,7 @@ class _FactsSection extends StatelessWidget {
             child: _row(
               '体重趋势',
               snapshot.weightTrend.available
-                  ? (snapshot.weightTrend.direction?.name ?? '未知')
+                  ? _weightTrendLabel(snapshot.weightTrend.direction)
                   : '数据不足',
             ),
           ),
@@ -350,8 +350,8 @@ class _FactsSection extends StatelessWidget {
     final refresh = n.refreshAvailable ? '；可请求刷新草案' : '';
     final unavailable = n.unavailableReason == null
         ? ''
-        : ' (${n.unavailableReason})';
-    return '${n.state.name}$age$refresh$unavailable';
+        : '（${_unavailableReasonLabel(n.unavailableReason!)}）';
+    return '${_nutritionStateLabel(n.state)}$age$refresh$unavailable';
   }
 
   String _postureLabel(PostureRecheckInfo p) {
@@ -361,7 +361,7 @@ class _FactsSection extends StatelessWidget {
       case PostureRecheckStatus.notDue:
         return '暂未到期';
       case PostureRecheckStatus.comparisonAvailable:
-        return '可比较（${p.comparisonSignal?.name ?? "未知"}）';
+        return '可比较（${_postureComparisonLabel(p.comparisonSignal)}）';
       case PostureRecheckStatus.unavailable:
         return '不可用${p.reason == null ? "" : "（${p.reason}）"}';
     }
@@ -430,7 +430,7 @@ class _ProposalsSection extends StatelessWidget {
           ),
           if (p.strategy != null)
             Text(
-              '  策略：${p.strategy!.name}',
+              '  调整方向：${_reviewStrategyLabel(p.strategy!)}',
               style: const TextStyle(
                 fontSize: 11,
                 color: Color(AppConstants.textMuted),
@@ -467,3 +467,50 @@ class _ProposalsSection extends StatelessWidget {
     );
   }
 }
+
+String _executionTrendLabel(ExecutionTrendDirection? direction) =>
+    switch (direction) {
+      ExecutionTrendDirection.improving => '执行改善',
+      ExecutionTrendDirection.steady => '执行稳定',
+      ExecutionTrendDirection.declining => '执行下降',
+      null => '未知',
+    };
+
+String _weightTrendLabel(WeightTrendDirection? direction) =>
+    switch (direction) {
+      WeightTrendDirection.rising => '上升',
+      WeightTrendDirection.falling => '下降',
+      WeightTrendDirection.stable => '稳定',
+      null => '未知',
+    };
+
+String _nutritionStateLabel(NutritionRecommendationState state) =>
+    switch (state) {
+      NutritionRecommendationState.none => '暂无营养建议',
+      NutritionRecommendationState.active => '营养建议已生效',
+      NutritionRecommendationState.stale => '营养建议待更新',
+      NutritionRecommendationState.unavailable => '营养建议不可用',
+    };
+
+String _unavailableReasonLabel(String reason) => switch (reason) {
+  'nutrition_clarification_required' => '需要补充营养信息',
+  'nutrition_restricted' => '当前安全状态受限',
+  'nutrition_red_flag' => '已触发安全阻断',
+  _ => '原因暂不可用',
+};
+
+String _postureComparisonLabel(PostureComparisonSignal? signal) =>
+    switch (signal) {
+      PostureComparisonSignal.added => '新增信号',
+      PostureComparisonSignal.notDetected => '本次未检出',
+      PostureComparisonSignal.unchanged => '无明显变化',
+      PostureComparisonSignal.changed => '已有变化',
+      null => '未知',
+    };
+
+String _reviewStrategyLabel(ReviewDraftStrategy strategy) => switch (strategy) {
+  ReviewDraftStrategy.conservativeDuration => '保守缩短单次时长',
+  ReviewDraftStrategy.lowerFrequency => '降低每周频次',
+  ReviewDraftStrategy.progression => '逐步进阶',
+  ReviewDraftStrategy.regression => '降低难度',
+};

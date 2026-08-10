@@ -493,10 +493,6 @@ class _MessageCard extends StatelessWidget {
                 Text(item.text),
                 if (item.turn != null) ...[
                   const SizedBox(height: 6),
-                  Text(
-                    item.turn!.resultCode,
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
                   for (final display in item.turn!.displayData)
                     _ToolDisplayCard(display: display),
                 ],
@@ -535,7 +531,7 @@ class _ToolDisplayCard extends StatelessWidget {
           if (rows.isEmpty) const Text('暂无结构化数据'),
           for (final row in rows.take(24))
             Text(
-              '${row.key}: ${row.value}',
+              '${_toolFieldLabel(row.key)}：${_toolFieldValue(row.value)}',
               style: const TextStyle(fontSize: 12),
             ),
         ],
@@ -823,6 +819,63 @@ String _toolLabel(String tool) {
     'get_training_exercise': '当前处方动作',
   };
   return labels[tool] ?? '结构化结果';
+}
+
+String _toolFieldLabel(String field) {
+  const labels = {
+    'configured': '档案已配置',
+    'profile_version': '档案版本',
+    'readiness_code': '准备状态',
+    'risk_version': '安全规则版本',
+    'fitness_goal': '训练目标',
+    'training_experience': '训练经验',
+    'weekly_frequency': '每周频次',
+    'session_duration_minutes': '单次时长（分钟）',
+    'equipment_bodyweight': '可做自重训练',
+    'equipment_resistance_band': '有弹力带',
+    'pain_limitation_count': '疼痛/限制项数量',
+    'allergies_count': '过敏项数量',
+    'diet_exclusions_count': '饮食排除项数量',
+    'restricted': '是否受限',
+    'state': '今日状态',
+    'local_date': '日期',
+    'decision_gate': '安全校验',
+    'change_reason': '变更原因',
+    'session_id': '训练场次',
+    'prescription_count': '动作数量',
+    'exercise_ids': '动作标识',
+    'substitution_applied': '已应用替换',
+    'feedback_outcome_state': '完成反馈',
+  };
+  final indexed = RegExp(r'^(.*)(\[\d+\])$').firstMatch(field);
+  final base = indexed?.group(1) ?? field;
+  final suffix = indexed?.group(2) ?? '';
+  return '${labels[base] ?? base}$suffix';
+}
+
+String _toolFieldValue(String value) {
+  const labels = {
+    'true': '是',
+    'false': '否',
+    'ready': '已就绪',
+    'basic_strength': '基础力量',
+    'posture_improvement': '体态改善',
+    'fat_loss': '减脂',
+    'general_wellness': '一般健康',
+    'beginner': '初学者',
+    'experienced': '有训练经验',
+    'session': '有训练安排',
+    'rest_day': '休息日',
+    'active_rest': '主动休息',
+    'plan_complete': '计划已完成',
+    'eligible': '已通过',
+    'eligible_conservative': '保守条件通过',
+    'clarification_required': '需要补充信息',
+    'restricted': '受限',
+    'red_flag': '已触发安全阻断',
+    'null': '无',
+  };
+  return labels[value] ?? value;
 }
 
 String _disclosureLabel(String code) {

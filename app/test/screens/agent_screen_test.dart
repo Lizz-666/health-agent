@@ -248,7 +248,9 @@ void main() {
     expect(find.text('今天练什么'), findsOneWidget);
     expect(find.text('已根据当前可访问的信息整理结果。'), findsOneWidget);
     expect(find.text('今日训练'), findsOneWidget);
-    expect(find.textContaining('exercise_ids'), findsOneWidget);
+    expect(find.textContaining('动作标识'), findsOneWidget);
+    expect(find.text('agent_answer_ready'), findsNothing);
+    expect(find.textContaining('exercise_ids'), findsNothing);
   });
 
   testWidgets(

@@ -145,6 +145,12 @@ void main() {
     final active = _draftPlanJson()
       ..['status'] = 'active'
       ..['confirmed_at'] = '2026-07-27T08:10:00Z';
+    final session = (active['sessions'] as List).first as Map<String, dynamic>;
+    final prescription =
+        (session['prescriptions'] as List).first as Map<String, dynamic>;
+    (prescription['exercise'] as Map<String, dynamic>)['substitution_ids'] = [
+      'ex_internal_replacement',
+    ];
     final adapter = FakeDioAdapter()
       ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
       ..registerJson(
@@ -160,7 +166,17 @@ void main() {
       ..registerJson(
         'GET',
         '/training/today',
-        (_) => {'state': 'plan_complete'},
+        (_) => {
+          'state': 'session',
+          'local_date': '2026-07-27',
+          'decision_gate': 'eligible',
+          'session': session,
+          'feedback_outcome_state': null,
+          'substitution_applied': false,
+          'original_session_id': 's-1',
+          'source_local_date': '2026-07-27',
+          'safety_status': 'eligible',
+        },
       );
 
     await tester.pumpWidget(_wrap(_apiWith(adapter)));
@@ -169,11 +185,47 @@ void main() {
     expect(find.byKey(const Key('plan-active-tab')), findsOneWidget);
     expect(find.byKey(const Key('agent-plan-entry')), findsOneWidget);
     expect(find.byKey(const Key('plan-confirm-button')), findsNothing);
+    expect(find.textContaining('计划状态：已生效'), findsOneWidget);
+    expect(find.textContaining('initial_generation'), findsNothing);
+    expect(find.text('替代动作 1'), findsOneWidget);
+    expect(find.textContaining('ex_internal_replacement'), findsNothing);
 
     await tester.tap(find.byKey(const Key('plan-draft-tab')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('plan-confirm-button')), findsOneWidget);
+  });
+
+  testWidgets('Today unavailable hides server detail and keeps retry visible', (
+    tester,
+  ) async {
+    final active = _draftPlanJson()
+      ..['status'] = 'active'
+      ..['confirmed_at'] = '2026-07-27T08:10:00Z';
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerError('GET', '/training/today', 503, {
+        'detail': 'Synthetic service fault',
+        'code': 'service_unavailable',
+      });
+
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('today-status-unavailable')), findsOneWidget);
+    expect(find.text('Synthetic service fault'), findsNothing);
+    expect(find.textContaining('请检查连接后重试'), findsOneWidget);
+    expect(find.text('重试'), findsOneWidget);
   });
 
   testWidgets('profile load failure does not hide an existing active plan', (

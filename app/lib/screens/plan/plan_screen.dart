@@ -552,7 +552,7 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
           ],
         ),
         Text(
-          '版本 ${active.changeReason} · 决策 ${active.decisionGate}',
+          '计划状态：已生效 · 安全校验：${_decisionGateLabel(active.decisionGate)}',
           style: const TextStyle(fontSize: 12),
         ),
         const Divider(),
@@ -573,7 +573,7 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
         key: const Key('today-status-unavailable'),
         icon: Icons.cloud_off,
         title: '今日加载失败',
-        detail: plan.error ?? '请稍后重试',
+        detail: '暂时无法加载今日训练。请检查连接后重试。',
         action: () =>
             ref.read(planProvider.notifier).fetchToday(_kDefaultTimezone),
         actionLabel: '重试',
@@ -615,7 +615,7 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
           key: const Key('today-status-safety'),
           icon: Icons.block,
           title: '当前安全状态暂停训练',
-          detail: '当前状态为 ${today.decisionGate ?? "blocked"}，不会显示为可执行训练。',
+          detail: '当前状态为${_decisionGateLabel(today.decisionGate)}，不会显示为可执行训练。',
         );
       }
       return const _StatusCard(
@@ -1049,6 +1049,7 @@ class _SessionSection extends StatelessWidget {
                   ),
                   if (p.exercise != null) ...[
                     const SizedBox(height: 4),
+                    const Text('动作步骤（知识库原文）', style: TextStyle(fontSize: 12)),
                     for (final step in p.exercise!.instructionSteps.take(4))
                       Text('· $step', style: const TextStyle(fontSize: 12)),
                     if (p.exercise!.substitutionIds.isNotEmpty &&
@@ -1056,12 +1057,13 @@ class _SessionSection extends StatelessWidget {
                         feedback == null) ...[
                       const SizedBox(height: 8),
                       const Text('可选替代动作', style: TextStyle(fontSize: 12)),
-                      for (final replacement in p.exercise!.substitutionIds)
+                      for (final (index, replacement)
+                          in p.exercise!.substitutionIds.indexed)
                         TextButton(
                           key: Key('substitute-${p.exerciseId}-$replacement'),
                           onPressed: () =>
                               onSubstitute(p.exerciseId, replacement),
-                          child: Text('替换为 $replacement'),
+                          child: Text('替代动作 ${index + 1}'),
                         ),
                     ],
                   ],
@@ -1086,6 +1088,15 @@ class _SessionSection extends StatelessWidget {
     );
   }
 }
+
+String _decisionGateLabel(String? gate) => switch (gate) {
+  'eligible' => '已通过',
+  'eligible_conservative' => '保守条件通过',
+  'clarification_required' => '需要补充信息',
+  'restricted' => '受限',
+  'red_flag' => '已触发安全阻断',
+  _ => '未通过',
+};
 
 class _StatusCard extends StatelessWidget {
   final IconData icon;

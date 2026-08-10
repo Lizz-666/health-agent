@@ -483,6 +483,7 @@ void main() {
     await _tap(tester, _keyStartsWith('candidate-'));
     await _tap(tester, find.byKey(const Key('confirm-goals-button')));
     await _pumpUntil(tester, find.text('已确认目标'));
+    await tester.ensureVisible(find.text('已确认目标'));
     await _captureScreenshot(tester, '03-posture-profile');
 
     // 4. The deterministic training gate requires today's current safety input
@@ -559,7 +560,7 @@ void main() {
     await _pumpUntil(tester, find.byKey(const Key('agent-message-input')));
     await tester.enterText(
       find.byKey(const Key('agent-message-input')),
-      'Summarize the synthetic health profile without changing records.',
+      '请总结当前合成健康档案，不要修改任何记录。',
     );
     await tester.pump();
     await _tap(tester, find.byKey(const Key('agent-send')));
@@ -589,6 +590,7 @@ void main() {
     expect(find.byKey(const Key('nutrition-active-label')), findsNothing);
     await _tap(tester, find.byKey(const Key('nutrition-confirm-draft')));
     await _pumpUntil(tester, find.byKey(const Key('nutrition-active-label')));
+    await tester.ensureVisible(find.byKey(const Key('nutrition-active-label')));
     await _captureScreenshot(tester, '07-active-nutrition');
   });
 
