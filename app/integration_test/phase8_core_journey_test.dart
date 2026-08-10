@@ -42,6 +42,7 @@ const bool _kCaptureScreenshots = bool.fromEnvironment(
   'PHASE8_CAPTURE_SCREENSHOTS',
 );
 late final IntegrationTestWidgetsFlutterBinding _binding;
+bool _surfaceConvertedForScreenshots = false;
 
 // --- Frozen Gate 2 control-plane contract -----------------------------------
 const String _kControlHeaderName = 'X-Phase8-Control-Token';
@@ -429,9 +430,11 @@ Future<void> _devLogin(WidgetTester tester) async {
 Future<void> _captureScreenshot(WidgetTester tester, String name) async {
   if (!_kCaptureScreenshots) return;
   await tester.pumpAndSettle();
-  // Flutter resets the platform screenshot callback between testWidgets cases.
-  await _binding.convertFlutterSurfaceToImage();
-  await tester.pumpAndSettle();
+  if (!_surfaceConvertedForScreenshots) {
+    await _binding.convertFlutterSurfaceToImage();
+    _surfaceConvertedForScreenshots = true;
+    await tester.pumpAndSettle();
+  }
   await _binding.takeScreenshot(name);
 }
 
@@ -443,6 +446,7 @@ void main() {
   final control = _ControlPlane();
 
   setUp(() async {
+    _surfaceConvertedForScreenshots = false;
     // Real secure storage may still hold a token from a previous run whose
     // backend rows were just dropped. Clear it so the app authenticates fresh.
     await AppStorage.clearTokens();
