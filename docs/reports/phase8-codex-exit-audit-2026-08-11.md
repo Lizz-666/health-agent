@@ -8,7 +8,7 @@ Gate 4 local implementation candidate: `6c4e48bdd5a878012bc3a6377d40f76c5799fa2f
 
 Branch: `codex/phase8-flutter-driver`
 
-> Candidate status: local acceptance passed; strict closure CI is pending. This
+> Status: verified for the synthetic Android personal-development scope. This
 > report authorizes no merge, deployment, `main` write, public release, medical
 > use, real health data/photo, production credential, or live-provider use.
 
@@ -92,11 +92,22 @@ repository assets, not user photos. No photo-analysis or live-provider path ran.
 
 ## CI And Decision
 
-Strict exact-SHA Fast/Flutter/Full/Phase8 CI is pending for the documentation
-candidate and final closure. Acceptance requires Full 1745/0/0, PostgreSQL
-expected/actual parity, Flutter 493, HTTP 11/11, eval 13/13, clean artifacts,
-and event SHA equal to checked-out SHA. Until that evidence is green, Phase 8
-remains `in_progress` and this report is a candidate, not final acceptance.
+Strict workflow-dispatch run
+[31506247788](https://github.com/Lizz-666/health-agent/actions/runs/31506247788)
+checked out exact documentation candidate SHA
+`fe6f18481235aea6d246c1a8166d28b2ca901483`:
+
+- Fast: 1015 passed, 0 failed, 11 expected conditional skips; ruff/diff clean.
+- Flutter: analyze success; 493 tests passed.
+- Full: 1745 passed, 0 failed, 0 skipped; PostgreSQL expected 28, actual 28,
+  version evidence present.
+- Phase8: HTTP 11/11 with zero residual tables; eval 13/13 with zero skipped.
+- Every job's event SHA and checked-out SHA matched the candidate.
+
+This status update is the final metadata closure and must itself pass a second
+strict exact-SHA run before Codex announces final acceptance. That run adds no
+new product claim; it verifies that the immutable status documents did not
+invalidate Fast/Flutter/Full/Phase8 evidence.
 
 The separate [Public Release Gate](../product/public-release-gate.md) remains
 entirely blocked. Phase 8 is only a repeatable synthetic Android development
