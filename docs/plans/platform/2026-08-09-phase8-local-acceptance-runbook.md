@@ -57,6 +57,48 @@ flutter test integration_test/phase8_core_journey_test.dart -d emulator-5554 `
   --dart-define=DEV_ADMIN_PASSWORD=synthetic-phase8-only
 ```
 
+To capture the ten required synthetic screenshots, keep the same server running
+and use the gated screenshot driver from `app/`:
+
+```powershell
+$env:PHASE8_SCREENSHOT_DIR = (Resolve-Path .\build).Path + '\phase8-gate4\screenshots'
+flutter drive `
+  --driver=test_driver/phase8_screenshot_driver.dart `
+  --target=integration_test/phase8_core_journey_test.dart `
+  -d emulator-5554 `
+  --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1 `
+  --dart-define=DEV_ADMIN_PHONE=13900000008 `
+  --dart-define=DEV_ADMIN_PASSWORD=synthetic-phase8-only `
+  --dart-define=PHASE8_CAPTURE_SCREENSHOTS=true
+```
+
+Screenshot capture is off by default. The driver deletes only its configured
+output directory, rejects unexpected names, and must write exactly the named
+synthetic checkpoints. Do not commit screenshots, logs, tokens, local databases,
+or generated plugin registrants.
+
+## Unreachable Android run
+
+Keep the synthetic server on host port 8000 for bounded reset and dev-login
+setup, but first prove host port 65534 has no listener:
+
+```powershell
+if (Get-NetTCPConnection -LocalPort 65534 -State Listen -ErrorAction SilentlyContinue) {
+  throw 'Port 65534 must be unreachable for this gate'
+}
+
+flutter test integration_test/phase8_unreachable_test.dart -d emulator-5554 `
+  --dart-define=API_BASE_URL=http://10.0.2.2:65534/api/v1 `
+  --dart-define=PHASE8_SEED_API_BASE_URL=http://10.0.2.2:8000/api/v1 `
+  --dart-define=DEV_ADMIN_PHONE=13900000008 `
+  --dart-define=DEV_ADMIN_PASSWORD=synthetic-phase8-only
+```
+
+The setup client may only reset the disposable synthetic backend and obtain its
+synthetic JWT. The production `ApiClient` remains pinned to the empty port. The
+test requires both Today providers to fail as `networkError`, a visible retry,
+no effective Today result, no applied adjustment, and no active/success UI.
+
 The blank checkpoint selects an existing legal production schedule. Saturday
 has no production session and is therefore asserted as `rest_day`; no test-only
 training day or safety-policy override is introduced. Other supported weekdays
@@ -114,3 +156,16 @@ The CLI refuses non-local HTTP targets/binds, wrong server modes, occupied verif
 ports, readiness timeout, malformed JSON, unexpected status codes, and unknown
 commands/checkpoints. Output must not contain JWTs, credentials, request bodies,
 health values, prompts, or response bodies.
+
+## Cleanup and limits
+
+After every device run, stop the exact server process, confirm ports 8000 and
+65534 have no listener, remove `backend/phase8_acceptance.db` and its sidecars,
+and restore only tool-generated plugin registrants. Never use `git clean` or a
+recursive repository-wide delete for this cleanup.
+
+This runbook proves a synthetic Android personal-development build. It does not
+approve deployment, public release, medical use, real health data or photos,
+production credentials, a live AI provider, iOS, a physical device, complete
+offline operation, accessibility certification, or production operations. The
+separate gate is [Public Release Gate](../../product/public-release-gate.md).

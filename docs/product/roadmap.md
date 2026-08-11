@@ -485,6 +485,13 @@ analyze 无问题且 384 tests，Android API 34 上启用/禁用营养流程 2/2
 
 ## 12. 阶段 8：个人开发版验收
 
+> 状态（2026-08-11）：Gate 4 本地候选已在实现 SHA
+> `6c4e48bdd5a878012bc3a6377d40f76c5799fa2f` 通过；strict exact-SHA CI
+> 尚待执行，因此本阶段仍为 `in_progress`，不得提前标记 `verified`。
+> 该验收仅覆盖合成数据 Android 个人开发版，不授权 merge、部署、真实数据、
+> 照片、生产凭据、live AI 或公开发布。公开发布另见
+> `docs/product/public-release-gate.md`。
+
 ### 目标
 
 形成一个可重复演示和继续迭代的 Android 本地产品。
