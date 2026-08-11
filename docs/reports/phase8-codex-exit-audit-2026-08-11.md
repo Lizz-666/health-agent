@@ -1,8 +1,11 @@
 # Phase 8 Codex Exit Audit
 
-Date: 2026-08-11  
-Gate 3 closure base: `ffb97ade27746ffeaf0826f762a2b7f8e7d90423`  
-Gate 4 local implementation candidate: `6c4e48bdd5a878012bc3a6377d40f76c5799fa2f`  
+Date: 2026-08-11
+
+Gate 3 closure base: `ffb97ade27746ffeaf0826f762a2b7f8e7d90423`
+
+Gate 4 local implementation candidate: `6c4e48bdd5a878012bc3a6377d40f76c5799fa2f`
+
 Branch: `codex/phase8-flutter-driver`
 
 > Candidate status: local acceptance passed; strict closure CI is pending. This
