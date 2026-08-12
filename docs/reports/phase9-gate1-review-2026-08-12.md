@@ -3,7 +3,8 @@
 > 日期：2026-08-12
 > 基线：Gate 0 exact closure `5cdd43bc808bc08897c05e31f22941239812f294`
 > 分支：`codex/phase9-implementation`
-> 状态：实现候选；提交后 exact-SHA 本地 Full 和 GitHub CI 尚待记录
+> 接受实现：`407ce9ce5de3f53140db8660505e8c15cf94e628`
+> 状态：accepted；严格 exact-SHA CI run `31569996543` 全部通过
 
 ## Findings First
 
@@ -29,8 +30,8 @@
 ### P3 / Residual
 
 - Gate 1 只提供 operator service，不提供公开或网络管理端；真实运营工具属于后续授权范围。
-- 本地无可用 PostgreSQL 时两个新增 PG 用例条件 skip；严格 GitHub Full 必须零 skip 并覆盖
-  邀请/refresh 并发单赢家及 `0013` downgrade/upgrade。
+- 本地无可用 PostgreSQL，因此两个新增 PG 用例在本地条件 skip；严格 GitHub Full 已以
+  零 skip 覆盖邀请/refresh 并发单赢家及 `0013` downgrade/upgrade。
 - 外部法律、健康专业和独立安全审查仍为 `not obtained`；本审查不替代外部意见。
 
 ## 实现结论
@@ -54,8 +55,17 @@
 - `flutter analyze` -> 无问题；
 - `flutter test` -> `498 passed`；
 - 候选有效配置测试 -> `1 passed`；候选无效配置 fail-closed -> `1 passed`；
-- Full 的全部业务断言除脏 worktree 硬门外为 `1724 passed, 44 skipped`；唯一失败是
-  Phase 8 HTTP runner 按设计拒绝未提交 diff，必须在提交后的干净 exact SHA 重跑。
+- 干净实现 SHA `db6e344988254159df7f22e144a7b8b2ff6889ad` 本地
+  `python scripts/verify.py full` -> `1731 passed, 0 failed, 38 skipped`，本机缺少
+  PostgreSQL 时 PG 用例按条件跳过；
+- 首轮严格 CI `31569256501` 暴露旧 `0012` 迁移测试降级后 teardown 仍引用新表；
+  schema-aware 清理修复后，接受 SHA 为
+  `407ce9ce5de3f53140db8660505e8c15cf94e628`；
+- 接受 SHA 的严格 CI `31569996543`：Fast、Flutter、Full、Phase 8 acceptance 全部
+  `success`；Full 为 `1769 passed, 0 failed, 0 skipped`，PostgreSQL
+  `expected=30 actual=30` 且版本证据存在；
+- `git merge-base 407ce9ce5de3f53140db8660505e8c15cf94e628
+  5cdd43bc808bc08897c05e31f22941239812f294` 精确等于 Gate 0 closure。
 
 ## 回滚与恢复
 
@@ -67,6 +77,6 @@
 
 ## Gate 结论
 
-当前实现候选的 P0/P1/P2 为零。只有提交后干净 exact SHA 的本地 Full、push 后同一 SHA
-的严格 PostgreSQL GitHub CI 全绿，才能把 Gate 1 标记为 accepted；绿色 CI 不授权真实试用、
-真实数据、部署或发布。
+接受实现的 P0/P1/P2 为零，Gate 1 标记为 `accepted`。Gate 2 可从
+`407ce9ce5de3f53140db8660505e8c15cf94e628` 顺序开始；绿色 CI 不授权真实试用、真实数据、
+生产凭据、部署或发布，外部专业审查仍为 `not obtained`。

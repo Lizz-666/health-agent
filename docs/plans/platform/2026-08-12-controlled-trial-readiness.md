@@ -118,6 +118,12 @@ flutter test
 
 **CI:** Fast/Flutter/Full，严格 PostgreSQL 零条件 skip；同一 exact SHA。
 
+**Accepted evidence (2026-08-12):** 实现
+`407ce9ce5de3f53140db8660505e8c15cf94e628` 已经 Codex findings-first 冷审，
+P0/P1/P2 为零；本地 Full 为 `1731 passed / 0 failed / 38` 个条件 PG skips，严格
+exact-SHA CI run `31569996543` 为 `1769 passed / 0 failed / 0 skipped`、PostgreSQL
+`30/30`，Fast/Flutter/Full/Phase8 全通过。Gate 1 accepted，不构成真实试用或发布授权。
+
 **Rollback:** 禁用候选模式并撤销所有邀请/refresh/device enrollment；不得通过回滚
 恢复开发登录、默认 secret 或已确认的鉴权漏洞。迁移必须有恢复说明。
 
