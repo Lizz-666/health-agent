@@ -6,9 +6,9 @@ Business base: `2ae03345a93d8cc22d0e47fcac415411798df48b`
 
 Branch: `codex/phase9-controlled-trial`
 
-> Status: local review candidate. Gate 0 is not accepted until the documentation
-> candidate is committed, pushed, and verified by exact-SHA GitHub CI. No
-> business code was changed by this Gate.
+> Status: local documentation candidate verified. Gate 0 is not finally accepted
+> until the metadata closure is committed, pushed, and verified by exact-SHA
+> GitHub CI. No business code was changed by this Gate.
 
 ## Findings First
 
@@ -129,8 +129,17 @@ Pre-commit verification on the documentation working tree:
 | `flutter test` | 493 passed, 0 failed |
 
 The Fast refusal is an intentional Phase 8 evidence invariant, not a product
-regression. Fast must be rerun on the clean committed Gate 0 candidate and that
-result must be recorded before Gate 0 closure.
+regression. It was rerun on clean committed candidate
+`b828b046baaa8c74186396481b52713828586570`:
+
+| Command/check | Result |
+| --- | --- |
+| `python scripts/verify.py fast` | passed; ruff clean, backend 1011 passed / 0 failed / 15 expected conditional skips, working/staged/candidate diff clean |
+| candidate scope | exactly seven Gate 0 documentation files; 835 insertions / 14 deletions; no app/backend/script/workflow/dependency change |
+
+The earlier Flutter evidence was produced on the same document content before
+the candidate commit; the commit did not change application files. Closure
+metadata changes still require a clean exact-SHA Fast rerun.
 
 Candidate and closure commands:
 
@@ -144,7 +153,7 @@ flutter test
 
 ## Decision
 
-Gate 0 may be committed only after the commands above pass and the final diff has
-no unresolved P0/P1/P2. Push and GitHub CI use the user's standing branch-push
+The local candidate has no unresolved P0/P1/P2 within Gate 0 scope and may enter
+metadata closure. Push and GitHub CI use the user's standing branch-push
 authorization; they do not authorize deployment, merge, production credentials,
 real data, external spend, live AI/photo, actual trial or public release.

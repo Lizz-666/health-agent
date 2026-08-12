@@ -3,7 +3,9 @@
 ## Status
 
 Accepted by product decision for Phase 9 Gate 0 on 2026-08-12. The decision is
-not implementation acceptance and remains bound to exact-SHA Gate verification.
+not implementation acceptance. Local documentation candidate
+`b828b046baaa8c74186396481b52713828586570` passed Gate 0 verification; final
+acceptance remains bound to closure exact-SHA GitHub CI.
 
 ## Context
 

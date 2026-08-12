@@ -64,7 +64,7 @@
 
 | Task | Executor | Branch / worktree | Base SHA | Status | Scope and coordination note |
 | --- | --- | --- | --- | --- | --- |
-| Phase 9 Task 0 | Codex specification, architecture, safety/privacy audit, task split, cold review, CI, and Gate 0 closure | `codex/phase9-controlled-trial` / current worktree | `2ae03345a93d8cc22d0e47fcac415411798df48b` | `review` | 仅允许 Phase 9 spec/plan/ADR/roadmap/public-release-gate/ACTIVE_TASKS/Gate 0 report；不写业务代码。等待本地验证、冷审、commit/push 和 exact-SHA CI。 |
+| Phase 9 Task 0 | Codex specification, architecture, safety/privacy audit, task split, cold review, CI, and Gate 0 closure | `codex/phase9-controlled-trial` / current worktree | `2ae03345a93d8cc22d0e47fcac415411798df48b` | `review` | 文档候选 `b828b046baaa8c74186396481b52713828586570` 已通过本地 Fast 1011/0/15、ruff/diff clean、Flutter analyze 和 493 tests；仅 7 个 Gate 0 文档文件，无业务代码。等待 closure commit/push 和 exact-SHA CI。 |
 | Phase 9 Task 1 | Codex sole identity/auth/config writer, cold reviewer, CI operator, and Gate 1 acceptor | implementation branch/worktree to be created from Gate 0 exact closure | Gate 0 exact closure TBD | `planned` | 唯一邀请码、独立账号、单活动设备、session rotation/revocation、provider-neutral auth 和候选配置 fail-closed；不得接短信/邮件、真实联系方式或生产凭据。 |
 | Phase 9 Task 2 | Codex sole privacy/security/operations writer and Gate 2 acceptor | same implementation branch/worktree | accepted Gate 1 SHA TBD | `planned` | 数据流、同意/导出/删除/备份、威胁模型、供应链、日志/监控和事故 runbook；只用合成数据；外部专业审查保持 not obtained。 |
 | Phase 9 Task 3A | One OpenCode + Claude Flutter writer; Codex review/takeover and acceptance | separate branch/worktree from accepted Gate 2 SHA | accepted Gate 2 SHA TBD | `planned` | 仅冻结的 Flutter 中文化/可访问性 allowlist；禁止 backend/auth/API/migration/健康规则/provider/依赖/CI；OpenCode 报告不是验收。 |
