@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
 
 enum TrialAuthAction { activate, login }
@@ -137,30 +138,44 @@ class _TrialAuthScreenState extends ConsumerState<TrialAuthScreen> {
                     if (state.error != null) ...[
                       const SizedBox(height: 12),
                       Semantics(
+                        key: const Key('trial-auth-error-live'),
                         liveRegion: true,
-                        child: Text(
-                          state.error!,
-                          style: const TextStyle(color: Colors.redAccent),
+                        label: '内测认证失败，请检查账号、凭据、邀请码和网络后重试。',
+                        excludeSemantics: true,
+                        child: const Text(
+                          '内测认证失败，请检查账号、凭据、邀请码和网络后重试。',
+                          style: TextStyle(
+                            color: Color(AppConstants.severeColor),
+                          ),
                         ),
                       ),
                     ],
                     const SizedBox(height: 24),
                     SizedBox(
                       height: 52,
-                      child: FilledButton.icon(
-                        key: const Key('trial-auth-submit'),
-                        onPressed: state.isLoading ? null : _submit,
-                        icon: state.isLoading
-                            ? const SizedBox.square(
-                                dimension: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                      child: Semantics(
+                        excludeSemantics: true,
+                        button: true,
+                        enabled: !state.isLoading,
+                        onTap: state.isLoading ? null : _submit,
+                        label: state.isLoading
+                            ? (activating ? '激活中，请稍候' : '登录中，请稍候')
+                            : (activating ? '激活账号' : '登录'),
+                        child: FilledButton.icon(
+                          key: const Key('trial-auth-submit'),
+                          onPressed: state.isLoading ? null : _submit,
+                          icon: state.isLoading
+                              ? const SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  activating ? Icons.key_outlined : Icons.login,
                                 ),
-                              )
-                            : Icon(
-                                activating ? Icons.key_outlined : Icons.login,
-                              ),
-                        label: Text(activating ? '激活账号' : '登录'),
+                          label: Text(activating ? '激活账号' : '登录'),
+                        ),
                       ),
                     ),
                   ],

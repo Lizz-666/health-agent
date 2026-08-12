@@ -25,6 +25,11 @@ const Map<String, String> _kGoalLabels = {
   'basic_strength': '基础增肌塑形',
 };
 
+String _goalLabel(String goal) => _kGoalLabels[goal] ?? '未识别目标';
+
+String _exerciseName(PlanPrescription prescription) =>
+    prescription.exercise?.nameZh ?? '动作信息暂不可用';
+
 String _outcomeLabel(OutcomeState s) {
   switch (s) {
     case OutcomeState.completed:
@@ -219,7 +224,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       return _StatusCard(
         icon: Icons.cloud_off,
         title: '加载失败',
-        detail: plan.error ?? '请稍后重试',
+        detail: '训练计划加载失败，请检查网络后重试。',
         action: () {
           ref.read(planProvider.notifier).fetchActive();
           ref.read(planProvider.notifier).fetchDraft();
@@ -415,10 +420,17 @@ class _GenerationForm extends StatelessWidget {
           onChanged: null,
         ),
         const SizedBox(height: 16),
-        FilledButton(
-          key: const Key('plan-generate-button'),
-          onPressed: onGenerate,
-          child: const Text('生成计划草案'),
+        Semantics(
+          excludeSemantics: true,
+          button: true,
+          enabled: true,
+          label: '生成四周训练计划草案',
+          onTap: onGenerate,
+          child: FilledButton(
+            key: const Key('plan-generate-button'),
+            onPressed: onGenerate,
+            child: const Text('生成计划草案'),
+          ),
         ),
         const SizedBox(height: 8),
         const Text(
@@ -455,7 +467,7 @@ class _DraftReview extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          '计划草案 · ${_kGoalLabels[draft.requestedGoal] ?? draft.requestedGoal} · '
+          '计划草案 · ${_goalLabel(draft.requestedGoal)} · '
           '${draft.weeklyFrequency}次/周 · ${draft.sessionDurationMinutes}分钟',
         ),
         const SizedBox(height: 8),
@@ -479,7 +491,7 @@ class _DraftReview extends StatelessWidget {
                           ],
                           Expanded(
                             child: Text(
-                              '${p.exercise?.nameZh ?? p.exerciseId} · '
+                              '${_exerciseName(p)} · '
                               '${p.sets}组'
                               '${p.reps != null ? " × ${p.reps}次" : ""}'
                               '${p.durationSeconds != null ? " · ${p.durationSeconds}秒" : ""}'
@@ -494,16 +506,30 @@ class _DraftReview extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 16),
-        FilledButton(
-          key: const Key('plan-confirm-button'),
-          onPressed: onConfirm,
-          child: const Text('确认并生效'),
+        Semantics(
+          excludeSemantics: true,
+          button: true,
+          enabled: true,
+          label: '确认计划草案并生效',
+          onTap: onConfirm,
+          child: FilledButton(
+            key: const Key('plan-confirm-button'),
+            onPressed: onConfirm,
+            child: const Text('确认并生效'),
+          ),
         ),
         const SizedBox(height: 8),
-        OutlinedButton(
-          key: const Key('plan-regenerate-button'),
-          onPressed: onRegenerate,
-          child: const Text('重新生成'),
+        Semantics(
+          excludeSemantics: true,
+          button: true,
+          enabled: true,
+          label: '重新生成训练计划草案',
+          onTap: onRegenerate,
+          child: OutlinedButton(
+            key: const Key('plan-regenerate-button'),
+            onPressed: onRegenerate,
+            child: const Text('重新生成'),
+          ),
         ),
       ],
     );
@@ -534,11 +560,7 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
       children: [
         Row(
           children: [
-            Expanded(
-              child: Text(
-                '生效计划 · ${_kGoalLabels[active.requestedGoal] ?? active.requestedGoal}',
-              ),
-            ),
+            Expanded(child: Text('生效计划 · ${_goalLabel(active.requestedGoal)}')),
             TextButton.icon(
               key: const Key('agent-plan-entry'),
               onPressed: () => _openAgent(
@@ -547,7 +569,7 @@ class _ActiveViewState extends ConsumerState<_ActiveView> {
                 entityId: active.planVersionId,
               ),
               icon: const Icon(Icons.auto_awesome_outlined),
-              label: const Text('问 Agent'),
+              label: const Text('问健康助手'),
             ),
           ],
         ),
@@ -860,7 +882,7 @@ class _AdjustmentControls extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                '原因：${today.adjustmentReasonCodes.join("、")}',
+                '原因：${today.adjustmentReasonCodes.map(_adjustmentReasonLabel).join("、")}',
                 style: const TextStyle(
                   fontSize: 11,
                   color: Color(AppConstants.textMuted),
@@ -902,7 +924,7 @@ class _AdjustmentControls extends ConsumerWidget {
       AdjustApplyState.stale => (
         const Key('adjust-status-stale'),
         Color(AppConstants.moderateColor),
-        '今日上下文已变化（stale），请刷新后重试。',
+        '今日上下文已变化，请刷新后重试。',
       ),
       AdjustApplyState.safetyBlocked => (
         const Key('adjust-status-safety'),
@@ -917,7 +939,7 @@ class _AdjustmentControls extends ConsumerWidget {
       AdjustApplyState.conflict => (
         const Key('adjust-status-conflict'),
         Color(AppConstants.moderateColor),
-        message ?? '当前冲突，暂不可调整。',
+        '当前状态冲突，调整未生效，请刷新后重试。',
       ),
       AdjustApplyState.unavailable => (
         const Key('adjust-status-unavailable'),
@@ -967,9 +989,7 @@ class _AdjustmentControls extends ConsumerWidget {
 
 String _sessionSummary(PlanSession session, int fallbackMinutes) {
   final minutes = session.targetMinutes ?? fallbackMinutes;
-  final exercises = session.prescriptions
-      .map((item) => item.exercise?.nameZh ?? item.exerciseId)
-      .join('、');
+  final exercises = session.prescriptions.map(_exerciseName).join('、');
   return '$minutes 分钟 · $exercises';
 }
 
@@ -1007,7 +1027,7 @@ class _SessionSection extends StatelessWidget {
                 entityId: session.sessionId,
               ),
               icon: const Icon(Icons.auto_awesome_outlined),
-              label: const Text('问 Agent'),
+              label: const Text('问健康助手'),
             ),
           ],
         ),
@@ -1019,7 +1039,7 @@ class _SessionSection extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    p.exercise?.nameZh ?? p.exerciseId,
+                    _exerciseName(p),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   if (p.exercise != null) ...[
@@ -1044,14 +1064,16 @@ class _SessionSection extends StatelessWidget {
                         entityId: p.exerciseId,
                       ),
                       icon: const Icon(Icons.auto_awesome_outlined),
-                      label: const Text('让 Agent 解释'),
+                      label: const Text('让健康助手解释'),
                     ),
                   ),
                   if (p.exercise != null) ...[
                     const SizedBox(height: 4),
-                    const Text('动作步骤（知识库原文）', style: TextStyle(fontSize: 12)),
-                    for (final step in p.exercise!.instructionSteps.take(4))
-                      Text('· $step', style: const TextStyle(fontSize: 12)),
+                    const Text(
+                      '中文动作说明待审校，当前不展示英文知识库原文。请依据插图和处方参数执行；不确定时暂停并咨询专业人员。',
+                      key: Key('plan-instructions-withheld'),
+                      style: TextStyle(fontSize: 12),
+                    ),
                     if (p.exercise!.substitutionIds.isNotEmpty &&
                         !substitutionApplied &&
                         feedback == null) ...[
@@ -1089,6 +1111,18 @@ class _SessionSection extends StatelessWidget {
   }
 }
 
+String _adjustmentReasonLabel(String reason) => switch (reason) {
+  'abnormal_pain_blocks_adjustment' => '异常疼痛已阻止自动调整',
+  'active_rest_requested' => '已选择主动休息',
+  'no_available_time' => '今日没有可用训练时间',
+  'energy_recovery' => '今日精力较低，改为恢复安排',
+  'muscle_soreness_recovery' => '肌肉酸痛较明显，改为恢复安排',
+  'daily_status_recovery' => '今日状态需要安全调整',
+  'available_time_shortened' => '按今日可用时间缩短',
+  'no_adjustment_needed' => '今日无需调整',
+  _ => '调整原因已记录',
+};
+
 String _decisionGateLabel(String? gate) => switch (gate) {
   'eligible' => '已通过',
   'eligible_conservative' => '保守条件通过',
@@ -1099,39 +1133,50 @@ String _decisionGateLabel(String? gate) => switch (gate) {
 };
 
 class _StatusCard extends StatelessWidget {
+  final Key? semanticsKey;
   final IconData icon;
   final String title;
   final String? detail;
   final VoidCallback? action;
   final String? actionLabel;
   const _StatusCard({
-    super.key,
+    Key? key,
     required this.icon,
     required this.title,
     this.detail,
     this.action,
     this.actionLabel,
-  });
+  }) : semanticsKey = key;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48),
-            const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            if (detail != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                detail!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13),
+            Semantics(
+              key: semanticsKey,
+              liveRegion: true,
+              label: detail == null ? title : '$title。$detail',
+              excludeSemantics: true,
+              child: Column(
+                children: [
+                  Icon(icon, size: 48),
+                  const SizedBox(height: 12),
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
+                  if (detail != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      detail!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ],
+                ],
               ),
-            ],
+            ),
             if (action != null && actionLabel != null) ...[
               const SizedBox(height: 16),
               OutlinedButton(onPressed: action, child: Text(actionLabel!)),

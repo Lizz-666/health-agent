@@ -148,15 +148,24 @@ class _TodayBody extends StatelessWidget {
     }
     if (status == LoadStatus.networkError) {
       return _box(
-        child: _ErrorState(
-          message: state.error ?? '今日签到加载失败',
-          onRetry: onRetry,
+        child: Semantics(
+          key: const Key('today-error-live'),
+          liveRegion: true,
+          label: '今日签到加载失败，请检查网络后重试。',
+          excludeSemantics: true,
+          child: _ErrorState(message: '今日签到加载失败，请检查网络后重试。', onRetry: onRetry),
         ),
       );
     }
     if (status == LoadStatus.parseError) {
       return _box(
-        child: _ErrorState(message: '数据解析异常', onRetry: onRetry),
+        child: Semantics(
+          key: const Key('today-error-live'),
+          liveRegion: true,
+          label: '今日签到数据无法验证，请重试。',
+          excludeSemantics: true,
+          child: _ErrorState(message: '数据解析异常', onRetry: onRetry),
+        ),
       );
     }
     if (status == LoadStatus.empty) {
@@ -406,21 +415,30 @@ class _CheckInFormState extends State<_CheckInForm> {
           if (_abnormalPain) ..._painFollowupFields(),
           if (_followupError != null) ...[
             const SizedBox(height: 4),
-            Text(
-              _followupError!,
-              style: const TextStyle(
-                color: Color(AppConstants.severeColor),
-                fontSize: 12,
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _followupError!,
+                style: const TextStyle(
+                  color: Color(AppConstants.severeColor),
+                  fontSize: 12,
+                ),
               ),
             ),
           ],
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              key: const Key('today-checkin-submit'),
-              onPressed: _submit,
-              child: const Text('完成签到'),
+            child: Semantics(
+              excludeSemantics: true,
+              button: true,
+              label: '完成今日签到',
+              onTap: _submit,
+              child: ElevatedButton(
+                key: const Key('today-checkin-submit'),
+                onPressed: _submit,
+                child: const Text('完成签到'),
+              ),
             ),
           ),
         ],
@@ -586,42 +604,50 @@ class _RiskSummaryCard extends StatelessWidget {
         '检测到红旗信号，请停止训练并尽快就医或联系专业人士。',
       ),
     };
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 8),
+    return Semantics(
+      key: Key('today-risk-${risk.name}'),
+      liveRegion: risk == CheckInRiskSummary.redFlag,
+      label: guidance != null ? '$label。$guidance' : label,
+      excludeSemantics: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (guidance != null) ...[
+              const SizedBox(height: 6),
               Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: color,
+                guidance,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(AppConstants.textColor),
                 ),
               ),
             ],
-          ),
-          if (guidance != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              guidance,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(AppConstants.textColor),
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -874,17 +900,27 @@ class _Field extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: Color(AppConstants.textMuted)),
+          Flexible(
+            flex: 2,
+            child: Text(
+              label,
+              style: const TextStyle(color: Color(AppConstants.textMuted)),
+            ),
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 15,
-              color: Color(AppConstants.textColor),
+          const SizedBox(width: 12),
+          Flexible(
+            flex: 3,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                value,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Color(AppConstants.textColor),
+                ),
+              ),
             ),
           ),
         ],

@@ -147,6 +147,29 @@ void main() {
     expect(find.textContaining('仅供参考'), findsOneWidget);
   });
 
+  testWidgets('safety block uses stable Chinese without raw reason codes', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/training/reviews/weeks/1', (_) {
+        final snapshot = _snapshotJson();
+        snapshot['safety'] = {
+          'gate': 'red_flag',
+          'blocked': true,
+          'reason_codes': ['review_red_flag', 'future_reason_code'],
+          'missing_fields': ['checkin:2026-07-21'],
+        };
+        return snapshot;
+      });
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('需优先处理的安全信号'), findsOneWidget);
+    expect(find.textContaining('review_red_flag'), findsNothing);
+    expect(find.textContaining('future_reason_code'), findsNothing);
+    expect(find.textContaining('checkin:2026-07-21'), findsNothing);
+  });
+
   testWidgets(
     'proposal vs draft distinction; draft needs separate confirmation',
     (tester) async {
@@ -361,5 +384,53 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    '320x720 textScaler 2.0 no overflow on data state, week selector findable',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 720);
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final adapter = FakeDioAdapter()
+        ..registerJson(
+          'GET',
+          '/training/reviews/weeks/1',
+          (_) => _snapshotJson(),
+        );
+      await tester.pumpWidget(_wrap(_apiWith(adapter)));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      // Week selector must remain accessible
+      expect(find.byKey(const Key('review-week-1')), findsOneWidget);
+    },
+  );
+
+  testWidgets('320x720 textScaler 2.0 no overflow on unavailable state', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 720);
+    tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    final adapter = FakeDioAdapter();
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('review-unavailable')), findsOneWidget);
+    expect(find.byKey(const Key('review-retry')), findsOneWidget);
+    expect(
+      tester.getSemantics(find.byKey(const Key('review-unavailable'))),
+      isSemantics(isLiveRegion: true),
+    );
   });
 }

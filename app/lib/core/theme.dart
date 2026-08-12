@@ -28,8 +28,16 @@ class AppTheme {
       bodyLarge: TextStyle(color: Color(AppConstants.textColor), fontSize: 16),
       bodyMedium: TextStyle(color: Color(AppConstants.textColor), fontSize: 15),
       bodySmall: TextStyle(color: Color(AppConstants.textMuted), fontSize: 13),
-      titleLarge: TextStyle(color: Color(AppConstants.textColor), fontSize: 20, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(color: Color(AppConstants.textColor), fontSize: 18, fontWeight: FontWeight.w600),
+      titleLarge: TextStyle(
+        color: Color(AppConstants.textColor),
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+      ),
+      titleMedium: TextStyle(
+        color: Color(AppConstants.textColor),
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+      ),
     ),
 
     // ElevatedButton
@@ -67,15 +75,18 @@ class AppTheme {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: const Color(AppConstants.glassBorder)),
+        borderSide: const BorderSide(color: Color(AppConstants.textMuted)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: const Color(AppConstants.glassBorder)),
+        borderSide: const BorderSide(color: Color(AppConstants.textMuted)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(AppConstants.glassBorder)),
+        borderSide: const BorderSide(
+          color: Color(AppConstants.accentColor),
+          width: 2,
+        ),
       ),
       labelStyle: const TextStyle(color: Color(AppConstants.textMuted)),
     ),
@@ -112,21 +123,32 @@ class AppTheme {
 
     // NavigationBar
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(AppConstants.surfaceDark).withValues(alpha: 0.95),
+      backgroundColor: const Color(
+        AppConstants.surfaceDark,
+      ).withValues(alpha: 0.95),
       elevation: 0,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      indicatorColor: const Color(AppConstants.accentColor).withValues(alpha: 0.2),
+      indicatorColor: const Color(
+        AppConstants.accentColor,
+      ).withValues(alpha: 0.2),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return const TextStyle(color: Color(AppConstants.accentLight), fontSize: 12, fontWeight: FontWeight.w600);
+          return const TextStyle(
+            color: Color(AppConstants.accentLight),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          );
         }
-        return const TextStyle(color: Color(AppConstants.textMuted), fontSize: 12);
+        return const TextStyle(
+          color: Color(AppConstants.navigationMuted),
+          fontSize: 12,
+        );
       }),
       iconTheme: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
           return const IconThemeData(color: Color(AppConstants.accentLight));
         }
-        return const IconThemeData(color: Color(AppConstants.textMuted));
+        return const IconThemeData(color: Color(AppConstants.navigationMuted));
       }),
     ),
 

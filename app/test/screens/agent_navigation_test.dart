@@ -98,14 +98,14 @@ void main() {
 
     expect(find.text('今日'), findsOneWidget);
     expect(find.text('计划'), findsOneWidget);
-    expect(find.text('Agent'), findsWidgets);
+    expect(find.text('健康助手'), findsWidgets);
     expect(find.text('我的'), findsOneWidget);
     expect(find.text('首页'), findsNothing);
-    expect(find.text('Agent 当前不可用'), findsOneWidget);
+    expect(find.text('健康助手当前不可用'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('agent-privacy-menu')));
     await tester.pumpAndSettle();
-    expect(find.text('删除 Agent 数据'), findsOneWidget);
+    expect(find.text('删除健康助手数据'), findsOneWidget);
   });
 
   testWidgets('unknown Agent query fails closed before capabilities request', (
@@ -131,7 +131,7 @@ void main() {
     router.go('/agent?entry_type=general&health_payload=forbidden');
     await tester.pumpAndSettle();
 
-    expect(find.text('Agent 入口无效'), findsOneWidget);
+    expect(find.text('健康助手入口无效'), findsOneWidget);
     expect(
       adapter.calls.where((call) => call.path == '/agent/capabilities'),
       isEmpty,

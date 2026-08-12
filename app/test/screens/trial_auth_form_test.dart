@@ -37,4 +37,45 @@ void main() {
     await tester.pump();
     expect(find.text('请输入有效的内测账号和凭据'), findsOneWidget);
   });
+
+  testWidgets(
+    '320x720 textScaler 2.0 no overflow, submit anchor still findable',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 720);
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: TrialAuthScreen())),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('trial-auth-submit')), findsOneWidget);
+    },
+  );
+
+  testWidgets('submit button has accessible Semantics label', (tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: TrialAuthScreen())),
+    );
+    await tester.pumpAndSettle();
+
+    final semantics = tester.getSemantics(
+      find.byKey(const Key('trial-auth-submit')),
+    );
+    expect(
+      semantics,
+      isSemantics(
+        label: '激活账号',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
+  });
 }

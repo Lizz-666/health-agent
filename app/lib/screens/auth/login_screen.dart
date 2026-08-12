@@ -108,7 +108,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 8),
                 const Text(
                   '了解你的身体，科学改善体态',
-                  style: TextStyle(color: Color(0xFF8892B0)),
+                  style: TextStyle(color: Color(AppConstants.textMuted)),
                 ),
                 const SizedBox(height: 48),
                 TextField(
@@ -140,17 +140,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     SizedBox(
                       width: 120,
                       height: 48,
-                      child: ElevatedButton(
-                        key: const Key('login-send-code'),
-                        onPressed: state.countdown > 0 || state.isLoading
+                      child: Semantics(
+                        excludeSemantics: true,
+                        button: true,
+                        enabled: state.countdown <= 0 && !state.isLoading,
+                        onTap: state.countdown > 0 || state.isLoading
                             ? null
                             : _sendCode,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F3460),
-                        ),
-                        child: Text(
-                          state.countdown > 0 ? '${state.countdown}s' : '发送验证码',
-                          style: const TextStyle(fontSize: 13),
+                        label: state.countdown > 0
+                            ? '验证码已发送，${state.countdown}秒后可重试'
+                            : '发送验证码',
+                        child: ElevatedButton(
+                          key: const Key('login-send-code'),
+                          onPressed: state.countdown > 0 || state.isLoading
+                              ? null
+                              : _sendCode,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F3460),
+                          ),
+                          child: Text(
+                            state.countdown > 0
+                                ? '${state.countdown}s'
+                                : '发送验证码',
+                            style: const TextStyle(fontSize: 13),
+                          ),
                         ),
                       ),
                     ),
@@ -158,31 +171,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 if (state.error != null) ...[
                   const SizedBox(height: 12),
-                  Text(
-                    state.error!,
-                    style: const TextStyle(color: Color(0xFFFF1744)),
+                  Semantics(
+                    key: const Key('login-error-live'),
+                    liveRegion: true,
+                    label: '登录请求失败，请检查输入和网络后重试。',
+                    excludeSemantics: true,
+                    child: const Text(
+                      '登录请求失败，请检查输入和网络后重试。',
+                      style: TextStyle(color: Color(AppConstants.severeColor)),
+                    ),
                   ),
                 ],
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   height: 52,
-                  child: ElevatedButton(
-                    key: const Key('login-submit'),
-                    onPressed: state.isLoading ? null : _login,
-                    child: state.isLoading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('登录', style: TextStyle(fontSize: 18)),
+                  child: Semantics(
+                    excludeSemantics: true,
+                    button: true,
+                    enabled: !state.isLoading,
+                    onTap: state.isLoading ? null : _login,
+                    label: state.isLoading ? '登录中，请稍候' : '登录',
+                    child: ElevatedButton(
+                      key: const Key('login-submit'),
+                      onPressed: state.isLoading ? null : _login,
+                      child: state.isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('登录', style: TextStyle(fontSize: 18)),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
                 const Text(
                   '首次验证将自动注册账号',
-                  style: TextStyle(color: Color(0xFF8892B0), fontSize: 13),
+                  style: TextStyle(
+                    color: Color(AppConstants.textMuted),
+                    fontSize: 13,
+                  ),
                 ),
                 if (AppConstants.devAdminPhone.isNotEmpty &&
                     AppConstants.devAdminPassword.isNotEmpty) ...[
@@ -191,7 +220,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 8),
                   const Text(
                     '开发环境',
-                    style: TextStyle(color: Color(0xFF8892B0), fontSize: 12),
+                    style: TextStyle(
+                      color: Color(AppConstants.textMuted),
+                      fontSize: 12,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   SizedBox(

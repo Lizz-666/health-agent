@@ -137,6 +137,36 @@ void main() {
     expect(find.byKey(const Key('nutrition-active-label')), findsNothing);
   });
 
+  testWidgets(
+    '320x720 textScaler 2.0 keeps red-flag guidance visible without overflow',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 720);
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final adapter = FakeDioAdapter()
+        ..registerJson(
+          'GET',
+          '/nutrition/eligibility',
+          (_) => eligibilityJson(gate: 'red_flag'),
+        )
+        ..registerJson('GET', '/nutrition/foods', (_) => foodListJson());
+      await tester.pumpWidget(_wrap(adapter, const NutritionScreen()));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('今日状态需要优先处理'), findsOneWidget);
+      expect(find.byIcon(Icons.health_and_safety_outlined), findsOneWidget);
+      expect(
+        tester.getSemantics(find.byKey(const Key('nutrition-status-live'))),
+        isSemantics(isLiveRegion: true),
+      );
+    },
+  );
+
   testWidgets('nutrition surface contains no meal tracking controls', (
     tester,
   ) async {
@@ -151,5 +181,34 @@ void main() {
     for (final forbidden in ['饮食打卡', '餐食完成', '记录摄入', '已吃']) {
       expect(allText, isNot(contains(forbidden)));
     }
+  });
+
+  testWidgets('missing catalog entries never expose internal food ids', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter();
+    final foods = foodListJson();
+    (foods['foods'] as List).clear();
+    adapter
+      ..registerJson('GET', '/nutrition/eligibility', (_) => eligibilityJson())
+      ..registerJson('GET', '/nutrition/foods', (_) => foods)
+      ..registerJson('GET', '/nutrition/targets', (_) => targetsResponseJson())
+      ..registerJson(
+        'GET',
+        '/nutrition/recommendations/draft',
+        (_) => recommendationResultJson(),
+      )
+      ..registerJson(
+        'GET',
+        '/nutrition/recommendations/active',
+        (_) => recommendationResultJson(status: 'active'),
+      );
+
+    await tester.pumpWidget(_wrap(adapter, const NutritionScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('食物信息暂不可用'), findsWidgets);
+    expect(find.textContaining('rice_white'), findsNothing);
+    expect(find.textContaining('oats_cooked'), findsNothing);
   });
 }

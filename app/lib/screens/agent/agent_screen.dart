@@ -55,12 +55,12 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
   Widget build(BuildContext context) {
     if (widget.routeContext == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Agent')),
+        appBar: AppBar(title: const Text('健康助手')),
         body: _CenteredState(
           icon: Icons.link_off,
-          title: 'Agent 入口无效',
+          title: '健康助手入口无效',
           message: '上下文参数无法识别，未请求或发送任何健康数据。',
-          actionLabel: '返回 Agent 首页',
+          actionLabel: '返回健康助手首页',
           onAction: () => context.go('/agent'),
         ),
       );
@@ -69,7 +69,7 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
     final state = ref.watch(agentProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agent'),
+        title: const Text('健康助手'),
         actions: [
           PopupMenuButton<String>(
             key: const Key('agent-privacy-menu'),
@@ -78,7 +78,7 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
               const PopupMenuItem(value: 'clear', child: Text('清除本地对话')),
               if (state.capabilities?.consentActive == true)
                 const PopupMenuItem(value: 'withdraw', child: Text('撤回云端处理同意')),
-              const PopupMenuItem(value: 'delete', child: Text('删除 Agent 数据')),
+              const PopupMenuItem(value: 'delete', child: Text('删除健康助手数据')),
             ],
           ),
         ],
@@ -93,23 +93,23 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
       case AgentLoadStatus.loading:
         return const _CenteredState(
           icon: Icons.auto_awesome_outlined,
-          title: '检查 Agent 可用状态',
+          title: '检查健康助手可用状态',
           message: '不会在条件确认前调用云端模型。',
           loading: true,
         );
       case AgentLoadStatus.networkError:
         return _CenteredState(
           icon: Icons.cloud_off_outlined,
-          title: 'Agent 服务不可用',
-          message: state.errorMessage ?? '无法连接 Agent 服务。',
+          title: '健康助手服务不可用',
+          message: '无法连接健康助手服务，未执行任何操作。',
           actionLabel: '重试',
           onAction: () => ref.read(agentProvider.notifier).loadCapabilities(),
         );
       case AgentLoadStatus.parseError:
         return _CenteredState(
           icon: Icons.warning_amber_outlined,
-          title: 'Agent 响应无法验证',
-          message: state.errorMessage ?? '响应格式异常，未执行任何操作。',
+          title: '健康助手响应无法验证',
+          message: '响应格式异常，未执行任何操作。',
           actionLabel: '重试',
           onAction: () => ref.read(agentProvider.notifier).loadCapabilities(),
         );
@@ -121,8 +121,8 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
         }
         return _CenteredState(
           icon: Icons.pause_circle_outline,
-          title: 'Agent 当前不可用',
-          message: capabilities?.message ?? 'Agent 当前未启用，其他功能仍可正常使用。',
+          title: '健康助手当前不可用',
+          message: _capabilityMessage(capabilities?.resultCode),
           secondaryLabel: '查看体态工具',
           onSecondary: () => context.push('/posture'),
           actionLabel: '刷新状态',
@@ -142,7 +142,7 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
       children: [
         const Icon(Icons.privacy_tip_outlined, size: 48),
         const SizedBox(height: 12),
-        Text('云端 Agent 使用告知', style: Theme.of(context).textTheme.titleLarge),
+        Text('云端健康助手使用告知', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         _InfoRow(label: '服务提供方', value: disclosure.providerNameZh),
         _InfoRow(label: '用途', value: _disclosureLabel(disclosure.purposeCode)),
@@ -160,8 +160,8 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
         ),
         const SizedBox(height: 12),
         const Text(
-          'Agent 仅用于一般健康与训练执行辅助，不提供医学诊断或治疗。'
-          '你可以随时撤回同意或删除 Agent 数据；聊天文本仅保存在当前应用内存中。',
+          '健康助手仅用于一般健康与训练执行辅助，不提供医学诊断或治疗。'
+          '你可以随时撤回同意或删除健康助手数据；聊天文本仅保存在当前应用内存中。',
         ),
         const SizedBox(height: 12),
         CheckboxListTile(
@@ -177,17 +177,25 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
                       : null,
                 ),
         ),
-        if (state.errorMessage != null) _InlineError(state.errorMessage!),
+        if (state.errorMessage != null)
+          _InlineError(_agentErrorMessage(state.errorCode)),
         const SizedBox(height: 8),
-        FilledButton(
-          key: const Key('agent-consent-grant'),
-          onPressed: !accepted || state.busy ? null : _grantConsent,
-          child: state.busy
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('同意并启用 Agent'),
+        Semantics(
+          excludeSemantics: true,
+          button: true,
+          enabled: accepted && !state.busy,
+          label: '同意并启用健康助手',
+          onTap: accepted && !state.busy ? _grantConsent : null,
+          child: FilledButton(
+            key: const Key('agent-consent-grant'),
+            onPressed: !accepted || state.busy ? null : _grantConsent,
+            child: state.busy
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('同意并启用健康助手'),
+          ),
         ),
         TextButton(
           onPressed: () => context.push('/posture'),
@@ -238,7 +246,7 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
                       ref.read(agentProvider.notifier).cancelProposal(),
                 ),
               if (state.errorMessage != null) ...[
-                _InlineError(state.errorMessage!),
+                _InlineError(_agentErrorMessage(state.errorCode)),
                 if (state.canRetry)
                   Align(
                     alignment: Alignment.centerLeft,
@@ -330,7 +338,7 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
     if (value == 'withdraw') {
       final confirmed = await _confirmDialog(
         title: '撤回云端处理同意？',
-        body: '撤回后会立即清除本地对话并阻止新的云端 Agent 调用。',
+        body: '撤回后会立即清除本地对话并阻止新的云端健康助手调用。',
         confirmText: '撤回同意',
       );
       if (confirmed) {
@@ -340,9 +348,9 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
     }
     if (value == 'delete') {
       final confirmed = await _confirmDialog(
-        title: '删除 Agent 数据？',
-        body: '将删除 Agent 同意、审计和待确认提案，但不会删除健康、体态或训练记录。',
-        confirmText: '删除 Agent 数据',
+        title: '删除健康助手数据？',
+        body: '将删除健康助手同意、审计和待确认提案，但不会删除健康、体态或训练记录。',
+        confirmText: '删除健康助手数据',
       );
       if (confirmed) {
         await ref.read(agentProvider.notifier).deleteAgentData();
@@ -379,7 +387,7 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Agent 服务告知'),
+        title: const Text('健康助手服务告知'),
         content: Text(
           disclosure == null
               ? '当前服务告知不可用。'
@@ -410,11 +418,7 @@ class _ContextCard extends StatelessWidget {
       child: ListTile(
         leading: const Icon(Icons.link),
         title: Text(_entryLabel(this.context.entryType)),
-        subtitle: Text(
-          this.context.entityId == null
-              ? '使用当前已拥有的信息'
-              : '标识：${this.context.entityId}',
-        ),
+        subtitle: const Text('使用当前已授权的上下文，不显示内部标识。'),
       ),
     );
   }
@@ -513,6 +517,9 @@ class _ToolDisplayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rows = <MapEntry<String, String>>[];
     _flatten(display.data, '', rows);
+    final visibleRows = rows
+        .where((row) => _isVisibleToolField(row.key))
+        .take(24);
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(10),
@@ -528,8 +535,8 @@ class _ToolDisplayCard extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
-          if (rows.isEmpty) const Text('暂无结构化数据'),
-          for (final row in rows.take(24))
+          if (visibleRows.isEmpty) const Text('暂无可展示的结构化数据'),
+          for (final row in visibleRows)
             Text(
               '${_toolFieldLabel(row.key)}：${_toolFieldValue(row.value)}',
               style: const TextStyle(fontSize: 12),
@@ -570,7 +577,7 @@ class _ProposalCard extends StatelessWidget {
             const SizedBox(height: 4),
             const Text('尚未执行。确认时服务器会重新检查最新权限、安全状态和上下文。'),
             const Divider(),
-            for (final row in proposal.diff.displayRows)
+            for (final row in _proposalRows(proposal.diff))
               _InfoRow(label: row.key, value: row.value),
             Text(
               '有效期至 ${proposal.expiresAt.toLocal()}',
@@ -638,11 +645,18 @@ class _Composer extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            IconButton.filled(
-              key: const Key('agent-send'),
-              onPressed: enabled ? onSend : null,
-              icon: const Icon(Icons.send),
-              tooltip: '发送',
+            Semantics(
+              excludeSemantics: true,
+              button: true,
+              enabled: enabled,
+              label: '发送消息',
+              onTap: enabled ? onSend : null,
+              child: IconButton.filled(
+                key: const Key('agent-send'),
+                onPressed: enabled ? onSend : null,
+                icon: const Icon(Icons.send),
+                tooltip: '发送',
+              ),
             ),
           ],
         ),
@@ -674,28 +688,35 @@ class _CenteredState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 52),
-            const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center),
-            if (loading) ...[
-              const SizedBox(height: 16),
-              const CircularProgressIndicator(),
+    return Semantics(
+      key: const Key('agent-status-live'),
+      liveRegion: true,
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 52),
+              const SizedBox(height: 12),
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(message, textAlign: TextAlign.center),
+              if (loading) ...[
+                const SizedBox(height: 16),
+                const CircularProgressIndicator(),
+              ],
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(height: 16),
+                FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+              ],
+              if (secondaryLabel != null && onSecondary != null)
+                TextButton(
+                  onPressed: onSecondary,
+                  child: Text(secondaryLabel!),
+                ),
             ],
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 16),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
-            ],
-            if (secondaryLabel != null && onSecondary != null)
-              TextButton(onPressed: onSecondary, child: Text(secondaryLabel!)),
-          ],
+          ),
         ),
       ),
     );
@@ -708,16 +729,19 @@ class _InlineError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Theme.of(context).colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            const Icon(Icons.error_outline),
-            const SizedBox(width: 8),
-            Expanded(child: Text(message)),
-          ],
+    return Semantics(
+      liveRegion: true,
+      child: Card(
+        color: Theme.of(context).colorScheme.errorContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              const Icon(Icons.error_outline, semanticLabel: '错误'),
+              const SizedBox(width: 8),
+              Expanded(child: Text(message)),
+            ],
+          ),
         ),
       ),
     );
@@ -774,7 +798,7 @@ void _flatten(
 String _entryLabel(AgentEntryType entry) {
   switch (entry) {
     case AgentEntryType.general:
-      return '一般 Agent 对话';
+      return '一般对话';
     case AgentEntryType.healthProfile:
       return '当前健康档案';
     case AgentEntryType.postureIssue:
@@ -802,6 +826,41 @@ String _actionLabel(AgentActionType action) {
       return '记录训练反馈';
   }
 }
+
+List<MapEntry<String, String>> _proposalRows(AgentActionDiff diff) {
+  final rows = diff.displayRows;
+  switch (diff.action) {
+    case AgentActionType.generateTrainingPlanDraft:
+      return rows
+          .map(
+            (row) => row.key == '目标'
+                ? MapEntry(row.key, _proposalValueLabel(row.value))
+                : row,
+          )
+          .toList(growable: false);
+    case AgentActionType.substituteTodayExercise:
+      return const [MapEntry('原动作', '当前处方动作'), MapEntry('替代动作', '已验证的候选替代动作')];
+    case AgentActionType.recordTrainingFeedback:
+      return rows
+          .map((row) => MapEntry(row.key, _proposalValueLabel(row.value)))
+          .toList(growable: false);
+    case AgentActionType.upsertTodayCheckin:
+    case AgentActionType.createWeightRecord:
+      return rows;
+  }
+}
+
+String _proposalValueLabel(String value) => switch (value) {
+  'posture_improvement' => '体态改善',
+  'fat_loss' => '减脂',
+  'basic_strength' => '基础力量',
+  'general_wellness' => '一般健康',
+  'completed' => '已完成',
+  'partial' => '部分完成',
+  'too_busy' => '太忙未练',
+  'intentional_rest' => '主动休息',
+  _ => '未识别',
+};
 
 String _toolLabel(String tool) {
   const labels = {
@@ -850,7 +909,7 @@ String _toolFieldLabel(String field) {
   final indexed = RegExp(r'^(.*)(\[\d+\])$').firstMatch(field);
   final base = indexed?.group(1) ?? field;
   final suffix = indexed?.group(2) ?? '';
-  return '${labels[base] ?? base}$suffix';
+  return '${labels[base] ?? '其他信息'}$suffix';
 }
 
 String _toolFieldValue(String value) {
@@ -875,12 +934,68 @@ String _toolFieldValue(String value) {
     'red_flag': '已触发安全阻断',
     'null': '无',
   };
-  return labels[value] ?? value;
+  final mapped = labels[value];
+  if (mapped != null) return mapped;
+  if (RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(value)) return '未识别';
+  return value;
 }
+
+bool _isInternalToolField(String field) {
+  final base = field.replaceAll(RegExp(r'\[\d+\]'), '').split('.').last;
+  return base == 'id' ||
+      base.endsWith('_id') ||
+      base.endsWith('_ids') ||
+      base == 'run_id' ||
+      base == 'proposal_id' ||
+      base == 'result_ref';
+}
+
+bool _isVisibleToolField(String field) {
+  if (_isInternalToolField(field)) return false;
+  final base = field.replaceAll(RegExp(r'\[\d+\]'), '').split('.').last;
+  return const {
+    'configured',
+    'profile_version',
+    'readiness_code',
+    'risk_version',
+    'fitness_goal',
+    'training_experience',
+    'weekly_frequency',
+    'session_duration_minutes',
+    'equipment_bodyweight',
+    'equipment_resistance_band',
+    'pain_limitation_count',
+    'allergies_count',
+    'diet_exclusions_count',
+    'restricted',
+    'state',
+    'local_date',
+    'decision_gate',
+    'change_reason',
+    'prescription_count',
+    'substitution_applied',
+    'feedback_outcome_state',
+  }.contains(base);
+}
+
+String _capabilityMessage(String? code) => switch (code) {
+  'agent_disabled' => '健康助手当前未启用，其他功能仍可正常使用。',
+  'agent_privacy_gate_blocked' => '当前隐私条件未满足，健康助手保持关闭。',
+  'agent_provider_unavailable' => '云端服务当前不可用，健康助手保持关闭。',
+  _ => '健康助手当前不可用，未发送健康数据，也未执行任何操作。',
+};
+
+String _agentErrorMessage(String? code) => switch (code) {
+  'agent_disclosure_stale' => '服务信息已更新，请重新阅读当前告知。',
+  'agent_request_invalid' => '输入内容无法提交，请检查后重试。',
+  'agent_network_error' => '健康助手请求失败，未执行任何操作。',
+  'agent_response_invalid' => '健康助手响应无法验证，未执行任何操作。',
+  _ => '健康助手请求未完成，未执行任何操作。',
+};
 
 String _disclosureLabel(String code) {
   const labels = {
-    'agent_cloud_processing': '一般健康与训练执行的云端 Agent 处理',
+    'agent_cloud_processing': '一般健康与训练执行的云端健康助手处理',
     'wellness_agent_assistance': '一般健康与训练执行辅助',
     'cloud_provider_china_mainland': '中国大陆云端模型服务',
     'cloud_model_processing': '在云端模型服务中处理最小必要上下文',
@@ -890,5 +1005,5 @@ String _disclosureLabel(String code) {
     'allowlisted_tool_metadata': '允许列表内的工具名称与结构化元数据',
     'no_chat_transcript_persistence': '不持久化聊天文本',
   };
-  return labels[code] ?? code;
+  return labels[code] ?? '（未知项）';
 }

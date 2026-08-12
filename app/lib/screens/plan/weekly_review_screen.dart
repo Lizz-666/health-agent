@@ -142,7 +142,7 @@ class _WeeklyReviewScreenState extends ConsumerState<WeeklyReviewScreen> {
           key: const Key('review-unavailable'),
           icon: Icons.cloud_off,
           title: '回顾暂不可用',
-          detail: state.message ?? '服务暂不可用或尚未实现，请稍后重试。',
+          detail: '周回顾暂时无法加载，请检查网络后重试。',
           action: () =>
               ref.read(adaptiveReviewProvider.notifier).loadReview(_week),
           actionLabel: '重试',
@@ -208,23 +208,43 @@ class _Panel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 40, color: const Color(AppConstants.textMuted)),
-          const SizedBox(height: 12),
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          if (detail != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              detail!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13),
+          Semantics(
+            liveRegion: true,
+            label: detail == null ? title : '$title。$detail',
+            excludeSemantics: true,
+            child: Column(
+              children: [
+                Icon(
+                  icon,
+                  size: 40,
+                  color: const Color(AppConstants.textMuted),
+                ),
+                const SizedBox(height: 12),
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                if (detail != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    detail!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
           if (action != null && actionLabel != null) ...[
             const SizedBox(height: 16),
-            FilledButton(
-              key: actionKey,
-              onPressed: action,
-              child: Text(actionLabel!),
+            Semantics(
+              excludeSemantics: true,
+              button: true,
+              enabled: true,
+              label: actionLabel,
+              onTap: action,
+              child: FilledButton(
+                key: actionKey,
+                onPressed: action,
+                child: Text(actionLabel!),
+              ),
             ),
           ],
         ],
@@ -261,7 +281,7 @@ class _FactsSection extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               color: Colors.orange.withValues(alpha: 0.12),
               child: Text(
-                '安全校验已阻止普通训练建议：${snapshot.safety.reasonCodes.join("、")}',
+                '安全校验已阻止普通训练建议。${_reviewSafetySummary(snapshot.safety.reasonCodes)}',
                 style: const TextStyle(fontSize: 12),
               ),
             ),
@@ -363,7 +383,7 @@ class _FactsSection extends StatelessWidget {
       case PostureRecheckStatus.comparisonAvailable:
         return '可比较（${_postureComparisonLabel(p.comparisonSignal)}）';
       case PostureRecheckStatus.unavailable:
-        return '不可用${p.reason == null ? "" : "（${p.reason}）"}';
+        return '不可用（${_postureUnavailableReasonLabel(p.reason)}）';
     }
   }
 }
@@ -497,6 +517,27 @@ String _unavailableReasonLabel(String reason) => switch (reason) {
   'nutrition_restricted' => '当前安全状态受限',
   'nutrition_red_flag' => '已触发安全阻断',
   _ => '原因暂不可用',
+};
+
+String _reviewSafetySummary(List<String> reasons) {
+  final labels = reasons.map(_reviewSafetyReasonLabel).toSet().toList();
+  if (labels.isEmpty) return '请先检查健康档案和本周期签到信息。';
+  return labels.join('；');
+}
+
+String _reviewSafetyReasonLabel(String reason) => switch (reason) {
+  'review_abnormal_pain' => '本周期记录到异常疼痛',
+  'review_restricted' => '本周期存在受限状态',
+  'review_red_flag' => '本周期存在需优先处理的安全信号',
+  'review_safety_input_missing' => '本周期签到信息不完整',
+  'review_low_energy' => '本周期多次记录精力较低',
+  'review_significant_soreness' => '本周期多次记录明显酸痛',
+  _ => '请检查健康档案和本周期签到信息',
+};
+
+String _postureUnavailableReasonLabel(String? reason) => switch (reason) {
+  'baseline_missing' => '缺少可比较的基线',
+  _ => '原因暂不可显示',
 };
 
 String _postureComparisonLabel(PostureComparisonSignal? signal) =>

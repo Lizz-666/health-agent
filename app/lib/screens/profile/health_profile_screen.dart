@@ -72,8 +72,9 @@ class _HealthProfileScreenState extends ConsumerState<HealthProfileScreen> {
       ),
     );
     if (ok == true && mounted) {
-      final deleted =
-          await ref.read(healthProfileProvider.notifier).deleteProfile();
+      final deleted = await ref
+          .read(healthProfileProvider.notifier)
+          .deleteProfile();
       if (deleted && mounted) {
         ref.read(nutritionProvider.notifier).invalidateForProfileChange();
       }
@@ -153,31 +154,33 @@ class _HealthProfileBody extends StatelessWidget {
     }
     if (status == LoadStatus.networkError) {
       return _box(
-        child: _ErrorState(
-          message: state.error ?? '健康档案加载失败',
-          onRetry: onRetry,
+        child: Semantics(
+          key: const Key('health-error-live'),
+          liveRegion: true,
+          label: '健康档案加载失败，请检查网络后重试。',
+          excludeSemantics: true,
+          child: _ErrorState(message: '健康档案加载失败，请检查网络后重试。', onRetry: onRetry),
         ),
       );
     }
     if (status == LoadStatus.parseError) {
       return _box(
-        child: _ErrorState(message: '数据解析异常', onRetry: onRetry),
+        child: Semantics(
+          key: const Key('health-error-live'),
+          liveRegion: true,
+          label: '健康档案数据无法验证，请重试。',
+          excludeSemantics: true,
+          child: _ErrorState(message: '数据解析异常', onRetry: onRetry),
+        ),
       );
     }
     final result = state.result!;
     if (status == LoadStatus.empty || !result.configured) {
       return _box(
-        child: _NotConfiguredView(
-          readiness: result.readiness,
-          onEdit: onEdit,
-        ),
+        child: _NotConfiguredView(readiness: result.readiness, onEdit: onEdit),
       );
     }
-    return _ConfiguredView(
-      result: result,
-      onEdit: onEdit,
-      onDelete: onDelete,
-    );
+    return _ConfiguredView(result: result, onEdit: onEdit, onDelete: onDelete);
   }
 }
 
@@ -213,21 +216,24 @@ class _NotConfiguredView extends StatelessWidget {
         const SizedBox(height: 4),
         const Text(
           '完善基本信息后即可生成健康档案。信息缺失会如实显示，不会自动补全。',
-          style: TextStyle(
-            fontSize: 12,
-            color: Color(AppConstants.textMuted),
-          ),
+          style: TextStyle(fontSize: 12, color: Color(AppConstants.textMuted)),
         ),
         const SizedBox(height: 12),
         _ReadinessCard(readiness: readiness),
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton.icon(
-            key: const Key('health-edit-button'),
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit),
-            label: const Text('完善健康档案'),
+          child: Semantics(
+            excludeSemantics: true,
+            button: true,
+            label: '完善健康档案',
+            onTap: onEdit,
+            child: ElevatedButton.icon(
+              key: const Key('health-edit-button'),
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit),
+              label: const Text('完善健康档案'),
+            ),
           ),
         ),
       ],
@@ -282,10 +288,7 @@ class _ConfiguredView extends StatelessWidget {
                 label: '单次时长',
                 value: _durationLabel(profile.sessionDurationMinutes),
               ),
-              _Field(
-                label: '器械',
-                value: _equipmentLabel(profile.equipment),
-              ),
+              _Field(label: '器械', value: _equipmentLabel(profile.equipment)),
               _Field(
                 label: '疼痛/损伤限制',
                 value: _listCountLabel(
@@ -343,25 +346,37 @@ class _ConfiguredView extends StatelessWidget {
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton.icon(
-            key: const Key('health-edit-button'),
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit),
-            label: const Text('更正 / 编辑'),
+          child: Semantics(
+            excludeSemantics: true,
+            button: true,
+            label: '更正或编辑健康档案',
+            onTap: onEdit,
+            child: ElevatedButton.icon(
+              key: const Key('health-edit-button'),
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit),
+              label: const Text('更正 / 编辑'),
+            ),
           ),
         ),
         const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
-          child: OutlinedButton.icon(
-            key: const Key('health-delete-button'),
-            onPressed: onDelete,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(AppConstants.severeColor),
-              side: const BorderSide(color: Color(AppConstants.severeColor)),
+          child: Semantics(
+            excludeSemantics: true,
+            button: true,
+            label: '删除健康档案',
+            onTap: onDelete,
+            child: OutlinedButton.icon(
+              key: const Key('health-delete-button'),
+              onPressed: onDelete,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(AppConstants.severeColor),
+                side: const BorderSide(color: Color(AppConstants.severeColor)),
+              ),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('删除健康档案'),
             ),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('删除健康档案'),
           ),
         ),
       ],
@@ -423,7 +438,7 @@ class _ReadinessCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            readiness.reason,
+            _readinessReasonLabel(readiness.readiness),
             style: const TextStyle(
               fontSize: 12,
               color: Color(AppConstants.textColor),
@@ -432,7 +447,7 @@ class _ReadinessCard extends StatelessWidget {
           if (readiness.missingFields.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              '缺失字段：${readiness.missingFields.join('、')}',
+              '待完善：${readiness.missingFields.map(_missingFieldLabel).join('、')}',
               style: const TextStyle(
                 fontSize: 11,
                 color: Color(AppConstants.textMuted),
@@ -442,7 +457,7 @@ class _ReadinessCard extends StatelessWidget {
           if (readiness.restrictedReason != null) ...[
             const SizedBox(height: 6),
             Text(
-              '受限原因：${readiness.restrictedReason}',
+              '受限原因：${_restrictedReasonLabel(readiness.restrictedReason!)}',
               style: const TextStyle(
                 fontSize: 11,
                 color: Color(AppConstants.severeColor),
@@ -584,7 +599,9 @@ class _HealthProfileEditSheetState
                     child: Text('经验丰富'),
                   ),
                 ],
-                onChanged: _saving ? null : (v) => setState(() => _experience = v),
+                onChanged: _saving
+                    ? null
+                    : (v) => setState(() => _experience = v),
               ),
               _DropdownField<int?>(
                 label: '每周频率',
@@ -594,7 +611,9 @@ class _HealthProfileEditSheetState
                   for (final f in const [2, 3, 4, 5])
                     DropdownMenuItem(value: f, child: Text('$f 次/周')),
                 ],
-                onChanged: _saving ? null : (v) => setState(() => _weeklyFrequency = v),
+                onChanged: _saving
+                    ? null
+                    : (v) => setState(() => _weeklyFrequency = v),
               ),
               _DropdownField<SessionDurationMinutes?>(
                 label: '单次时长',
@@ -618,7 +637,9 @@ class _HealthProfileEditSheetState
                     child: Text('60 分钟'),
                   ),
                 ],
-                onChanged: _saving ? null : (v) => setState(() => _duration = v),
+                onChanged: _saving
+                    ? null
+                    : (v) => setState(() => _duration = v),
               ),
               const SizedBox(height: 8),
               const Text(
@@ -656,7 +677,9 @@ class _HealthProfileEditSheetState
                 label: '未成年',
                 value: _underage,
                 items: _yesNoUnknownItems(),
-                onChanged: _saving ? null : (v) => setState(() => _underage = v),
+                onChanged: _saving
+                    ? null
+                    : (v) => setState(() => _underage = v),
               ),
               _DropdownField<YesNoUnknown?>(
                 label: '孕期或产后',
@@ -672,8 +695,7 @@ class _HealthProfileEditSheetState
                 items: _yesNoUnknownItems(),
                 onChanged: _saving
                     ? null
-                    : (v) =>
-                        setState(() => _recentSurgeryOrMajorInjury = v),
+                    : (v) => setState(() => _recentSurgeryOrMajorInjury = v),
               ),
               _DropdownField<YesNoUnknown?>(
                 label: '重大慢性病',
@@ -697,8 +719,9 @@ class _HealthProfileEditSheetState
                 items: _yesNoUnknownItems(),
                 onChanged: _saving
                     ? null
-                    : (v) =>
-                        setState(() => _professionalInstructionLimitations = v),
+                    : (v) => setState(
+                        () => _professionalInstructionLimitations = v,
+                      ),
               ),
               const SizedBox(height: 12),
               const Text(
@@ -717,9 +740,9 @@ class _HealthProfileEditSheetState
                 onChanged: _saving
                     ? null
                     : (value) => setState(() {
-                          _allergensAnswered = value ?? false;
-                          if (!_allergensAnswered) _allergenCodes.clear();
-                        }),
+                        _allergensAnswered = value ?? false;
+                        if (!_allergensAnswered) _allergenCodes.clear();
+                      }),
               ),
               Wrap(
                 spacing: 8,
@@ -732,10 +755,10 @@ class _HealthProfileEditSheetState
                         onSelected: !_allergensAnswered || _saving
                             ? null
                             : (selected) => setState(() {
-                                  selected
-                                      ? _allergenCodes.add(code)
-                                      : _allergenCodes.remove(code);
-                                }),
+                                selected
+                                    ? _allergenCodes.add(code)
+                                    : _allergenCodes.remove(code);
+                              }),
                       ),
                     )
                     .toList(),
@@ -757,9 +780,9 @@ class _HealthProfileEditSheetState
                 onChanged: _saving
                     ? null
                     : (value) => setState(() {
-                          _exclusionsAnswered = value ?? false;
-                          if (!_exclusionsAnswered) _excludedFoodCodes.clear();
-                        }),
+                        _exclusionsAnswered = value ?? false;
+                        if (!_exclusionsAnswered) _excludedFoodCodes.clear();
+                      }),
               ),
               Wrap(
                 spacing: 8,
@@ -772,10 +795,10 @@ class _HealthProfileEditSheetState
                         onSelected: !_exclusionsAnswered || _saving
                             ? null
                             : (selected) => setState(() {
-                                  selected
-                                      ? _excludedFoodCodes.add(code)
-                                      : _excludedFoodCodes.remove(code);
-                                }),
+                                selected
+                                    ? _excludedFoodCodes.add(code)
+                                    : _excludedFoodCodes.remove(code);
+                              }),
                       ),
                     )
                     .toList(),
@@ -801,8 +824,9 @@ class _HealthProfileEditSheetState
                                 SizedBox(
                                   width: 14,
                                   height: 14,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                                 SizedBox(width: 8),
                                 Text('保存中…'),
@@ -821,11 +845,11 @@ class _HealthProfileEditSheetState
   }
 
   List<DropdownMenuItem<YesNoUnknown?>> _yesNoUnknownItems() => const [
-        DropdownMenuItem(value: null, child: Text('未填写')),
-        DropdownMenuItem(value: YesNoUnknown.yes, child: Text('是')),
-        DropdownMenuItem(value: YesNoUnknown.no, child: Text('否')),
-        DropdownMenuItem(value: YesNoUnknown.unknown, child: Text('不确定')),
-      ];
+    DropdownMenuItem(value: null, child: Text('未填写')),
+    DropdownMenuItem(value: YesNoUnknown.yes, child: Text('是')),
+    DropdownMenuItem(value: YesNoUnknown.no, child: Text('否')),
+    DropdownMenuItem(value: YesNoUnknown.unknown, child: Text('不确定')),
+  ];
 
   Future<void> _save() async {
     setState(() => _saving = true);
@@ -852,10 +876,12 @@ class _HealthProfileEditSheetState
       ),
       allergies: existing?.allergies,
       dietExclusions: existing?.dietExclusions,
-      foodAllergenCodes:
-          _allergensAnswered ? _allergenCodes.toList(growable: false) : null,
-      excludedFoodCodes:
-          _exclusionsAnswered ? _excludedFoodCodes.toList(growable: false) : null,
+      foodAllergenCodes: _allergensAnswered
+          ? _allergenCodes.toList(growable: false)
+          : null,
+      excludedFoodCodes: _exclusionsAnswered
+          ? _excludedFoodCodes.toList(growable: false)
+          : null,
     );
     final ok = await notifier.updateProfile(update);
     if (!mounted) return;
@@ -868,20 +894,20 @@ class _HealthProfileEditSheetState
 }
 
 String _allergenLabel(FoodAllergenCode code) => switch (code) {
-      FoodAllergenCode.glutenCereal => '含麸质谷物',
-      FoodAllergenCode.crustacean => '甲壳类',
-      FoodAllergenCode.fish => '鱼类',
-      FoodAllergenCode.egg => '蛋类',
-      FoodAllergenCode.peanut => '花生',
-      FoodAllergenCode.soy => '大豆',
-      FoodAllergenCode.milk => '乳类',
-      FoodAllergenCode.treeNut => '坚果',
-    };
+  FoodAllergenCode.glutenCereal => '含麸质谷物',
+  FoodAllergenCode.crustacean => '甲壳类',
+  FoodAllergenCode.fish => '鱼类',
+  FoodAllergenCode.egg => '蛋类',
+  FoodAllergenCode.peanut => '花生',
+  FoodAllergenCode.soy => '大豆',
+  FoodAllergenCode.milk => '乳类',
+  FoodAllergenCode.treeNut => '坚果',
+};
 
 String _exclusionLabel(ExcludedFoodCode code) => switch (code) {
-      ExcludedFoodCode.avoidPork => '不吃猪肉',
-      ExcludedFoodCode.avoidBeef => '不吃牛肉',
-    };
+  ExcludedFoodCode.avoidPork => '不吃猪肉',
+  ExcludedFoodCode.avoidBeef => '不吃牛肉',
+};
 
 // ---------------------------------------------------------------------------
 // Small shared widgets
@@ -997,39 +1023,64 @@ class _DropdownField<T extends Object?> extends StatelessWidget {
 }
 
 Widget _box({required Widget child}) => Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(AppConstants.cardColor),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(AppConstants.glassBorder)),
-      ),
-      child: child,
-    );
+  width: double.infinity,
+  padding: const EdgeInsets.all(16),
+  decoration: BoxDecoration(
+    color: const Color(AppConstants.cardColor),
+    borderRadius: BorderRadius.circular(8),
+    border: Border.all(color: const Color(AppConstants.glassBorder)),
+  ),
+  child: child,
+);
 
 String? _fitnessGoalLabel(FitnessGoal? v) => switch (v) {
-      FitnessGoal.postureImprovement => '改善体态',
-      FitnessGoal.fatLoss => '减脂',
-      FitnessGoal.basicStrength => '基础力量',
-      FitnessGoal.mobility => '活动度',
-      FitnessGoal.generalWellness => '综合健康',
-      null => null,
-    };
+  FitnessGoal.postureImprovement => '改善体态',
+  FitnessGoal.fatLoss => '减脂',
+  FitnessGoal.basicStrength => '基础力量',
+  FitnessGoal.mobility => '活动度',
+  FitnessGoal.generalWellness => '综合健康',
+  null => null,
+};
+
+String _readinessReasonLabel(ReadinessTier tier) => switch (tier) {
+  ReadinessTier.ready => '必填训练信息已完整，当前未触发档案安全限制。',
+  ReadinessTier.missingRequiredData => '完成以下必要信息后，才能生成普通训练建议。',
+  ReadinessTier.restricted => '安全筛查结果暂不适用普通训练建议。',
+};
+
+String _missingFieldLabel(String field) => switch (field) {
+  'fitness_goal' => '训练目标',
+  'training_experience' => '训练经验',
+  'weekly_frequency' => '每周训练次数',
+  'session_duration_minutes' => '单次训练时长',
+  'equipment' => '可用器械',
+  _ => '其他必要信息',
+};
+
+String _restrictedReasonLabel(String reason) => switch (reason) {
+  'underage' => '年龄范围不适用',
+  'pregnancy_or_postpartum' => '孕期或产后状态',
+  'recent_surgery_or_major_injury' => '近期手术或重大损伤',
+  'major_chronic_condition' => '存在重大慢性健康状况',
+  'eating_disorder_concern' => '存在饮食失调相关风险',
+  'professional_instruction_limitations' => '已有专业人员限制要求',
+  _ => '安全筛查结果需要进一步确认',
+};
 
 String? _experienceLabel(TrainingExperience? v) => switch (v) {
-      TrainingExperience.beginner => '初级',
-      TrainingExperience.someExperience => '有一些经验',
-      TrainingExperience.experienced => '经验丰富',
-      null => null,
-    };
+  TrainingExperience.beginner => '初级',
+  TrainingExperience.someExperience => '有一些经验',
+  TrainingExperience.experienced => '经验丰富',
+  null => null,
+};
 
 String? _durationLabel(SessionDurationMinutes? v) => switch (v) {
-      SessionDurationMinutes.fifteen => '15 分钟',
-      SessionDurationMinutes.thirty => '30 分钟',
-      SessionDurationMinutes.fortyFive => '45 分钟',
-      SessionDurationMinutes.sixty => '60 分钟',
-      null => null,
-    };
+  SessionDurationMinutes.fifteen => '15 分钟',
+  SessionDurationMinutes.thirty => '30 分钟',
+  SessionDurationMinutes.fortyFive => '45 分钟',
+  SessionDurationMinutes.sixty => '60 分钟',
+  null => null,
+};
 
 String? _equipmentLabel(Equipment? e) {
   if (e == null) return null;
