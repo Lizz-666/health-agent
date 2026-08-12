@@ -1,12 +1,12 @@
 # Active Agent Tasks
 
-> 当前开发协调账本，不是产品规格。最后核对：2026-08-12。
+> 当前开发协调账本，不是产品规格。最后核对：2026-08-13。
 > 所有会话先遵守根目录 `AGENTS.md` 的“开发总纲”，再读取本文件中与当前 Task 对应的行和链接。
 
 ## Current Initiative
 
-- 阶段：Phase 9 Android 小范围受控试用候选准备，状态 `in_progress`；Gate 1 已接受，
-  Codex 单写入者 Gate 2 隐私/安全/运维进入 exact-SHA CI 审查。唯一业务基线仍为 Phase 8 exact closure
+- 阶段：Phase 9 Android 小范围受控试用候选准备，状态 `in_progress`；Gate 2 已接受，
+  下一批为 Gate 3A Flutter 中文化/可访问性。唯一业务基线仍为 Phase 8 exact closure
   `2ae03345a93d8cc22d0e47fcac415411798df48b`；Gate 1 接受实现
   `407ce9ce5de3f53140db8660505e8c15cf94e628` 可追溯到 Gate 0 closure。
 - Phase 9 已批准产品方向：中国大陆一般健康成年人、Android 非公开小范围候选；运营
@@ -66,7 +66,7 @@
 | --- | --- | --- | --- | --- | --- |
 | Phase 9 Task 0 | Codex specification, architecture, safety/privacy audit, task split, cold review, CI, and Gate 0 closure | `codex/phase9-controlled-trial` / current worktree | `2ae03345a93d8cc22d0e47fcac415411798df48b` | `committed` | 文档候选 `b828b046baaa8c74186396481b52713828586570` 本地 Fast/Flutter 通过；metadata 候选 `af508a795c340226fae1ddabec0a42f13a9fd192` 的严格 CI `31559582176` 为 Fast 1015/0/11、Flutter 493、Full 1745/0/0、PG 28/28、Phase8 11/11 + 13/13。仅 7 个 Gate 0 文档文件，无业务代码；最终 status commit 必须通过自身 exact-SHA CI 才可宣布 Gate 0 verified。 |
 | Phase 9 Task 1 | Codex sole identity/auth/config writer, cold reviewer, CI operator, and Gate 1 acceptor | `codex/phase9-implementation` / `C:\Users\Lenovo\Desktop\develop\health-worktrees\phase9-implementation` | Gate 0 exact closure `5cdd43bc808bc08897c05e31f22941239812f294` | `verified` | 接受实现 `407ce9ce5de3f53140db8660505e8c15cf94e628`：唯一邀请码、独立非联系方式账号、单活动设备、session rotation/revocation、provider-neutral auth 和候选配置 fail-closed 已完成；本地 Full `1731/0/38` 条件 PG skips，严格 CI `31569996543` 为 Full `1769/0/0`、PG `30/30`，Fast/Flutter/Full/Phase8 全绿；P0/P1/P2 为零。报告 `docs/reports/phase9-gate1-review-2026-08-12.md`。 |
-| Phase 9 Task 2 | Codex sole privacy/security/operations writer and Gate 2 acceptor | same implementation branch/worktree | Gate 1 closure `9be5db1d6d8bcf70b08115b0432969b5aabe3011` | `review` | 实现候选 `0bb260638da00d10d539a70a52a3853749b298ed`：版本化同意、本人脱敏导出、身份纳入原子删除、带完整性独立删除账本、恢复复活阻断、稳定码日志、hash lock、exact VEX、secret/artifact 门和事故 runbook 已完成。本地 Full `1747/0/50`（35 PG/Docker + 15 GitHub API 条件 skip）、定向 `100/0/5`、Flutter `498`、security/dependency 门通过；P0/P1/P2 为零。等待报告/状态 closure 的 exact-SHA GitHub CI；外部审查仍 not obtained。 |
+| Phase 9 Task 2 | Codex sole privacy/security/operations writer and Gate 2 acceptor | same implementation branch/worktree | Gate 1 closure `9be5db1d6d8bcf70b08115b0432969b5aabe3011` | `verified` | 接受实现 `80135bc3aa551a0fe7c1f2898ab5cebe61f67ab3`：版本化同意、本人脱敏导出、身份纳入原子删除、完整性独立删除账本、恢复复活阻断、稳定码日志、跨平台 hash lock、exact VEX、secret/artifact 门和事故 runbook 已完成。本地 Full `1747/0/50` 条件 skip、Flutter `498`；严格 CI `31622194153` 为 Fast `1034/0/14`、Flutter `498`、Full `1798/0/0`、PostgreSQL `33/33`、Phase8 `11/11 + 13/13`、Phase9 security `19/19`，全部成功；P0/P1/P2 为零。报告 `docs/reports/phase9-gate2-review-2026-08-13.md`；外部审查仍 not obtained。 |
 | Phase 9 Task 3A | One OpenCode + Claude Flutter writer; Codex review/takeover and acceptance | separate branch/worktree from accepted Gate 2 SHA | accepted Gate 2 SHA TBD | `planned` | 仅冻结的 Flutter 中文化/可访问性 allowlist；禁止 backend/auth/API/migration/健康规则/provider/依赖/CI；OpenCode 报告不是验收。 |
 | Phase 9 Task 3B | Codex sole Android reliability/E2E writer and Gate 3 acceptor | Phase 9 implementation branch/worktree | accepted Gate 2 SHA plus reviewed 3A commit | `planned` | API 设备矩阵、慢网/断网/不可达、token 过期、Asia/Shanghai 边界、兼容/升级/回滚；Phase9 synthetic runner/CI。 |
 | Phase 9 Task 4 | Codex sole final E2E writer, cold reviewer, CI operator, and exit acceptor | Phase 9 implementation branch/worktree | accepted Gate 3 SHA TBD | `planned` | Full/Flutter/Phase8/Phase9/Android、隐私 artifact scan、事故演练、exit audit 和 exact-SHA CI；最高结论 controlled-trial candidate，仍不得真实试用/部署/发布。 |
@@ -120,8 +120,8 @@
   `codex/phase9-implementation`，从 Gate 0 exact closure
   `5cdd43bc808bc08897c05e31f22941239812f294` 创建；Gate 1 接受实现为
   `407ce9ce5de3f53140db8660505e8c15cf94e628`，Gate 2 实现候选为
-  `0bb260638da00d10d539a70a52a3853749b298ed`，当前只允许 Codex 写 Gate 2 审查/CI closure；
-  不得创建并行 privacy/security writer 或吸收其他分支变更。
+  `80135bc3aa551a0fe7c1f2898ab5cebe61f67ab3`，当前只允许 Codex 写 Gate 2 metadata
+  closure；closure 自身 exact-SHA CI 通过后才可创建 Gate 3A worktree。
 - 当前 worktree `C:\Users\Lenovo\.codex\worktrees\be24\health` 已从 Phase 8 exact
   closure `2ae03345a93d8cc22d0e47fcac415411798df48b` 切换到
   `codex/phase9-controlled-trial`，仅用于 Phase 9 Gate 0 文档、审查、提交和 CI；
@@ -148,6 +148,10 @@
   `1731/0/38` 条件 PG skips；严格 CI run `31569996543` 为 `1769/0/0`、PostgreSQL
   `30/30`，Fast/Flutter/Full/Phase8 全通过；报告
   `docs/reports/phase9-gate1-review-2026-08-12.md`。
+- Phase 9 Gate 2：接受实现 `80135bc3aa551a0fe7c1f2898ab5cebe61f67ab3`；本地 Full
+  `1747/0/50` 条件 skips、Flutter `498`；严格 CI run `31622194153` 为 Fast `1034/0/14`、
+  Flutter `498`、Full `1798/0/0`、PostgreSQL `33/33`、Phase8 与 Phase9 security 全绿；
+  报告 `docs/reports/phase9-gate2-review-2026-08-13.md`。
 - Phase 1：`docs/reports/phase1-exit-audit-2026-07-22.md`
 - Phase 2：`docs/reports/phase2-exit-audit-2026-07-26.md`
 - Phase 3：`docs/reports/phase3-exit-audit-2026-07-26.md`；远程 CI 后续事实以本账本和 PR #1 exact-SHA checks 为准。

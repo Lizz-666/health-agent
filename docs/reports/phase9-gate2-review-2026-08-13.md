@@ -3,9 +3,9 @@
 > 完成日期：2026-08-13
 > Gate 1 closure：`9be5db1d6d8bcf70b08115b0432969b5aabe3011`
 > 唯一 Phase 8 业务基线：`2ae03345a93d8cc22d0e47fcac415411798df48b`
-> 实现候选：`0bb260638da00d10d539a70a52a3853749b298ed`
+> 接受实现：`80135bc3aa551a0fe7c1f2898ab5cebe61f67ab3`
 > 分支：`codex/phase9-implementation`
-> 状态：本地接受候选；exact-SHA GitHub CI 待运行
+> 状态：accepted；严格 exact-SHA GitHub CI run `31622194153` 全部通过
 
 ## Findings First
 
@@ -34,6 +34,11 @@
 - 新安全测试在 `backend` 工作目录不能导入根目录脚本；现显式、局部引入仓库根路径，Full
   收集通过。
 - Phase 1/2 迁移回归仍固定 `0013`；已更新为唯一 head `0014_controlled_trial_privacy`。
+- 首轮 CI `31617341156` 暴露 Windows 生成的 `uvicorn[standard]` hash lock 缺少 Linux 专属
+  `uvloop` pin。现改用产品实际需要的 plain Uvicorn，空环境 hashed install 与 Linux CI 均通过，
+  并增加禁止平台专属 extra 漂移的仓库安全门。
+- 严格 CI `31619020475` 的 Full `1798/0/0` 已通过，但 Fast 在 15 分钟 job 上限被取消；日志无
+  测试失败。Fast 保持原测试和失败语义，仅将上限调整为 25 分钟；最终 run 在 4 分 23 秒完成。
 
 ### P3 / Residual
 
@@ -78,6 +83,22 @@
   9be5db1d6d8bcf70b08115b0432969b5aabe3011` 精确等于 Gate 1 closure；与 Phase 8 closure 的
   merge-base 精确等于 `2ae03345a93d8cc22d0e47fcac415411798df48b`。
 
+## GitHub CI 证据
+
+接受实现 `80135bc3aa551a0fe7c1f2898ab5cebe61f67ab3` 的严格 workflow dispatch
+run `31622194153`：
+
+- Fast：`1034 passed, 0 failed, 14 skipped`；14 个均为 Fast 层允许的 PostgreSQL 条件用例；
+- Flutter：analyze success，`498 passed`；
+- Full：`1798 passed, 0 failed, 0 skipped`；PostgreSQL `expected=33 actual=33`，版本证据存在；
+- Phase 8：真实 HTTP `11/11`、eval `13/13`、零残留；
+- Phase 9 security：secret/artifact、VEX、dependency audit 全通过，`19 passed`；
+- 五个 job 的 checkout SHA 与 event SHA 均精确等于接受实现 SHA。
+
+历史 run 不被隐藏：`31617341156` 因跨平台 hash lock 失败；`31618479425` 未启用 Full，不能作为
+严格验收；`31619020475` 的 Full 成功但 Fast 达到旧 timeout，run 总状态 cancelled。上述原因均在
+后续提交关闭，最终 run 全部 success。
+
 ## 回滚与恢复
 
 1. 应用回滚必须保持 `0014` 表和 privacy gate；不得 downgrade 后继续候选服务。
@@ -88,7 +109,7 @@
 
 ## Gate 结论
 
-实现候选本地 P0/P1/P2 为零，可进入 exact-SHA GitHub CI。绿色 CI 只证明本 Gate 的合成工程门，
-不授权真实测试者、真实健康数据/照片、生产凭据、live AI、部署、分发或公开发布。Gate 2 只有在
-报告/状态 closure 自身的 Fast、Flutter、Full、Phase 8、Phase 9 security 与 PostgreSQL 证据全部
-通过后才能标记 `verified`。
+接受实现 P0/P1/P2 为零，Gate 2 标记 `accepted`。绿色 CI 只证明本 Gate 的合成工程门，不授权
+真实测试者、真实健康数据/照片、生产凭据、live AI、部署、分发或公开发布。报告/状态 closure
+仍必须通过自身 exact-SHA Fast、Flutter、Full、Phase 8、Phase 9 security 与 PostgreSQL CI，
+才能作为 Gate 3 的精确基线。
