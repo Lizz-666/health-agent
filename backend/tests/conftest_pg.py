@@ -33,7 +33,7 @@ from urllib.parse import urlparse
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -396,15 +396,19 @@ def _get_engine_and_sessionmaker(dsn: str):
 
 
 async def _truncate_all(engine) -> None:
-    """Wipe every data table for test isolation without dropping the schema."""
+    """Wipe every existing data table without assuming the schema is at head."""
     from app.db.base import Base
 
-    names = ", ".join(
-        '"{}"'.format(t) for t in sorted(Base.metadata.tables.keys())
-    )
-    if not names:
-        return
     async with engine.connect() as conn:
+        existing = set(
+            await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+        )
+        names = ", ".join(
+            '"{}"'.format(table)
+            for table in sorted(existing.intersection(Base.metadata.tables.keys()))
+        )
+        if not names:
+            return
         await conn.execute(text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
         await conn.commit()
 
