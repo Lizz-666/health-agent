@@ -66,6 +66,8 @@ ALL_TABLES = {
     "trial_device_enrollments",
     "auth_sessions",
     "auth_attempts",
+    "sensitive_health_consent_events",
+    "account_deletion_markers",
     "posture_assessment_events",
     "posture_profile_entries",
     "posture_user_goals",
@@ -113,12 +115,12 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0012_review_draft_origins。"""
+    """Alembic 只有一个 head。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0013_controlled_trial_auth", head_lines[0]
+    assert head_lines[0].split()[0] == "0014_controlled_trial_privacy", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
@@ -592,6 +594,9 @@ def test_metadata_indexes_match_offline_sql():
         "training_day_adjustment_items",
         "training_weekly_reviews",
         "posture_recheck_dismissals",
+        # Phase 9 controlled-trial privacy (migration 0014).
+        "sensitive_health_consent_events",
+        "account_deletion_markers",
     }
 
     # Indexes that exist ONLY in the migration SQL, by design (ADR-0002): the

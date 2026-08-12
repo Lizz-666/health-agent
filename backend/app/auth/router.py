@@ -16,6 +16,16 @@ from app.auth import service
 from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, decode_token
 from app.core.exceptions import AppException, BadRequest, Unauthorized
+from app.core.observability import (
+    SecurityEventCode,
+    SecurityEventOutcome,
+    emit_security_event,
+)
+
+import logging
+
+
+logger = logging.getLogger("app.security")
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -112,6 +122,11 @@ async def trial_activate(
         device_key=request.device_key,
         source_key=http_request.client.host if http_request.client else "unknown",
     )
+    emit_security_event(
+        logger,
+        SecurityEventCode.AUTH_TRIAL_ACTIVATION,
+        SecurityEventOutcome.ACCEPTED,
+    )
     return TokenResponse(**tokens.__dict__)
 
 
@@ -129,6 +144,11 @@ async def trial_login(
         credential_value=request.credential,
         device_key=request.device_key,
         source_key=http_request.client.host if http_request.client else "unknown",
+    )
+    emit_security_event(
+        logger,
+        SecurityEventCode.AUTH_TRIAL_LOGIN,
+        SecurityEventOutcome.ACCEPTED,
     )
     return TokenResponse(**tokens.__dict__)
 

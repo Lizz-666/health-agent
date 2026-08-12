@@ -513,7 +513,8 @@ async def send_verification_code(db: AsyncSession, phone: str) -> None:
     await db.commit()
 
     if settings.DEV_MODE:
-        logger.info(f"[DEV] 验证码: phone={phone}, code={code}")
+        # Never place a phone number or one-time credential in process logs.
+        logger.info("Development verification code generated")
     else:
         # TODO: 调用阿里云短信服务发送验证码
         pass

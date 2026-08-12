@@ -278,3 +278,11 @@ Gate 3A 是 Phase 9 默认唯一可委派实现批次。提示词必须包含：
 - 无未解决 P0/P1/P2；P3 和外部依赖明确登记；
 - 没有真实健康数据/照片/联系方式/生产凭据/live provider/外部成本；
 - public release gate 仍为 `not approved`；真实受控试用必须获得新的用户授权。
+
+## 9. Gate 2 实际验证面（2026-08-12）
+
+Gate 2 增加 `python scripts/phase9_security.py verify` 和 `dependencies`，并在 Python 3.12
+独立环境从 `backend/requirements-dev.lock` 使用 `--require-hashes` 安装。目标测试为
+`test_trial_privacy.py`、`test_security_observability.py`、`test_phase9_security.py`、迁移与既有
+privacy/deletion 回归；严格 Full CI 必须执行 PostgreSQL 同意并发、身份删除和 `0014` 升降级且零 skip。
+GitHub 新增非 live `phase9-security` job，摘要只含规则、路径、稳定计数和测试结果。

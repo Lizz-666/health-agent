@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_sensitive_health_consent
 from app.core.exceptions import AppException
 from app.db.database import get_db
 from app.nutrition import service
@@ -23,7 +23,11 @@ from app.nutrition.schemas_api import (
     TargetsResponse,
 )
 
-router = APIRouter(prefix="/api/v1/nutrition", tags=["nutrition"])
+router = APIRouter(
+    prefix="/api/v1/nutrition",
+    tags=["nutrition"],
+    dependencies=[Depends(require_sensitive_health_consent)],
+)
 
 
 @router.get("/eligibility", response_model=EligibilityResponse)

@@ -303,7 +303,7 @@ def test_risk_version_bumped_for_p2_1_downgrade():
 async def test_pain_signal_downgrades_related_profile(client):
     token = await _login_user(client)
     # Decode user id from token to create a profile entry.
-    from jose import jwt
+    import jwt
 
     from app.core.config import settings
 
@@ -390,7 +390,7 @@ async def test_severe_assessment_alone_does_not_trigger_red_flag(client):
     """Anti-inference: severe profile + knowledge red_flags + NO structured signal
     reclassifies to normal, never red_flag."""
     token = await _login_user(client)
-    from jose import jwt
+    import jwt
 
     from app.core.config import settings
 
@@ -538,7 +538,7 @@ async def test_nonexistent_related_issue_returns_400(client):
 @pytest.mark.asyncio
 async def test_risk_version_written_to_profile_and_signal(client):
     token = await _login_user(client)
-    from jose import jwt
+    import jwt
 
     from app.core.config import settings
 
@@ -627,7 +627,7 @@ async def test_no_auto_recovery_after_30_days(client):
 
 
 def _user_from_token(token):
-    from jose import jwt
+    import jwt
 
     from app.core.config import settings
 

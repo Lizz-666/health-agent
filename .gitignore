@@ -10,6 +10,7 @@
 **/.ruff_cache/
 **/.hypothesis/
 **/.venv/
+**/.phase9-venv/
 **/.env
 **/*.db
 

@@ -1,3 +1,5 @@
+import json
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -9,7 +11,7 @@ class Settings(BaseSettings):
     )
 
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/posture_app"
-    SECRET_KEY: str = "CHANGE-ME-IN-PRODUCTION"
+    SECRET_KEY: str = "CHANGE-ME-IN-PRODUCTION-32-BYTES-MINIMUM"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -24,6 +26,8 @@ class Settings(BaseSettings):
     AUTH_AUDIT_HMAC_KEY: str = ""
     AUTH_LOGIN_MAX_ATTEMPTS: int = 5
     AUTH_LOGIN_WINDOW_MINUTES: int = 15
+    PRIVACY_AUDIT_HMAC_KEY: str = ""
+    PRIVACY_NOTICE_VERSION: str = "controlled-trial-sensitive-health-v1"
 
     ALIBABA_CLOUD_ACCESS_KEY_ID: str = ""
     ALIBABA_CLOUD_ACCESS_KEY_SECRET: str = ""
@@ -91,6 +95,15 @@ class Settings(BaseSettings):
     # is under staged review. Deletion remains available even when disabled.
     NUTRITION_RUNTIME_ENABLED: bool = False
 
+    @staticmethod
+    def _valid_aes256_hex(value: object) -> bool:
+        if not isinstance(value, str):
+            return False
+        try:
+            return len(bytes.fromhex(value)) == 32
+        except ValueError:
+            return False
+
     @model_validator(mode="after")
     def validate_controlled_trial_candidate(self):
         if self.DEPLOYMENT_PROFILE != "controlled_trial_candidate":
@@ -100,12 +113,23 @@ class Settings(BaseSettings):
             errors.append("AUTH_MODE must be controlled_trial")
         if self.AUTH_CREDENTIAL_PROVIDER != "offline_password":
             errors.append("AUTH_CREDENTIAL_PROVIDER must be offline_password")
-        if self.SECRET_KEY == "CHANGE-ME-IN-PRODUCTION" or len(self.SECRET_KEY) < 32:
+        if self.SECRET_KEY.startswith("CHANGE-ME-IN-PRODUCTION") or len(self.SECRET_KEY) < 32:
             errors.append("SECRET_KEY must be a non-default value of at least 32 characters")
-        if self.DATABASE_URL == "postgresql+asyncpg://user:password@localhost:5432/posture_app":
+        if not self.DATABASE_URL.startswith("postgresql+asyncpg://"):
+            errors.append("DATABASE_URL must use PostgreSQL with asyncpg")
+        elif self.DATABASE_URL == "postgresql+asyncpg://user:password@localhost:5432/posture_app":
             errors.append("DATABASE_URL must not use the repository default")
         if len(self.AUTH_AUDIT_HMAC_KEY) < 32:
             errors.append("AUTH_AUDIT_HMAC_KEY must be at least 32 characters")
+        if len(self.PRIVACY_AUDIT_HMAC_KEY) < 32:
+            errors.append("PRIVACY_AUDIT_HMAC_KEY must be at least 32 characters")
+        if self.PRIVACY_AUDIT_HMAC_KEY in {
+            self.SECRET_KEY,
+            self.AUTH_AUDIT_HMAC_KEY,
+        }:
+            errors.append("PRIVACY_AUDIT_HMAC_KEY must be cryptographically separate")
+        if not self.PRIVACY_NOTICE_VERSION.strip():
+            errors.append("PRIVACY_NOTICE_VERSION is required")
         if not self.JWT_ISSUER.strip() or not self.JWT_AUDIENCE.strip():
             errors.append("JWT_ISSUER and JWT_AUDIENCE are required")
         if self.JWT_ISSUER == "posture-app" or self.JWT_AUDIENCE == "posture-app-client":
@@ -120,6 +144,26 @@ class Settings(BaseSettings):
             errors.append("development authentication must be disabled")
         if self.PHOTO_ANALYSIS_ENABLED or self.AGENT_RUNTIME_ENABLED:
             errors.append("photo analysis and live Agent runtime must be disabled")
+        if not self.PURGE_ENCRYPTION_KEY and not self.PURGE_ENCRYPTION_KEYS:
+            errors.append("a purge encryption key or keyring is required")
+        elif self.PURGE_ENCRYPTION_KEYS:
+            try:
+                keyring = json.loads(self.PURGE_ENCRYPTION_KEYS)
+            except (json.JSONDecodeError, TypeError):
+                keyring = None
+            if not isinstance(keyring, dict) or not keyring:
+                errors.append("PURGE_ENCRYPTION_KEYS must be a non-empty JSON object")
+            elif any(
+                not isinstance(version, str)
+                or not version
+                or not self._valid_aes256_hex(key)
+                for version, key in keyring.items()
+            ):
+                errors.append("PURGE_ENCRYPTION_KEYS must contain AES-256 hex keys")
+            elif self.PURGE_ACTIVE_KEY_VERSION not in keyring:
+                errors.append("PURGE_ACTIVE_KEY_VERSION must exist in the keyring")
+        elif not self._valid_aes256_hex(self.PURGE_ENCRYPTION_KEY):
+            errors.append("PURGE_ENCRYPTION_KEY must be a 64-character hex value")
         if errors:
             raise ValueError("controlled-trial configuration rejected: " + "; ".join(errors))
         return self

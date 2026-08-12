@@ -38,6 +38,8 @@ def _candidate_settings(**overrides):
         "AUTH_MODE": "controlled_trial",
         "SECRET_KEY": "synthetic-secret-key-that-is-long-enough",
         "AUTH_AUDIT_HMAC_KEY": "synthetic-audit-key-that-is-long-enough",
+        "PRIVACY_AUDIT_HMAC_KEY": "synthetic-privacy-key-that-is-long-enough",
+        "PURGE_ENCRYPTION_KEY": "0123456789abcdef" * 4,
         "DATABASE_URL": "postgresql+asyncpg://synthetic:synthetic@localhost/synthetic",
         "ACCESS_TOKEN_EXPIRE_MINUTES": 15,
         "JWT_ISSUER": "synthetic-controlled-trial-issuer",
@@ -57,7 +59,10 @@ def _candidate_settings(**overrides):
     [
         {"SECRET_KEY": "CHANGE-ME-IN-PRODUCTION"},
         {"DATABASE_URL": "postgresql+asyncpg://user:password@localhost:5432/posture_app"},
+        {"DATABASE_URL": "sqlite+aiosqlite:///candidate.db"},
         {"AUTH_AUDIT_HMAC_KEY": ""},
+        {"PRIVACY_AUDIT_HMAC_KEY": "synthetic-secret-key-that-is-long-enough"},
+        {"PRIVACY_AUDIT_HMAC_KEY": "synthetic-audit-key-that-is-long-enough"},
         {"JWT_ISSUER": "posture-app"},
         {"JWT_AUDIENCE": "posture-app-client"},
         {"AUTH_MODE": "legacy"},
@@ -66,6 +71,16 @@ def _candidate_settings(**overrides):
         {"PHOTO_ANALYSIS_ENABLED": True},
         {"AGENT_RUNTIME_ENABLED": True},
         {"ACCESS_TOKEN_EXPIRE_MINUTES": 16},
+        {"PURGE_ENCRYPTION_KEY": "not-a-valid-aes-key"},
+        {
+            "PURGE_ENCRYPTION_KEY": "",
+            "PURGE_ENCRYPTION_KEYS": '{"v1":"not-a-valid-aes-key"}',
+        },
+        {
+            "PURGE_ENCRYPTION_KEY": "",
+            "PURGE_ENCRYPTION_KEYS": '{"v2":"' + "01" * 32 + '"}',
+            "PURGE_ACTIVE_KEY_VERSION": "v1",
+        },
     ],
 )
 def test_candidate_configuration_rejects_unsafe_values(override):
@@ -76,6 +91,15 @@ def test_candidate_configuration_rejects_unsafe_values(override):
 def test_candidate_configuration_accepts_complete_synthetic_values():
     configured = _candidate_settings()
     assert configured.AUTH_MODE == "controlled_trial"
+
+
+def test_candidate_configuration_accepts_valid_versioned_purge_keyring():
+    configured = _candidate_settings(
+        PURGE_ENCRYPTION_KEY="",
+        PURGE_ENCRYPTION_KEYS='{"v2":"' + "01" * 32 + '"}',
+        PURGE_ACTIVE_KEY_VERSION="v2",
+    )
+    assert configured.PURGE_ACTIVE_KEY_VERSION == "v2"
 
 
 @pytest.mark.asyncio

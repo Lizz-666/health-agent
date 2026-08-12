@@ -131,6 +131,10 @@ FAST_TEST_TARGETS = [
     "tests/test_phase8_deletion.py",
     "tests/test_phase8_http_journey.py",
     "tests/test_phase8_evaluations.py",
+    # Phase 9 Gate 2: controlled-trial privacy and repository security gates.
+    "tests/test_trial_privacy.py",
+    "tests/test_security_observability.py",
+    "tests/test_phase9_security.py",
 ]
 
 

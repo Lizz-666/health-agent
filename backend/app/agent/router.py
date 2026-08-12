@@ -21,11 +21,15 @@ from app.agent.schemas import (
 )
 from app.core.actor_context import ActorContext
 from app.core.config import settings
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_sensitive_health_consent
 from app.db.database import get_db
 
 
-router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
+router = APIRouter(
+    prefix="/api/v1/agent",
+    tags=["agent"],
+    dependencies=[Depends(require_sensitive_health_consent)],
+)
 
 
 def get_agent_provider() -> AgentProvider:

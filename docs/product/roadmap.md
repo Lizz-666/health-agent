@@ -126,7 +126,9 @@ flowchart TB
 - 新环境可按明确命令启动前后端（README 含 DATABASE_URL → `alembic upgrade head` → uvicorn 完整顺序）
 - 当前体态主流程可运行（真实 PostgreSQL + 真实后端 + Android 完整业务冒烟通过）
 - 测试和分析结果有新鲜证据（后端 81 passed、Flutter analyze 无问题、Flutter test 7 passed）
-- 运行时和配置方式已确定（Python 3.9.13、Flutter 3.44.0、PostgreSQL 16、Alembic、Dart-define）
+- Phase 0 基线运行时曾为 Python 3.9.13；Phase 9 Gate 2 因已知依赖漏洞修复将候选后端提升为
+  Python 3.12.13，并使用带哈希运行时/dev 锁文件。Flutter 3.44.0、PostgreSQL 16、Alembic
+  和 Dart-define 保持不变。
 - 数据模式和真实敏感数据启用门已记录，照片分析默认关闭
 - 详见 `docs/specs/platform/2026-06-12-baseline-contract.md` 和 `docs/plans/platform/2026-06-12-baseline-convergence.md`
 

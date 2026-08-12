@@ -13,7 +13,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_sensitive_health_consent
 from app.db.database import get_db
 from app.training import review_service, service
 from app.training.schemas_api import (
@@ -36,7 +36,11 @@ from app.training.schemas_api import (
     WeeklyReviewResponse,
 )
 
-router = APIRouter(prefix="/api/v1/training", tags=["training"])
+router = APIRouter(
+    prefix="/api/v1/training",
+    tags=["training"],
+    dependencies=[Depends(require_sensitive_health_consent)],
+)
 
 
 @router.post("/plans:draft", response_model=DraftResponse)

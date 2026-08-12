@@ -208,3 +208,13 @@ Gate 4 后仍需单独的用户决定和授权才能进入真实试用，包括�
 - 批准部署、分发和真实用户数据处理。
 
 公开发布继续完全受 `docs/product/public-release-gate.md` 约束。
+
+## 13. Gate 2 已实现契约（2026-08-12）
+
+- 候选后端运行时提升为 Python 3.12.13；运行时/dev 依赖分离并使用完整哈希锁。
+- 敏感健康目的采用当前告知版本的追加式 grant/withdraw 事件；候选健康领域路由默认拒绝未同意。
+- 本人导出显式排除认证器；删号重新认证后先禁用凭据和 session，再执行可恢复 purge。
+- 删除完成只保留 HMAC 标记/不可关联回执；对象删除失败返回 pending，账号保持禁用和冻结。
+- 候选启动检测备份复活身份；结构化日志只允许稳定码、服务端 request ID 和聚合 count。
+- threat model、VEX、license、secret/artifact、事故和备份恢复证据见 `docs/security/**`、
+  `docs/privacy/**`、`docs/operations/**`。这些仍不是外部专业审查或真实试用授权。

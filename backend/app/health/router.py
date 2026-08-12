@@ -12,7 +12,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_sensitive_health_consent
 from app.db.database import get_db
 from app.health import service
 from app.health.schemas import (
@@ -31,7 +31,11 @@ from app.health.schemas import (
     WeightTrendResponse,
 )
 
-router = APIRouter(prefix="/api/v1/health", tags=["health"])
+router = APIRouter(
+    prefix="/api/v1/health",
+    tags=["health"],
+    dependencies=[Depends(require_sensitive_health_consent)],
+)
 
 
 @router.get("/profile", response_model=HealthProfileResultResponse)

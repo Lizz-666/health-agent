@@ -1,0 +1,55 @@
+{
+  "schema_version": "phase9-vex-v1",
+  "reviewed_at": "2026-08-12",
+  "tool": "pip-audit==2.9.0",
+  "entries": [
+    {
+      "id": "PYSEC-2026-1845",
+      "package": "pytest",
+      "version": "8.4.2",
+      "status": "not_affected",
+      "justification": "development_only_single_tenant_ci",
+      "invariant": "pytest_is_not_runtime_dependency"
+    },
+    {
+      "id": "PYSEC-2026-161",
+      "package": "starlette",
+      "version": "0.49.3",
+      "status": "not_affected",
+      "justification": "authorization_uses_asgi_scope_path_not_reconstructed_url",
+      "invariant": "no_request_url_in_runtime_code"
+    },
+    {
+      "id": "PYSEC-2026-248",
+      "package": "starlette",
+      "version": "0.49.3",
+      "status": "not_affected",
+      "justification": "authorization_uses_asgi_scope_path_not_reconstructed_url",
+      "invariant": "no_request_url_in_runtime_code"
+    },
+    {
+      "id": "PYSEC-2026-249",
+      "package": "starlette",
+      "version": "0.49.3",
+      "status": "not_affected",
+      "justification": "runtime_has_no_form_parser_usage",
+      "invariant": "no_form_parser_in_runtime_code"
+    },
+    {
+      "id": "PYSEC-2026-2281",
+      "package": "starlette",
+      "version": "0.49.3",
+      "status": "not_affected",
+      "justification": "runtime_has_no_staticfiles_mount",
+      "invariant": "no_staticfiles_in_runtime_code"
+    },
+    {
+      "id": "PYSEC-2026-2280",
+      "package": "starlette",
+      "version": "0.49.3",
+      "status": "not_affected",
+      "justification": "runtime_has_no_httpendpoint_or_raw_route_registration",
+      "invariant": "no_httpendpoint_in_runtime_code"
+    }
+  ]
+}

@@ -185,6 +185,18 @@ class FakeObjectStore(ObjectStore):
         self._deleted.append(object_key)
 
 
+class FailClosedObjectStore(ObjectStore):
+    """Candidate adapter while photo storage remains disabled.
+
+    An account with no photo objects can be deleted normally. If persisted
+    object keys exist, deletion must stop until a reviewed real adapter is
+    configured; treating those keys as absent would fabricate deletion proof.
+    """
+
+    async def delete_object(self, object_key: str) -> None:
+        raise ObjectStoreError("object deletion adapter is not configured")
+
+
 # --------------------------------------------------------------------------- #
 # Purge scope (spec §6.6)
 # --------------------------------------------------------------------------- #
@@ -573,6 +585,13 @@ async def _has_purgeable_data(db: AsyncSession, user_id: UUID) -> bool:
     idempotency_records. If ANY exist → proceed with purge. Only if ALL are
     empty → no-op (hardening fix #7).
     """
+    from app.auth.models import TrialCredential
+
+    trial_identity = await db.scalar(
+        select(TrialCredential.user_id).where(TrialCredential.user_id == user_id)
+    )
+    if trial_identity is not None:
+        return True
     for model in (
         PostureAssessmentEvent,
         PostureProfileEntry,
@@ -920,6 +939,12 @@ async def _finalize_purge(
     else:
         object_delete_status = _object_delete_status_for(photo_keys)
     assert object_delete_status in _TOMBSTONE_COMPLETED_STATUSES
+    from app.privacy.service import finalize_trial_identity_deletion, is_trial_identity
+
+    trial_account = bool(
+        op.user_id is not None and await is_trial_identity(db, op.user_id)
+    )
+    deleted_user_id = op.user_id
     tombstone = PosturePurgeTombstone(
         receipt_id=_uuid.uuid4(),
         deleted_at=datetime.now(timezone.utc),
@@ -928,6 +953,8 @@ async def _finalize_purge(
         object_delete_status=object_delete_status,
     )
     db.add(tombstone)
+    if trial_account and deleted_user_id is not None:
+        await finalize_trial_identity_deletion(db, deleted_user_id)
     op.status = "completed"
     op.user_id = None
     op.target_event_ids = None
@@ -1152,6 +1179,10 @@ async def run_purge(
         op.encrypted_object_keys = None
     op.target_event_ids = event_ids or None
     op.target_signal_ids = signal_ids or None
+    if scope == PurgeScope.ACCOUNT_DELETION:
+        from app.privacy.service import freeze_trial_identity_for_deletion
+
+        await freeze_trial_identity_for_deletion(db, user_uuid)
     # Keep the initial freezing lease. If the process crashes after this commit
     # but before publishing oss_deleting, run_due_purge_jobs can reclaim the
     # operation and resume from the persisted freezing phase.

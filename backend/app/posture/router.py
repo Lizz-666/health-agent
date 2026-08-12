@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import require_sensitive_health_consent
 from app.core.actor_context import ActorContext, get_actor_context
 from app.core.exceptions import NotFound, BadRequest, AppException
 from app.core.privacy_gate import require_photo_privacy
@@ -57,7 +57,7 @@ async def get_related(issue_id: str):
 @router.post("/assess", response_model=SelfAssessResponse)
 async def self_assess(
     request: SelfAssessRequest,
-    user_id: str = Depends(get_current_user),
+    user_id: str = Depends(require_sensitive_health_consent),
     db: AsyncSession = Depends(get_db),
 ):
     if request.answer not in ("positive", "negative", "uncertain"):
@@ -94,6 +94,7 @@ async def self_assess(
 )
 async def photo_assess(
     request: Request,
+    _consent_user_id: str = Depends(require_sensitive_health_consent),
     actor: ActorContext = Depends(get_actor_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -136,7 +137,7 @@ async def photo_assess(
 
 @router.get("/history", response_model=List[AssessmentRecord])
 async def get_history(
-    user_id: str = Depends(get_current_user),
+    user_id: str = Depends(require_sensitive_health_consent),
     db: AsyncSession = Depends(get_db),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -163,6 +164,7 @@ async def get_history(
 )
 async def report_safety_signal(
     request: Request,
+    _consent_user_id: str = Depends(require_sensitive_health_consent),
     actor: ActorContext = Depends(get_actor_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -202,6 +204,7 @@ async def report_safety_signal(
 
 @router.get("/profile", response_model=PostureProfileResponse)
 async def get_profile(
+    _consent_user_id: str = Depends(require_sensitive_health_consent),
     actor: ActorContext = Depends(get_actor_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -216,6 +219,7 @@ async def get_profile(
 @router.get("/profile/{issue_id}", response_model=PostureProfileEntryResponse)
 async def get_profile_entry(
     issue_id: str,
+    _consent_user_id: str = Depends(require_sensitive_health_consent),
     actor: ActorContext = Depends(get_actor_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -233,6 +237,7 @@ async def get_profile_entry(
 
 @router.get("/priorities", response_model=PrioritySuggestionsResponse)
 async def get_priorities(
+    _consent_user_id: str = Depends(require_sensitive_health_consent),
     actor: ActorContext = Depends(get_actor_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -267,6 +272,7 @@ async def get_priorities(
 )
 async def confirm_goals(
     request: Request,
+    _consent_user_id: str = Depends(require_sensitive_health_consent),
     actor: ActorContext = Depends(get_actor_context),
     db: AsyncSession = Depends(get_db),
 ):

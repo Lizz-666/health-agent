@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import uuid
-from jose import jwt, JWTError
+import jwt
 from app.core.config import settings
 
 
@@ -41,5 +41,5 @@ def decode_token(token: str) -> dict:
             issuer=settings.JWT_ISSUER,
             audience=settings.JWT_AUDIENCE,
         )
-    except JWTError:
+    except jwt.PyJWTError:
         return {}

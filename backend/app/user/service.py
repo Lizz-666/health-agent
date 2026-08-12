@@ -7,8 +7,10 @@ from sqlalchemy import select
 from app.auth.models import User as UserModel
 from app.auth.models import TrialCredential
 from app.user.schemas import UpdateProfileRequest, UserProfileResponse
+from app.core.config import settings
 from app.core.exceptions import NotFound
 from app.posture.user_lock import acquire_user_transaction_lock
+from app.privacy.service import consent_is_active
 
 
 def _to_profile(
@@ -36,6 +38,16 @@ async def get_profile(db: AsyncSession, user_id: str) -> Optional[UserProfileRes
     account_name = await db.scalar(
         select(TrialCredential.login_id).where(TrialCredential.user_id == user.id)
     )
+    if settings.AUTH_MODE == "controlled_trial" and not await consent_is_active(
+        db, user_id
+    ):
+        return UserProfileResponse(
+            id=str(user.id),
+            phone=None,
+            account_name=account_name,
+            membership_level=user.membership_level,
+            created_at=user.created_at.isoformat() if user.created_at else None,
+        )
     return _to_profile(user, account_name)
 
 

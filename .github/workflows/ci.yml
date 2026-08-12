@@ -51,15 +51,56 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: "3.9.13"
+  PYTHON_VERSION: "3.12.13"
   FLUTTER_VERSION: "3.44.0"
   VERIFY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
   # Pinned dev/CI tools kept OUT of backend/requirements.txt by design (they
   # are not runtime dependencies). Both are reproducible, immutable versions.
   RUFF_VERSION: "0.15.22"
   HYPOTHESIS_VERSION: "6.141.1"
+  PIP_AUDIT_VERSION: "2.9.0"
 
 jobs:
+  phase9-security:
+    name: Phase 9 security (privacy + supply chain)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.lock
+      - name: Install hashed dependencies and pinned audit tool
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r backend/requirements-dev.lock
+          pip install pip-audit==${{ env.PIP_AUDIT_VERSION }}
+      - name: Verify secrets, artifacts, VEX, and dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            python scripts/phase9_security.py verify
+            python scripts/phase9_security.py dependencies
+            cd backend
+            python -m pytest tests/test_trial_privacy.py tests/test_security_observability.py tests/test_phase9_security.py -q
+          } 2>&1 | tee "$RUNNER_TEMP/phase9-security-summary.txt"
+      - name: Upload sanitized security summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-phase9-security-summary
+          path: ${{ runner.temp }}/phase9-security-summary.txt
+          if-no-files-found: error
+          retention-days: 30
+
   fast:
     name: Fast (lint + SQLite tests)
     runs-on: ubuntu-latest
@@ -77,11 +118,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.lock
+            backend/requirements-dev.lock
       - name: Install backend deps + pinned dev tools
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install --require-hashes -r backend/requirements-dev.lock
           pip install ruff==${{ env.RUFF_VERSION }} hypothesis==${{ env.HYPOTHESIS_VERSION }}
       - name: Fast verify (lint + SQLite tests + git diff --check)
         env:
@@ -198,11 +241,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.lock
+            backend/requirements-dev.lock
       - name: Install backend deps + pinned dev tools
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install --require-hashes -r backend/requirements-dev.lock
           pip install ruff==${{ env.RUFF_VERSION }} hypothesis==${{ env.HYPOTHESIS_VERSION }}
       - name: Wait for PostgreSQL
         run: |
@@ -248,11 +293,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.lock
+            backend/requirements-dev.lock
       - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install --require-hashes -r backend/requirements-dev.lock
       - name: Run isolated real-HTTP and evaluation acceptance
         run: |
           set -o pipefail
