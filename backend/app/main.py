@@ -67,6 +67,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     # Turn validation uses a stable fail-closed envelope. A missing timezone
     # keeps its dedicated code; all other validation errors are generic. Never
     # echo validation input because it may contain the ephemeral user message.
+    if request.url.path.startswith("/api/v1/auth/trial/"):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": "认证请求格式无效",
+                "code": "auth_invalid_request",
+            },
+        )
     if request.url.path == "/api/v1/agent/turns":
         code = (
             ResultCode.INVALID_TIMEZONE

@@ -31,7 +31,7 @@ class ProfileScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(profile?.phone ?? '未登录',
+                      Text(profile?.accountName ?? profile?.phone ?? '未登录',
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const Text('普通用户', style: TextStyle(color: Color(0xFF8892B0))),
                     ],

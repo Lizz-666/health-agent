@@ -1,7 +1,8 @@
 // app/lib/models/user.dart
 class UserProfile {
   final String id;
-  final String phone;
+  final String? phone;
+  final String? accountName;
   final String? nickname;
   final double? height;
   final double? weight;
@@ -12,7 +13,8 @@ class UserProfile {
 
   UserProfile({
     required this.id,
-    required this.phone,
+    this.phone,
+    this.accountName,
     this.nickname,
     this.height,
     this.weight,
@@ -24,7 +26,8 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
     id: json['id'] as String,
-    phone: json['phone'] as String,
+    phone: json['phone'] as String?,
+    accountName: json['account_name'] as String?,
     nickname: json['nickname'] as String?,
     height: (json['height'] as num?)?.toDouble(),
     weight: (json['weight'] as num?)?.toDouble(),

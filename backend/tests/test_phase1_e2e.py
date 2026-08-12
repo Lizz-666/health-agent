@@ -160,7 +160,7 @@ def test_e2e_migration_head_is_current():
     assert proc.returncode == 0, proc.stderr
     lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(lines) == 1, f"expected exactly one head, got: {lines}"
-    assert lines[0].split()[0] == "0012_review_draft_origins", lines[0]
+    assert lines[0].split()[0] == "0013_controlled_trial_auth", lines[0]
 
 
 def test_e2e_schema_source_lifecycle_not_null_severity_nullable():

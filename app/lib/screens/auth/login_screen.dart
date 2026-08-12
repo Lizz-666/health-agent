@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
+import 'trial_auth_form.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -71,6 +72,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(authProvider);
+    if (AppConstants.controlledTrialAuth) {
+      if (!AppConstants.controlledTrialConfigurationValid) {
+        return Scaffold(
+          body: SafeArea(
+            child: Center(
+              child: Semantics(
+                liveRegion: true,
+                child: const Text('内测配置无效，应用已停止登录'),
+              ),
+            ),
+          ),
+        );
+      }
+      return const TrialAuthScreen();
+    }
     return Scaffold(
       body: SafeArea(
         child: Center(

@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +13,17 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    JWT_ISSUER: str = "posture-app"
+    JWT_AUDIENCE: str = "posture-app-client"
+
+    # Phase 9 controlled-trial authentication. Defaults preserve the synthetic
+    # development workflow; the candidate profile is deliberately fail-closed.
+    DEPLOYMENT_PROFILE: str = "development"
+    AUTH_MODE: str = "legacy"
+    AUTH_CREDENTIAL_PROVIDER: str = "offline_password"
+    AUTH_AUDIT_HMAC_KEY: str = ""
+    AUTH_LOGIN_MAX_ATTEMPTS: int = 5
+    AUTH_LOGIN_WINDOW_MINUTES: int = 15
 
     ALIBABA_CLOUD_ACCESS_KEY_ID: str = ""
     ALIBABA_CLOUD_ACCESS_KEY_SECRET: str = ""
@@ -78,6 +90,39 @@ class Settings(BaseSettings):
     # Phase 6 nutrition recommendation runtime. Default-off while the feature
     # is under staged review. Deletion remains available even when disabled.
     NUTRITION_RUNTIME_ENABLED: bool = False
+
+    @model_validator(mode="after")
+    def validate_controlled_trial_candidate(self):
+        if self.DEPLOYMENT_PROFILE != "controlled_trial_candidate":
+            return self
+        errors: list[str] = []
+        if self.AUTH_MODE != "controlled_trial":
+            errors.append("AUTH_MODE must be controlled_trial")
+        if self.AUTH_CREDENTIAL_PROVIDER != "offline_password":
+            errors.append("AUTH_CREDENTIAL_PROVIDER must be offline_password")
+        if self.SECRET_KEY == "CHANGE-ME-IN-PRODUCTION" or len(self.SECRET_KEY) < 32:
+            errors.append("SECRET_KEY must be a non-default value of at least 32 characters")
+        if self.DATABASE_URL == "postgresql+asyncpg://user:password@localhost:5432/posture_app":
+            errors.append("DATABASE_URL must not use the repository default")
+        if len(self.AUTH_AUDIT_HMAC_KEY) < 32:
+            errors.append("AUTH_AUDIT_HMAC_KEY must be at least 32 characters")
+        if not self.JWT_ISSUER.strip() or not self.JWT_AUDIENCE.strip():
+            errors.append("JWT_ISSUER and JWT_AUDIENCE are required")
+        if self.JWT_ISSUER == "posture-app" or self.JWT_AUDIENCE == "posture-app-client":
+            errors.append("JWT_ISSUER and JWT_AUDIENCE must not use repository defaults")
+        if self.ALGORITHM != "HS256":
+            errors.append("ALGORITHM must be HS256")
+        if not 1 <= self.ACCESS_TOKEN_EXPIRE_MINUTES <= 15:
+            errors.append("ACCESS_TOKEN_EXPIRE_MINUTES must be between 1 and 15")
+        if not 1 <= self.REFRESH_TOKEN_EXPIRE_DAYS <= 30:
+            errors.append("REFRESH_TOKEN_EXPIRE_DAYS must be between 1 and 30")
+        if self.DEV_MODE or self.DEV_ADMIN_PHONE or self.DEV_ADMIN_PASSWORD:
+            errors.append("development authentication must be disabled")
+        if self.PHOTO_ANALYSIS_ENABLED or self.AGENT_RUNTIME_ENABLED:
+            errors.append("photo analysis and live Agent runtime must be disabled")
+        if errors:
+            raise ValueError("controlled-trial configuration rejected: " + "; ".join(errors))
+        return self
 
 
 settings = Settings()

@@ -7,12 +7,28 @@ class AppConstants {
   static const bool photoAnalysisEnabled = bool.fromEnvironment(
     'PHOTO_ANALYSIS_ENABLED',
   );
+  static const String authMode = String.fromEnvironment(
+    'AUTH_MODE',
+    defaultValue: 'legacy',
+  );
+  static const String authCredentialProvider = String.fromEnvironment(
+    'AUTH_CREDENTIAL_PROVIDER',
+    defaultValue: 'offline_password',
+  );
+  static const bool controlledTrialAuth = authMode == 'controlled_trial';
   static const String appName = '体态分析';
   static const Duration httpTimeout = Duration(seconds: 30);
   static const String devAdminPhone = String.fromEnvironment('DEV_ADMIN_PHONE');
   static const String devAdminPassword = String.fromEnvironment(
     'DEV_ADMIN_PASSWORD',
   );
+  static bool get controlledTrialConfigurationValid =>
+      !controlledTrialAuth ||
+      (apiBaseUrl.startsWith('https://') &&
+          !photoAnalysisEnabled &&
+          devAdminPhone.isEmpty &&
+          devAdminPassword.isEmpty &&
+          authCredentialProvider.isNotEmpty);
 
   // 色板 — Light Gray Glassmorphism (F1 branding)
   static const int bgColor = 0xFFD6D8D9; // 浅灰背景

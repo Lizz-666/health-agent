@@ -61,6 +61,11 @@ def _offline_downgrade_sql() -> str:
 ALL_TABLES = {
     "users",
     "verification_codes",
+    "trial_credentials",
+    "trial_invitations",
+    "trial_device_enrollments",
+    "auth_sessions",
+    "auth_attempts",
     "posture_assessment_events",
     "posture_profile_entries",
     "posture_user_goals",
@@ -113,7 +118,7 @@ def test_single_head():
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0012_review_draft_origins", head_lines[0]
+    assert head_lines[0].split()[0] == "0013_controlled_trial_auth", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
@@ -476,6 +481,41 @@ def test_orm_users_has_no_unique_constraint():
     idx = indexes[0]
     assert idx.name == "ix_users_phone"
     assert idx.unique is True
+    assert users.c.phone.nullable is True
+
+
+def test_0013_controlled_trial_auth_upgrade_and_downgrade_contract():
+    upgrade = _run_alembic(
+        "upgrade", "0012_review_draft_origins:0013_controlled_trial_auth", "--sql"
+    )
+    assert upgrade.returncode == 0, upgrade.stderr
+    sql = upgrade.stdout
+    for table in (
+        "trial_credentials",
+        "trial_invitations",
+        "trial_device_enrollments",
+        "auth_sessions",
+        "auth_attempts",
+    ):
+        assert f"CREATE TABLE {table}" in sql
+    assert "ALTER COLUMN phone DROP NOT NULL" in sql
+    assert "CREATE INDEX ix_trial_invitations_user_id" in sql
+    assert "CREATE UNIQUE INDEX ix_trial_device_enrollments_user_id" in sql
+    assert "ON DELETE CASCADE" in sql
+
+    downgrade = _run_alembic(
+        "downgrade", "0013_controlled_trial_auth:0012_review_draft_origins", "--sql"
+    )
+    assert downgrade.returncode == 0, downgrade.stderr
+    for table in (
+        "auth_attempts",
+        "auth_sessions",
+        "trial_device_enrollments",
+        "trial_invitations",
+        "trial_credentials",
+    ):
+        assert f"DROP TABLE {table}" in downgrade.stdout
+    assert "ALTER COLUMN phone SET NOT NULL" in downgrade.stdout
 
 
 def test_new_models_unique_constraints():

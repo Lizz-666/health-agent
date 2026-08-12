@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
 import '../core/storage.dart';
+import '../core/constants.dart';
 import '../models/token.dart';
 import 'activity_grid_provider.dart';
 import 'agent_provider.dart';
@@ -128,9 +129,69 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    if (AppConstants.controlledTrialAuth) {
+      final refreshToken = await AppStorage.getRefreshToken();
+      if (refreshToken != null) {
+        try {
+          await Dio(
+            BaseOptions(
+              baseUrl: AppConstants.apiBaseUrl,
+              connectTimeout: AppConstants.httpTimeout,
+              receiveTimeout: AppConstants.httpTimeout,
+              headers: {'Content-Type': 'application/json'},
+            ),
+          ).post(
+            '/auth/trial/logout',
+            data: {'refresh_token': refreshToken},
+          );
+        } catch (_) {
+          // Local logout still clears credentials when the service is offline.
+        }
+      }
+    }
     await AppStorage.clearTokens();
     _resetSessionState();
     state = const AuthState();
+  }
+
+  Future<bool> trialAuthenticate({
+    required bool activate,
+    required String accountName,
+    required String credential,
+    String? invitationCode,
+  }) async {
+    try {
+      state = state.copyWith(isLoading: true, clearError: true);
+      final deviceKey = await AppStorage.getOrCreateTrialDeviceKey();
+      final data = <String, dynamic>{
+        'account_name': accountName,
+        'provider_id': AppConstants.authCredentialProvider,
+        'credential': credential,
+        'device_key': deviceKey,
+      };
+      if (activate) data['invitation_code'] = invitationCode;
+      final response = await _api.dio.post(
+        activate ? '/auth/trial/activate' : '/auth/trial/login',
+        data: data,
+      );
+      final token = TokenResponse.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+      await AppStorage.saveTokens(token.accessToken, token.refreshToken);
+      _resetSessionState();
+      state = state.copyWith(
+        isLoading: false,
+        isLoggedIn: true,
+        isNewUser: token.isNewUser,
+      );
+      return true;
+    } on DioException catch (error) {
+      state = state.copyWith(isLoading: false, error: _extractError(error));
+      return false;
+    } catch (_) {
+      state = state.copyWith(isLoading: false, error: '认证失败，请重试');
+      return false;
+    }
   }
 
   /// 开发环境密码快速登录
