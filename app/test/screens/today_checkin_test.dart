@@ -435,12 +435,12 @@ void main() {
 
     expect(find.text('今日'), findsWidgets);
     expect(find.text('计划'), findsOneWidget);
-    expect(find.text('Agent'), findsOneWidget);
+    expect(find.text('健康助手'), findsOneWidget);
     expect(find.text('我的'), findsOneWidget);
     expect(find.text('首页'), findsNothing);
     expect(find.textContaining('今日尚未签到'), findsOneWidget);
 
-    await tester.tap(find.text('Agent'));
+    await tester.tap(find.text('健康助手'));
     await tester.pumpAndSettle();
 
     expect(find.text('AGENT_PAGE'), findsOneWidget);
@@ -469,6 +469,85 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    '320x720 textScaler 2.0 no overflow on check-in form, submit findable',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 720);
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final adapter = FakeDioAdapter()
+        ..registerJson(
+          'GET',
+          '/health/checkins/today',
+          (_) => _todayResult(null),
+        )
+        ..registerJson(
+          'GET',
+          '/training/today',
+          (_) => {'state': 'no_active_plan'},
+        );
+      await tester.pumpWidget(_wrap(_apiWith(adapter)));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('today-checkin-submit')), findsOneWidget);
+    },
+  );
+
+  testWidgets('320x720 textScaler 2.0 no overflow on red_flag summary state', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 720);
+    tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    final adapter = FakeDioAdapter()
+      ..registerJson(
+        'GET',
+        '/health/checkins/today',
+        (_) => _todayResult(_checkin(riskSummary: 'red_flag')),
+      )
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {'state': 'no_active_plan'},
+      );
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('红旗信号'), findsOneWidget);
+    expect(find.byIcon(Icons.dangerous), findsOneWidget);
+  });
+
+  testWidgets('red_flag risk card has non-empty Semantics label', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter()
+      ..registerJson(
+        'GET',
+        '/health/checkins/today',
+        (_) => _todayResult(_checkin(riskSummary: 'red_flag')),
+      );
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    final semantics = tester.getSemantics(
+      find.byKey(const Key('today-risk-redFlag')),
+    );
+    expect(
+      semantics,
+      isSemantics(label: '红旗信号。检测到红旗信号，请停止训练并尽快就医或联系专业人士。', isLiveRegion: true),
+    );
   });
 
   // -------------------------------------------------------------------------

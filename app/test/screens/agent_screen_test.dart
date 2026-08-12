@@ -100,7 +100,7 @@ void main() {
     await tester.pumpWidget(_wrap(adapter, routeContext: null));
     await tester.pumpAndSettle();
 
-    expect(find.text('Agent 入口无效'), findsOneWidget);
+    expect(find.text('健康助手入口无效'), findsOneWidget);
     expect(find.textContaining('未请求或发送任何健康数据'), findsOneWidget);
     expect(adapter.calls, isEmpty);
   });
@@ -217,10 +217,10 @@ void main() {
     await tester.pumpWidget(_wrap(adapter));
     await tester.pumpAndSettle();
 
-    expect(find.text('Agent 服务不可用'), findsOneWidget);
+    expect(find.text('健康助手服务不可用'), findsOneWidget);
     await tester.tap(find.byKey(const Key('agent-privacy-menu')));
     await tester.pumpAndSettle();
-    expect(find.text('删除 Agent 数据'), findsOneWidget);
+    expect(find.text('删除健康助手数据'), findsOneWidget);
   });
 
   testWidgets('available Agent renders structured read result', (tester) async {
@@ -248,7 +248,8 @@ void main() {
     expect(find.text('今天练什么'), findsOneWidget);
     expect(find.text('已根据当前可访问的信息整理结果。'), findsOneWidget);
     expect(find.text('今日训练'), findsOneWidget);
-    expect(find.textContaining('动作标识'), findsOneWidget);
+    expect(find.textContaining('动作标识'), findsNothing);
+    expect(find.textContaining('exercise-1'), findsNothing);
     expect(find.text('agent_answer_ready'), findsNothing);
     expect(find.textContaining('exercise_ids'), findsNothing);
   });
@@ -290,6 +291,8 @@ void main() {
 
       expect(find.byKey(const Key('agent-proposal-card')), findsOneWidget);
       expect(find.textContaining('尚未执行'), findsWidgets);
+      expect(find.text('基础力量'), findsOneWidget);
+      expect(find.text('basic_strength'), findsNothing);
       expect(find.text('操作已按确认内容执行。'), findsNothing);
       expect(confirmCalls, 0);
       expect(
@@ -351,7 +354,7 @@ void main() {
     expect(find.text('操作已按确认内容执行。'), findsNothing);
   });
 
-  testWidgets('context card contains only entry and owned identifier', (
+  testWidgets('context card hides the owned internal identifier', (
     tester,
   ) async {
     final adapter = FakeDioAdapter()
@@ -373,7 +376,56 @@ void main() {
 
     expect(find.byKey(const Key('agent-context-card')), findsOneWidget);
     expect(find.text('当前处方动作'), findsOneWidget);
-    expect(find.text('标识：exercise-owned-1'), findsOneWidget);
+    expect(find.textContaining('不显示内部标识'), findsOneWidget);
+    expect(find.textContaining('exercise-owned-1'), findsNothing);
+  });
+
+  testWidgets(
+    '320x720 textScaler 2.0 keeps unavailable actions reachable without overflow',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 720);
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final adapter = FakeDioAdapter();
+      await tester.pumpWidget(_wrap(adapter));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('agent-privacy-menu')), findsOneWidget);
+      final status = tester.getSemantics(
+        find.byKey(const Key('agent-status-live')),
+      );
+      expect(status, isSemantics(isLiveRegion: true));
+    },
+  );
+
+  testWidgets('send action exposes one explicit Chinese button node', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter()
+      ..registerJson(
+        'GET',
+        '/agent/capabilities',
+        (_) => _capabilities(available: true),
+      );
+    await tester.pumpWidget(_wrap(adapter));
+    await tester.pumpAndSettle();
+
+    final semantics = tester.getSemantics(find.byKey(const Key('agent-send')));
+    expect(
+      semantics,
+      isSemantics(
+        label: '发送消息',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
   });
 
   testWidgets('provider unavailable remains a failure with explicit retry', (

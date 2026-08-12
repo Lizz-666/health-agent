@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants.dart';
 import '../../models/nutrition.dart';
 import '../../providers/assessment_provider.dart' show LoadStatus;
 import '../../providers/nutrition_provider.dart';
@@ -49,7 +50,7 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
       return _StatusView(
         icon: Icons.error_outline,
         title: '数据异常',
-        detail: state.error ?? '服务返回内容无法安全解析。',
+        detail: '服务返回内容无法安全解析，未生成或更新饮食建议。',
         onRetry: () => ref.read(nutritionProvider.notifier).load(),
       );
     }
@@ -58,7 +59,7 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
       return _StatusView(
         icon: disabled ? Icons.pause_circle_outline : Icons.cloud_off,
         title: disabled ? '饮食建议暂未开放' : '网络连接失败',
-        detail: state.error ?? '请稍后重试。',
+        detail: disabled ? '当前构建未启用饮食建议服务。' : '饮食建议加载失败，请检查网络后重试。',
         onRetry: disabled
             ? null
             : () => ref.read(nutritionProvider.notifier).load(),
@@ -130,9 +131,15 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
           ],
           if (state.error != null) ...[
             const SizedBox(height: 12),
-            Text(
-              state.error!,
-              style: const TextStyle(color: Colors.orangeAccent),
+            Semantics(
+              key: const Key('nutrition-error-live'),
+              liveRegion: true,
+              label: '饮食建议操作未完成，请重试。',
+              excludeSemantics: true,
+              child: const Text(
+                '饮食建议操作未完成，请重试。',
+                style: TextStyle(color: Color(AppConstants.severeColor)),
+              ),
             ),
           ],
           const SizedBox(height: 20),
@@ -171,7 +178,7 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('删除饮食建议数据？'),
-        content: const Text('这会删除饮食建议草案、激活版本和相关 Agent 记录，不会删除训练计划。'),
+        content: const Text('这会删除饮食建议草案、激活版本和相关健康助手记录，不会删除训练计划。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -216,11 +223,7 @@ class _ActiveAndDraftNutritionView extends StatelessWidget {
               Tab(key: Key('nutrition-draft-tab'), text: '待确认草案'),
             ],
           ),
-          Expanded(
-            child: TabBarView(
-              children: [_tab(active), _tab(draft)],
-            ),
-          ),
+          Expanded(child: TabBarView(children: [_tab(active), _tab(draft)])),
         ],
       ),
     );
@@ -465,34 +468,37 @@ class _FoodRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    leading: NutritionFoodImage(
-      imageKey: item.imageKey ?? food?.imageKey,
-      semanticLabel: food?.nameZh ?? item.foodId,
-    ),
-    title: Text(food?.nameZh ?? item.foodId),
-    subtitle: Text(
-      '${item.gramMin}-${item.gramMax} 克，约 ${item.householdPortion.amountMin}-${item.householdPortion.amountMax}${item.householdPortion.unitLabel}',
-    ),
-    trailing: alternativesEnabled && item.alternatives.isNotEmpty
-        ? PopupMenuButton<FoodAlternative>(
-            key: Key('nutrition-replace-${dayKind.wire}-${meal.wire}-$index'),
-            tooltip: '预览替换',
-            onSelected: (alternative) =>
-                onAlternative?.call(dayKind, meal, index, item, alternative),
-            itemBuilder: (_) => item.alternatives
-                .map(
-                  (alternative) => PopupMenuItem(
-                    value: alternative,
-                    child: Text(
-                      '替换为 ${foods[alternative.foodId]?.nameZh ?? alternative.foodId}',
+  Widget build(BuildContext context) {
+    final foodName = food?.nameZh ?? '食物信息暂不可用';
+    return ListTile(
+      leading: NutritionFoodImage(
+        imageKey: item.imageKey ?? food?.imageKey,
+        semanticLabel: foodName,
+      ),
+      title: Text(foodName),
+      subtitle: Text(
+        '${item.gramMin}-${item.gramMax} 克，约 ${item.householdPortion.amountMin}-${item.householdPortion.amountMax}${item.householdPortion.unitLabel}',
+      ),
+      trailing: alternativesEnabled && item.alternatives.isNotEmpty
+          ? PopupMenuButton<FoodAlternative>(
+              key: Key('nutrition-replace-${dayKind.wire}-${meal.wire}-$index'),
+              tooltip: '预览替换',
+              onSelected: (alternative) =>
+                  onAlternative?.call(dayKind, meal, index, item, alternative),
+              itemBuilder: (_) => item.alternatives
+                  .map(
+                    (alternative) => PopupMenuItem(
+                      value: alternative,
+                      child: Text(
+                        '替换为 ${foods[alternative.foodId]?.nameZh ?? '食物信息暂不可用'}',
+                      ),
                     ),
-                  ),
-                )
-                .toList(),
-          )
-        : null,
-  );
+                  )
+                  .toList(),
+            )
+          : null,
+    );
+  }
 }
 
 class NutritionFoodImage extends StatelessWidget {
@@ -595,11 +601,11 @@ class _ReplacementPreview extends StatelessWidget {
           children: [
             Text('替换预览', style: Theme.of(context).textTheme.titleMedium),
             Text(
-              '${names[diff.fromFoodId] ?? diff.fromFoodId} ${diff.fromGramMin}-${diff.fromGramMax} 克',
+              '${names[diff.fromFoodId] ?? '食物信息暂不可用'} ${diff.fromGramMin}-${diff.fromGramMax} 克',
             ),
             const Icon(Icons.arrow_downward),
             Text(
-              '${names[diff.toFoodId] ?? diff.toFoodId} ${diff.toGramMin}-${diff.toGramMax} 克',
+              '${names[diff.toFoodId] ?? '食物信息暂不可用'} ${diff.toGramMin}-${diff.toGramMax} 克',
             ),
             const Text('预览不会修改当前建议。确认后才会创建新的激活版本。'),
             FilledButton(
@@ -633,13 +639,15 @@ class _EligibilityView extends StatelessWidget {
       ),
       _ => ('暂不可用', '当前无法生成饮食建议。'),
     };
+    final missingHint = eligibility.missingFieldCodes.isNotEmpty
+        ? '\n请补全健康档案中缺失的项目后重试。'
+        : '';
     return KeyedSubtree(
       key: Key('nutrition-status-${eligibility.gate.wire}'),
       child: _StatusView(
         icon: Icons.health_and_safety_outlined,
         title: title,
-        detail:
-            '$detail\n原因：${eligibility.reasonCodes.join('、')}\n缺失：${eligibility.missingFieldCodes.join('、')}',
+        detail: '$detail$missingHint',
       ),
     );
   }
@@ -658,22 +666,26 @@ class _StatusView extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 48),
-          const SizedBox(height: 12),
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(detail, textAlign: TextAlign.center),
-          if (onRetry != null) ...[
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('重试')),
+  Widget build(BuildContext context) => Semantics(
+    key: const Key('nutrition-status-live'),
+    liveRegion: true,
+    child: Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 48),
+            const SizedBox(height: 12),
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(detail, textAlign: TextAlign.center),
+            if (onRetry != null) ...[
+              const SizedBox(height: 16),
+              FilledButton(onPressed: onRetry, child: const Text('重试')),
+            ],
           ],
-        ],
+        ),
       ),
     ),
   );

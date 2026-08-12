@@ -137,6 +137,13 @@ void main() {
 
     expect(find.byKey(const Key('plan-status-safety')), findsOneWidget);
     expect(find.byKey(const Key('plan-confirm-button')), findsNothing);
+    expect(
+      tester.getSemantics(find.byKey(const Key('plan-status-safety'))),
+      isSemantics(
+        label: '当前安全状态不允许生成训练计划。受限或红旗状态不会被显示为普通失败，也不会创建可确认草案。',
+        isLiveRegion: true,
+      ),
+    );
   });
 
   testWidgets('pending draft does not hide the current active plan', (
@@ -194,6 +201,81 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('plan-confirm-button')), findsOneWidget);
+  });
+
+  testWidgets('active plan withholds unreviewed English instruction text', (
+    tester,
+  ) async {
+    final active = _draftPlanJson()
+      ..['status'] = 'active'
+      ..['confirmed_at'] = '2026-07-27T08:10:00Z';
+    final session = (active['sessions'] as List).first as Map<String, dynamic>;
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': true, 'plan': active},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      )
+      ..registerJson(
+        'GET',
+        '/training/today',
+        (_) => {
+          'state': 'session',
+          'local_date': '2026-07-27',
+          'decision_gate': 'eligible',
+          'session': session,
+          'feedback_outcome_state': null,
+          'substitution_applied': false,
+          'original_session_id': 's-1',
+          'source_local_date': '2026-07-27',
+          'safety_status': 'eligible',
+        },
+      );
+
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('plan-instructions-withheld')), findsOneWidget);
+    expect(find.text('stand'), findsNothing);
+    expect(find.text('straight'), findsNothing);
+  });
+
+  testWidgets('missing exercise details never expose internal exercise id', (
+    tester,
+  ) async {
+    final draft = _draftPlanJson();
+    draft['requested_goal'] = 'future_goal_code';
+    final session = (draft['sessions'] as List).first as Map<String, dynamic>;
+    final prescription =
+        (session['prescriptions'] as List).first as Map<String, dynamic>;
+    prescription['exercise_id'] = 'internal-exercise-42';
+    prescription['exercise'] = null;
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': false},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': true, 'draft': draft},
+      );
+
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('动作信息暂不可用'), findsOneWidget);
+    expect(find.textContaining('未识别目标'), findsOneWidget);
+    expect(find.textContaining('internal-exercise-42'), findsNothing);
+    expect(find.textContaining('future_goal_code'), findsNothing);
   });
 
   testWidgets('Today unavailable hides server detail and keeps retry visible', (
@@ -900,6 +982,8 @@ void main() {
     expect(find.byKey(const Key('today-effective-summary')), findsOneWidget);
     expect(find.textContaining('30 分钟'), findsOneWidget);
     expect(find.textContaining('15 分钟'), findsWidgets);
+    expect(find.textContaining('按今日可用时间缩短'), findsOneWidget);
+    expect(find.textContaining('available_time_shortened'), findsNothing);
   });
 
   testWidgets('weekly-review entry navigates to /plan/weekly-review', (
@@ -942,5 +1026,98 @@ void main() {
 
     expect(find.text('WEEKLY_REVIEW_PAGE'), findsOneWidget);
     expect(captured.path, '/plan/weekly-review');
+  });
+
+  testWidgets(
+    '320x720 textScaler 2.0 on generation form no overflow, generate button findable',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 720);
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final adapter = FakeDioAdapter()
+        ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+        ..registerJson(
+          'GET',
+          '/training/plans/active',
+          (_) => {'has_active': false},
+        )
+        ..registerJson(
+          'GET',
+          '/training/plans/draft',
+          (_) => {'has_draft': false},
+        );
+      await tester.pumpWidget(_wrap(_apiWith(adapter)));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('plan-generate-button')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '320x720 textScaler 2.0 on draft review no overflow, confirm button findable',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 720);
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final adapter = FakeDioAdapter()
+        ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+        ..registerJson(
+          'GET',
+          '/training/plans/active',
+          (_) => {'has_active': false},
+        )
+        ..registerJson(
+          'GET',
+          '/training/plans/draft',
+          (_) => {'has_draft': true, 'draft': _draftPlanJson()},
+        );
+      await tester.pumpWidget(_wrap(_apiWith(adapter)));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('plan-confirm-button')), findsOneWidget);
+    },
+  );
+
+  testWidgets('generate and confirm buttons have accessible Semantics labels', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter()
+      ..registerJson('GET', '/health/profile', (_) => _healthProfileJson())
+      ..registerJson(
+        'GET',
+        '/training/plans/active',
+        (_) => {'has_active': false},
+      )
+      ..registerJson(
+        'GET',
+        '/training/plans/draft',
+        (_) => {'has_draft': false},
+      );
+    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    await tester.pumpAndSettle();
+
+    final semantics = tester.getSemantics(
+      find.byKey(const Key('plan-generate-button')),
+    );
+    expect(
+      semantics,
+      isSemantics(
+        label: '生成四周训练计划草案',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
   });
 }

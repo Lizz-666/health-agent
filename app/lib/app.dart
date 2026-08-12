@@ -260,7 +260,7 @@ class AppShell extends StatelessWidget {
           NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),
             selectedIcon: Icon(Icons.auto_awesome),
-            label: 'Agent',
+            label: '健康助手',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outlined),

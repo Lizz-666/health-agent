@@ -58,4 +58,44 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    '320x720 textScaler 2.0 no overflow, key anchors still findable',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 720);
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('login-submit')), findsOneWidget);
+      expect(find.byKey(const Key('login-send-code')), findsOneWidget);
+    },
+  );
+
+  testWidgets('login submit button has accessible Semantics label', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap());
+    await tester.pumpAndSettle();
+
+    final semantics = tester.getSemantics(
+      find.byKey(const Key('login-submit')),
+    );
+    expect(
+      semantics,
+      isSemantics(
+        label: '登录',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
+  });
 }
