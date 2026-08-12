@@ -5,8 +5,8 @@
 
 ## Current Initiative
 
-- 阶段：Phase 9 Android 小范围受控试用候选准备，状态 `in_progress`；当前只执行
-  Task 0 / Gate 0 文档与契约关闭，不写业务代码。唯一业务基线为 Phase 8 exact closure
+- 阶段：Phase 9 Android 小范围受控试用候选准备，状态 `in_progress`；Task 0 / Gate 0
+  已进入最终 metadata closure，不写业务代码。唯一业务基线为 Phase 8 exact closure
   `2ae03345a93d8cc22d0e47fcac415411798df48b`，当前分支
   `codex/phase9-controlled-trial` 从该 SHA 创建。
 - Phase 9 已批准产品方向：中国大陆一般健康成年人、Android 非公开小范围候选；运营
@@ -64,7 +64,7 @@
 
 | Task | Executor | Branch / worktree | Base SHA | Status | Scope and coordination note |
 | --- | --- | --- | --- | --- | --- |
-| Phase 9 Task 0 | Codex specification, architecture, safety/privacy audit, task split, cold review, CI, and Gate 0 closure | `codex/phase9-controlled-trial` / current worktree | `2ae03345a93d8cc22d0e47fcac415411798df48b` | `review` | 文档候选 `b828b046baaa8c74186396481b52713828586570` 已通过本地 Fast 1011/0/15、ruff/diff clean、Flutter analyze 和 493 tests；仅 7 个 Gate 0 文档文件，无业务代码。等待 closure commit/push 和 exact-SHA CI。 |
+| Phase 9 Task 0 | Codex specification, architecture, safety/privacy audit, task split, cold review, CI, and Gate 0 closure | `codex/phase9-controlled-trial` / current worktree | `2ae03345a93d8cc22d0e47fcac415411798df48b` | `committed` | 文档候选 `b828b046baaa8c74186396481b52713828586570` 本地 Fast/Flutter 通过；metadata 候选 `af508a795c340226fae1ddabec0a42f13a9fd192` 的严格 CI `31559582176` 为 Fast 1015/0/11、Flutter 493、Full 1745/0/0、PG 28/28、Phase8 11/11 + 13/13。仅 7 个 Gate 0 文档文件，无业务代码；最终 status commit 必须通过自身 exact-SHA CI 才可宣布 Gate 0 verified。 |
 | Phase 9 Task 1 | Codex sole identity/auth/config writer, cold reviewer, CI operator, and Gate 1 acceptor | implementation branch/worktree to be created from Gate 0 exact closure | Gate 0 exact closure TBD | `planned` | 唯一邀请码、独立账号、单活动设备、session rotation/revocation、provider-neutral auth 和候选配置 fail-closed；不得接短信/邮件、真实联系方式或生产凭据。 |
 | Phase 9 Task 2 | Codex sole privacy/security/operations writer and Gate 2 acceptor | same implementation branch/worktree | accepted Gate 1 SHA TBD | `planned` | 数据流、同意/导出/删除/备份、威胁模型、供应链、日志/监控和事故 runbook；只用合成数据；外部专业审查保持 not obtained。 |
 | Phase 9 Task 3A | One OpenCode + Claude Flutter writer; Codex review/takeover and acceptance | separate branch/worktree from accepted Gate 2 SHA | accepted Gate 2 SHA TBD | `planned` | 仅冻结的 Flutter 中文化/可访问性 allowlist；禁止 backend/auth/API/migration/健康规则/provider/依赖/CI；OpenCode 报告不是验收。 |
@@ -134,6 +134,9 @@
 
 ## Completed Initiative References
 
+- Phase 9 Gate 0：本地候选 `b828b04`，metadata 候选 `af508a7` 的严格 CI run
+  `31559582176` 为 Fast/Flutter/Full/Phase8 全通过；最终 status commit 仍须通过自身
+  exact-SHA CI。审查报告 `docs/reports/phase9-gate0-review-2026-08-12.md`。
 - Phase 1：`docs/reports/phase1-exit-audit-2026-07-22.md`
 - Phase 2：`docs/reports/phase2-exit-audit-2026-07-26.md`
 - Phase 3：`docs/reports/phase3-exit-audit-2026-07-26.md`；远程 CI 后续事实以本账本和 PR #1 exact-SHA checks 为准。

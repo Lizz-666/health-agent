@@ -5,7 +5,9 @@
 Accepted by product decision for Phase 9 Gate 0 on 2026-08-12. The decision is
 not implementation acceptance. Local documentation candidate
 `b828b046baaa8c74186396481b52713828586570` passed Gate 0 verification; final
-acceptance remains bound to closure exact-SHA GitHub CI.
+metadata candidate `af508a795c340226fae1ddabec0a42f13a9fd192` passed strict
+exact-SHA GitHub CI run `31559582176`. Gate 0 closure remains bound to the final
+status commit proving itself through strict exact-SHA GitHub CI.
 
 ## Context
 

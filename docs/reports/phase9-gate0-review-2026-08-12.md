@@ -6,9 +6,9 @@ Business base: `2ae03345a93d8cc22d0e47fcac415411798df48b`
 
 Branch: `codex/phase9-controlled-trial`
 
-> Status: local documentation candidate verified. Gate 0 is not finally accepted
-> until the metadata closure is committed, pushed, and verified by exact-SHA
-> GitHub CI. No business code was changed by this Gate.
+> Status: closure candidate. Local and strict metadata-candidate CI evidence is
+> verified. Gate 0 is finally accepted only when this immutable status commit
+> passes its own strict exact-SHA GitHub CI. No business code was changed.
 
 ## Findings First
 
@@ -141,6 +141,25 @@ The earlier Flutter evidence was produced on the same document content before
 the candidate commit; the commit did not change application files. Closure
 metadata changes still require a clean exact-SHA Fast rerun.
 
+Metadata candidate `af508a795c340226fae1ddabec0a42f13a9fd192` then passed local
+Fast with ruff clean, 1003 passed / 0 failed / 23 conditional PostgreSQL skips,
+and clean working/staged/candidate diffs.
+
+Strict workflow-dispatch run
+[31559582176](https://github.com/Lizz-666/health-agent/actions/runs/31559582176)
+checked out exact event and working SHA
+`af508a795c340226fae1ddabec0a42f13a9fd192`:
+
+| Job | Result |
+| --- | --- |
+| Fast | 1015 passed, 0 failed, 11 expected conditional skips; ruff/diff clean |
+| Flutter | analyze passed; 493 tests passed |
+| Full | 1745 passed, 0 failed, 0 skipped; PostgreSQL expected/actual 28/28 with version evidence |
+| Phase 8 | HTTP 11/11 with zero residual tables; eval 13/13 with zero skipped |
+
+An earlier run `31559314142` passed Fast/Flutter/Phase8 but was not accepted as
+strict evidence because Full was skipped. It is retained only as an audit fact.
+
 Candidate and closure commands:
 
 ```powershell
@@ -153,7 +172,8 @@ flutter test
 
 ## Decision
 
-The local candidate has no unresolved P0/P1/P2 within Gate 0 scope and may enter
-metadata closure. Push and GitHub CI use the user's standing branch-push
+Gate 0 has no unresolved P0/P1/P2 within its approved scope. This status commit
+is the immutable closure candidate and must pass strict exact-SHA CI before Task 1
+can start. Push and GitHub CI use the user's standing branch-push
 authorization; they do not authorize deployment, merge, production credentials,
 real data, external spend, live AI/photo, actual trial or public release.

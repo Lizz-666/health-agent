@@ -1,7 +1,7 @@
 # Phase 9 Android 小范围受控试用候选版规格
 
 > 日期：2026-08-12
-> 状态：Gate 0 本地候选已验证，等待 closure exact-SHA GitHub CI
+> 状态：Gate 0 closure candidate；候选 exact-SHA CI 已通过，closure 须自证
 > 唯一业务基线：`2ae03345a93d8cc22d0e47fcac415411798df48b`
 > 基线分支：`codex/phase8-flutter-driver`
 
