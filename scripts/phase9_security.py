@@ -199,10 +199,25 @@ def evaluate_dependency_audit(
 
 def audit_dependencies(repo_root: Path = REPO_ROOT) -> List[Finding]:
     findings = verify_vex_invariants(repo_root)
+    runtime_input = (repo_root / "backend" / "requirements.txt").read_text(
+        encoding="utf-8"
+    ).casefold()
+    if "uvicorn[standard]" in runtime_input:
+        findings.append(Finding("platform-specific-uvicorn-extra", "requirements.txt"))
     for lock_name, include_development in (
         ("requirements.lock", False),
         ("requirements-dev.lock", True),
     ):
+        lock_text = (repo_root / "backend" / lock_name).read_text(
+            encoding="utf-8"
+        ).casefold()
+        if "uvicorn==0.39.0" not in lock_text:
+            findings.append(Finding("uvicorn-lock-mismatch", lock_name))
+        for optional_dependency in ("uvloop", "httptools", "watchfiles", "websockets"):
+            if re.search(rf"^{optional_dependency}==", lock_text, re.MULTILINE):
+                findings.append(
+                    Finding("platform-specific-lock-entry", f"{lock_name}:{optional_dependency}")
+                )
         result = subprocess.run(
             [
                 sys.executable,

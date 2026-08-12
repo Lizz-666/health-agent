@@ -6,6 +6,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from scripts.phase9_security import (  # noqa: E402
+    audit_dependencies,
     evaluate_dependency_audit,
     scan_artifact_paths,
     scan_secret_text,
@@ -81,4 +82,40 @@ def test_dependency_audit_requires_exact_vex_match(monkeypatch, tmp_path):
     assert {finding.rule_id for finding in findings} == {
         "unexpected-vulnerability",
         "stale-vex-entry",
+    }
+
+
+def test_dependency_gate_rejects_platform_specific_uvicorn_extra(
+    monkeypatch, tmp_path
+):
+    backend = tmp_path / "backend"
+    backend.mkdir()
+    (backend / "requirements.txt").write_text(
+        "uvicorn[standard]==0.39.0\n", encoding="utf-8"
+    )
+    for lock_name in ("requirements.lock", "requirements-dev.lock"):
+        (backend / lock_name).write_text(
+            "uvicorn[standard]==0.39.0\nuvloop==0.22.1\n",
+            encoding="utf-8",
+        )
+    monkeypatch.setattr(
+        "scripts.phase9_security.verify_vex_invariants", lambda _root: []
+    )
+    monkeypatch.setattr(
+        "scripts.phase9_security.subprocess.run",
+        lambda *args, **kwargs: type(
+            "Result", (), {"returncode": 0, "stdout": '{"dependencies": []}'}
+        )(),
+    )
+    vex = tmp_path / "vex.json"
+    vex.write_text('{"entries": []}', encoding="utf-8")
+    monkeypatch.setattr("scripts.phase9_security.DEPENDENCY_VEX_PATH", vex)
+
+    findings = audit_dependencies(tmp_path)
+
+    assert "platform-specific-uvicorn-extra" in {
+        finding.rule_id for finding in findings
+    }
+    assert "platform-specific-lock-entry" in {
+        finding.rule_id for finding in findings
     }
