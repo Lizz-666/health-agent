@@ -3,6 +3,13 @@
 > Status: not approved. Phase 8 synthetic personal-development acceptance does
 > not satisfy this gate and must never be presented as deployment, medical,
 > privacy, security, accessibility, or regulatory approval.
+>
+> Phase 9 may produce an engineering-reviewed Android controlled-trial candidate
+> using synthetic data only. The approved invitation/account design, internal
+> Codex review, and green exact-SHA CI do not satisfy this public-release gate.
+> Qualified legal/privacy, health-professional, and independent security review
+> are currently `not obtained`; real health data, real testers, deployment and
+> distribution remain separately blocked.
 
 ## Required decisions and evidence
 
@@ -43,3 +50,9 @@ Every item requires a named owner and evidence link. Unmet items remain blocked;
 they cannot be waived by a green development CI run. Release, deployment, real
 data migration, production credentials, external spend, or public distribution
 requires separate explicit user authorization after this checklist is reviewed.
+
+Codex may prepare and internally review specifications, data-flow and impact-
+assessment drafts, health-source traceability, threat models, test evidence and
+incident runbooks. That work is engineering pre-review only and must not be
+represented as legal advice, licensed health-professional approval, independent
+penetration testing or regulatory certification.
