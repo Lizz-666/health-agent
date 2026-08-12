@@ -5,8 +5,8 @@
 
 ## Current Initiative
 
-- 阶段：Phase 9 Android 小范围受控试用候选准备，状态 `in_progress`；Gate 2 已接受，
-  下一批为 Gate 3A Flutter 中文化/可访问性。唯一业务基线仍为 Phase 8 exact closure
+- 阶段：Phase 9 Android 小范围受控试用候选准备，状态 `in_progress`；Gate 3A 已接受，
+  下一批为 Gate 3B Android 可靠性/E2E。唯一业务基线仍为 Phase 8 exact closure
   `2ae03345a93d8cc22d0e47fcac415411798df48b`；Gate 1 接受实现
   `407ce9ce5de3f53140db8660505e8c15cf94e628` 可追溯到 Gate 0 closure。
 - Phase 9 已批准产品方向：中国大陆一般健康成年人、Android 非公开小范围候选；运营
@@ -67,8 +67,8 @@
 | Phase 9 Task 0 | Codex specification, architecture, safety/privacy audit, task split, cold review, CI, and Gate 0 closure | `codex/phase9-controlled-trial` / current worktree | `2ae03345a93d8cc22d0e47fcac415411798df48b` | `committed` | 文档候选 `b828b046baaa8c74186396481b52713828586570` 本地 Fast/Flutter 通过；metadata 候选 `af508a795c340226fae1ddabec0a42f13a9fd192` 的严格 CI `31559582176` 为 Fast 1015/0/11、Flutter 493、Full 1745/0/0、PG 28/28、Phase8 11/11 + 13/13。仅 7 个 Gate 0 文档文件，无业务代码；最终 status commit 必须通过自身 exact-SHA CI 才可宣布 Gate 0 verified。 |
 | Phase 9 Task 1 | Codex sole identity/auth/config writer, cold reviewer, CI operator, and Gate 1 acceptor | `codex/phase9-implementation` / `C:\Users\Lenovo\Desktop\develop\health-worktrees\phase9-implementation` | Gate 0 exact closure `5cdd43bc808bc08897c05e31f22941239812f294` | `verified` | 接受实现 `407ce9ce5de3f53140db8660505e8c15cf94e628`：唯一邀请码、独立非联系方式账号、单活动设备、session rotation/revocation、provider-neutral auth 和候选配置 fail-closed 已完成；本地 Full `1731/0/38` 条件 PG skips，严格 CI `31569996543` 为 Full `1769/0/0`、PG `30/30`，Fast/Flutter/Full/Phase8 全绿；P0/P1/P2 为零。报告 `docs/reports/phase9-gate1-review-2026-08-12.md`。 |
 | Phase 9 Task 2 | Codex sole privacy/security/operations writer and Gate 2 acceptor | same implementation branch/worktree | Gate 1 closure `9be5db1d6d8bcf70b08115b0432969b5aabe3011` | `verified` | 接受实现 `80135bc3aa551a0fe7c1f2898ab5cebe61f67ab3`：版本化同意、本人脱敏导出、身份纳入原子删除、完整性独立删除账本、恢复复活阻断、稳定码日志、跨平台 hash lock、exact VEX、secret/artifact 门和事故 runbook 已完成。本地 Full `1747/0/50` 条件 skip、Flutter `498`；严格 CI `31622194153` 为 Fast `1034/0/14`、Flutter `498`、Full `1798/0/0`、PostgreSQL `33/33`、Phase8 `11/11 + 13/13`、Phase9 security `19/19`，全部成功；P0/P1/P2 为零。报告 `docs/reports/phase9-gate2-review-2026-08-13.md`；外部审查仍 not obtained。 |
-| Phase 9 Task 3A | One OpenCode + Claude Flutter writer; Codex review/takeover and acceptance | `codex/phase9-gate3a-flutter` / `C:\Users\Lenovo\Desktop\develop\health-worktrees\phase9-gate3a-flutter` | Gate 2 closure `c0686c42d907c18aa2656372beb08bf869720cdb` | `in_progress` | 冻结 allowlist：`app/lib/app.dart`，`app/lib/screens/auth/{login_screen,trial_auth_form}.dart`，`app/lib/screens/profile/health_profile_screen.dart`，`app/lib/screens/plan/{plan_screen,weekly_review_screen}.dart`，`app/lib/screens/{today/today_screen,agent/agent_screen,nutrition/nutrition_screen}.dart`，以及直接对应的 `app/test/screens/{login_screen,trial_auth_form,trial_invalid_config,health_profile,plan_screen,weekly_review_screen,today_checkin,agent_screen,agent_navigation,nutrition_screen}.dart`、`app/test/widget_test.dart`。Codex 冷审量化发现现行主题次要文字/背景 `2.48:1`、白字/主按钮 `2.96:1`、警示色/背景 `1.56:1`，不能满足 Gate 3 关键对比度检查，因此 finding 相关 allowlist 扩为 `app/lib/core/constants.dart`、`app/lib/core/theme.dart`（仅调整呈现色，不改配置/领域逻辑），并由 `app/test/widget_test.dart` 锁定关键色对。目标是核心流程用户可见 `Agent` 统一为“健康助手”、稳定中文未知/错误说明、TalkBack 标签/状态/错误播报、200% 大字不阻断和关键文字/控件对比度；标准单位 `kg`/`kcal`/`RPE` 可保留。不允许其他 Flutter 文件、backend、auth/API/migration、健康规则、provider/model、依赖、CI 或文档；不改变领域状态机。OpenCode 不得 commit/push/merge/rebase；报告不是验收。 |
-| Phase 9 Task 3B | Codex sole Android reliability/E2E writer and Gate 3 acceptor | Phase 9 implementation branch/worktree | accepted Gate 2 SHA plus reviewed 3A commit | `planned` | API 设备矩阵、慢网/断网/不可达、token 过期、Asia/Shanghai 边界、兼容/升级/回滚；Phase9 synthetic runner/CI。 |
+| Phase 9 Task 3A | OpenCode + Claude partial Flutter writer; Codex takeover writer, cold reviewer, CI operator, and acceptor | `codex/phase9-gate3a-flutter` / `C:\Users\Lenovo\Desktop\develop\health-worktrees\phase9-gate3a-flutter` | Gate 2 closure `c0686c42d907c18aa2656372beb08bf869720cdb` | `verified` | OpenCode 会话未完成交接并被终止，Codex 在同一单写入者边界内接管。接受 Task 提交 `079a92e18eaac0f93ab14acca987c4e1cc1cabf6`，集成实现 `c7c81edfc78d4149052667c6087b56e364d75868`：核心流程中文化、稳定中文未知/错误说明、内部 ID/机器值/英文知识步骤隐藏、Semantics/动态播报、320x720 + 200% 大字和关键色对对比度测试已完成。候选严格 CI `31629386472` 为 Fast `1034/0/14`、Flutter `522`、Full `1798/0/0`、PostgreSQL `33/33`、Phase8 `11/11 + 13/13`、Phase9 security `19/19`，全部成功；集成 SHA 上 `flutter analyze` 无问题、`flutter test` `522/522`；P0/P1/P2 为零。报告 `docs/reports/phase9-gate3a-review-2026-08-13.md`。 |
+| Phase 9 Task 3B | Codex sole Android reliability/E2E writer and Gate 3 acceptor | Phase 9 implementation branch/worktree | accepted Gate 3A integrated SHA `c7c81edfc78d4149052667c6087b56e364d75868` plus metadata closure | `planned` | API 设备矩阵、慢网/断网/不可达、token 过期、Asia/Shanghai 边界、兼容/升级/回滚；Phase9 synthetic runner/CI。 |
 | Phase 9 Task 4 | Codex sole final E2E writer, cold reviewer, CI operator, and exit acceptor | Phase 9 implementation branch/worktree | accepted Gate 3 SHA TBD | `planned` | Full/Flutter/Phase8/Phase9/Android、隐私 artifact scan、事故演练、exit audit 和 exact-SHA CI；最高结论 controlled-trial candidate，仍不得真实试用/部署/发布。 |
 | Phase 8 Task 0 | Codex specification, architecture, safety/privacy audit, task split, cold review, CI, and Gate 0 closure | `codex/phase8-spec-plan` / `health-worktrees/phase8-spec-plan` | `36be9a0f0cd989f32c8f4f7f7b9e2bc5fb4c66e6` | `committed` | 本地接受候选 `02229fa566d5765d75ef45a379b6800fef84ae53`；closure `ad876d1b8b60a386f970ff1dfcd4ea78907b67b9` 的 CI `31296538532` 为 Fast 936/0/10、Flutter 472、Full 1665/0/0、PG 27/27，三项全绿；P0/P1/P2 为零。 |
 | Phase 8 Task 1 | Codex sole privacy/isolation writer, cold reviewer, CI operator, and Gate 1 acceptor | `codex/phase8-implementation` / `health-worktrees/phase8-implementation` | `ad876d1b8b60a386f970ff1dfcd4ea78907b67b9` | `committed` | 接受候选 `b964de14ecd6be3cde042223e2fd92cef488d4e3`；closure `3de6d3f1b47b6403e321710b4216eeb81636aa6a` 的 CI `31305119808` 为 Full 1687/0/0、PG 28/28，P0/P1/P2 为零。 |
@@ -119,9 +119,14 @@
   `C:\Users\Lenovo\Desktop\develop\health-worktrees\phase9-implementation`，分支
   `codex/phase9-implementation`，从 Gate 0 exact closure
   `5cdd43bc808bc08897c05e31f22941239812f294` 创建；Gate 1 接受实现为
-  `407ce9ce5de3f53140db8660505e8c15cf94e628`，Gate 2 实现候选为
-  `80135bc3aa551a0fe7c1f2898ab5cebe61f67ab3`，当前只允许 Codex 写 Gate 2 metadata
-  closure；closure 自身 exact-SHA CI 通过后才可创建 Gate 3A worktree。
+  `407ce9ce5de3f53140db8660505e8c15cf94e628`，Gate 2 接受实现为
+  `80135bc3aa551a0fe7c1f2898ab5cebe61f67ab3`，Gate 3A 集成实现为
+  `c7c81edfc78d4149052667c6087b56e364d75868`；当前只允许 Codex 写 Gate 3A metadata
+  closure，closure 自身 exact-SHA CI 通过后才可开始 Gate 3B。
+- Phase 9 Gate 3A 独立 Flutter worktree 为
+  `C:\Users\Lenovo\Desktop\develop\health-worktrees\phase9-gate3a-flutter`，分支
+  `codex/phase9-gate3a-flutter`，停在已推送且严格 CI 全绿的 Task 提交
+  `079a92e18eaac0f93ab14acca987c4e1cc1cabf6`；不再作为 Gate 3B 写入目录。
 - 当前 worktree `C:\Users\Lenovo\.codex\worktrees\be24\health` 已从 Phase 8 exact
   closure `2ae03345a93d8cc22d0e47fcac415411798df48b` 切换到
   `codex/phase9-controlled-trial`，仅用于 Phase 9 Gate 0 文档、审查、提交和 CI；
@@ -152,6 +157,11 @@
   `1747/0/50` 条件 skips、Flutter `498`；严格 CI run `31622194153` 为 Fast `1034/0/14`、
   Flutter `498`、Full `1798/0/0`、PostgreSQL `33/33`、Phase8 与 Phase9 security 全绿；
   报告 `docs/reports/phase9-gate2-review-2026-08-13.md`。
+- Phase 9 Gate 3A：接受 Task 提交 `079a92e18eaac0f93ab14acca987c4e1cc1cabf6`，集成实现
+  `c7c81edfc78d4149052667c6087b56e364d75868`；候选严格 CI run `31629386472` 为 Fast
+  `1034/0/14`、Flutter `522`、Full `1798/0/0`、PostgreSQL `33/33`、Phase8 与 Phase9
+  security 全绿；集成 SHA 本地 Flutter `522/522`。报告
+  `docs/reports/phase9-gate3a-review-2026-08-13.md`。
 - Phase 1：`docs/reports/phase1-exit-audit-2026-07-22.md`
 - Phase 2：`docs/reports/phase2-exit-audit-2026-07-26.md`
 - Phase 3：`docs/reports/phase3-exit-audit-2026-07-26.md`；远程 CI 后续事实以本账本和 PR #1 exact-SHA checks 为准。
