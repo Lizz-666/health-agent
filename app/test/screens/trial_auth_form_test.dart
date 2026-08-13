@@ -78,4 +78,19 @@ void main() {
       ),
     );
   });
+
+  testWidgets('trial credential fields expose accessible names', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: TrialAuthScreen())),
+    );
+    await tester.pumpAndSettle();
+
+    for (final label in <String>['内测账号', '邀请码', '内测凭据']) {
+      final field = find.bySemanticsLabel(RegExp(label));
+      expect(field, findsOneWidget);
+      expect(tester.getSemantics(field), isSemantics(isTextField: true));
+    }
+  });
 }

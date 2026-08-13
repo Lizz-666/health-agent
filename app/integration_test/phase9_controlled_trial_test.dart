@@ -209,6 +209,38 @@ void main() {
     await _reset();
   });
 
+  testWidgets('failed activation exposes an accessible live error', (
+    tester,
+  ) async {
+    await _boot(tester);
+    await tester.enterText(
+      find.byKey(const Key('trial-account-input')),
+      _account,
+    );
+    await tester.enterText(
+      find.byKey(const Key('trial-invitation-input')),
+      _invitation,
+    );
+    await tester.enterText(
+      find.byKey(const Key('trial-credential-input')),
+      'wrong-synthetic-credential',
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+    final submit = find.byKey(const Key('trial-auth-submit'));
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+
+    final error = find.byKey(const Key('trial-auth-error-live'));
+    await _pumpUntil(tester, error);
+    expect(
+      tester.getSemantics(error),
+      isSemantics(label: '内测认证失败，请检查账号、凭据、邀请码和网络后重试。', isLiveRegion: true),
+    );
+    expect(find.byKey(const Key('trial-auth-submit')), findsOneWidget);
+    expect(await AppStorage.getAccessToken(), isNull);
+    expect(await AppStorage.getRefreshToken(), isNull);
+  });
+
   testWidgets('activation, background resume, and slow request remain usable', (
     tester,
   ) async {
