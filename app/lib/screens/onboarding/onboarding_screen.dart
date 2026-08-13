@@ -18,22 +18,42 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   double _weight = 65;
   int _age = 25;
   String? _gender;
+  bool _consentAccepted = false;
 
   void _next() {
     if (_currentPage < 3) {
-      _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
   Future<void> _finish() async {
     if (_gender == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请选择性别')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请选择性别')));
       return;
     }
-    final ok = await ref.read(userProvider.notifier).updateProfile(
-      height: _height, weight: _weight, age: _age, gender: _gender);
-    if (ok && mounted) context.go('/today');
+    if (!_consentAccepted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先确认敏感健康数据告知')));
+      return;
+    }
+    final ok = await ref
+        .read(userProvider.notifier)
+        .completeOnboarding(
+          height: _height,
+          weight: _weight,
+          age: _age,
+          gender: _gender!,
+        );
+    if (ok && mounted) {
+      ref.read(authProvider.notifier).clearisNewUser();
+      context.go('/today');
+    }
   }
 
   Future<void> _skip() async {
@@ -43,6 +63,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userState = ref.watch(userProvider);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -53,35 +74,110 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 controller: _pageController,
                 onPageChanged: (i) => setState(() => _currentPage = i),
                 children: [
-                  _buildSliderPage('你的身高？', 'cm', _height, 100, 220,
-                      (v) => setState(() => _height = v), Icons.height),
-                  _buildSliderPage('你的体重？', 'kg', _weight, 30, 200,
-                      (v) => setState(() => _weight = v), Icons.monitor_weight_outlined),
-                  _buildNumberPage('你的年龄？', _age, 13, 120,
-                      (v) => setState(() => _age = v)),
+                  _buildSliderPage(
+                    '你的身高？',
+                    'cm',
+                    _height,
+                    100,
+                    220,
+                    (v) => setState(() => _height = v),
+                    Icons.height,
+                  ),
+                  _buildSliderPage(
+                    '你的体重？',
+                    'kg',
+                    _weight,
+                    30,
+                    200,
+                    (v) => setState(() => _weight = v),
+                    Icons.monitor_weight_outlined,
+                  ),
+                  _buildNumberPage(
+                    '你的年龄？',
+                    _age,
+                    13,
+                    120,
+                    (v) => setState(() => _age = v),
+                  ),
                   _buildGenderPage(),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.all(24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextButton(onPressed: _skip, child: const Text('稍后完善')),
-                  Row(
-                    children: List.generate(4, (i) => Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: 8, height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: i == _currentPage ? const Color(0xFFE94560) : const Color(0xFF0F3460),
+                  if (_currentPage == 3)
+                    CheckboxListTile(
+                      key: const Key('onboarding-health-consent'),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: _consentAccepted,
+                      onChanged: userState.isLoading
+                          ? null
+                          : (value) => setState(
+                              () => _consentAccepted = value ?? false,
+                            ),
+                      title: const Text(
+                        '本轮仅限合成测试资料。我同意保存上述身高、体重、年龄和性别。',
+                        style: TextStyle(fontSize: 13),
                       ),
-                    )),
+                    ),
+                  if (userState.error != null)
+                    Semantics(
+                      key: const Key('onboarding-save-error'),
+                      liveRegion: true,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          userState.error!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        onPressed: userState.isLoading ? null : _skip,
+                        child: const Text('稍后完善'),
+                      ),
+                      Row(
+                        children: List.generate(
+                          4,
+                          (i) => Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: i == _currentPage
+                                  ? const Color(0xFFE94560)
+                                  : const Color(0xFF0F3460),
+                            ),
+                          ),
+                        ),
+                      ),
+                      _currentPage < 3
+                          ? ElevatedButton(
+                              onPressed: _next,
+                              child: const Text('下一步'),
+                            )
+                          : ElevatedButton(
+                              key: const Key('onboarding-finish'),
+                              onPressed: userState.isLoading ? null : _finish,
+                              child: userState.isLoading
+                                  ? const SizedBox.square(
+                                      dimension: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('完成'),
+                            ),
+                    ],
                   ),
-                  _currentPage < 3
-                      ? ElevatedButton(onPressed: _next, child: const Text('下一步'))
-                      : ElevatedButton(onPressed: _finish, child: const Text('完成')),
                 ],
               ),
             ),
@@ -91,8 +187,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-  Widget _buildSliderPage(String title, String unit, double value, double min,
-      double max, ValueChanged<double> onChanged, IconData icon) {
+  Widget _buildSliderPage(
+    String title,
+    String unit,
+    double value,
+    double min,
+    double max,
+    ValueChanged<double> onChanged,
+    IconData icon,
+  ) {
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -100,13 +203,20 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         children: [
           Icon(icon, size: 64, color: const Color(0xFFE94560)),
           const SizedBox(height: 24),
-          Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
-          Text('${value.toInt()} $unit',
-              style: const TextStyle(fontSize: 32, color: Color(0xFFE94560))),
+          Text(
+            '${value.toInt()} $unit',
+            style: const TextStyle(fontSize: 32, color: Color(0xFFE94560)),
+          ),
           Slider(value: value, min: min, max: max, onChanged: onChanged),
           Text(
-            unit == 'cm' ? '范围: ${min.toInt()}-${max.toInt()}cm' : '范围: ${min.toInt()}-${max.toInt()}kg',
+            unit == 'cm'
+                ? '范围: ${min.toInt()}-${max.toInt()}cm'
+                : '范围: ${min.toInt()}-${max.toInt()}kg',
             style: const TextStyle(color: Color(0xFF8892B0)),
           ),
         ],
@@ -114,7 +224,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-  Widget _buildNumberPage(String title, int value, int min, int max, ValueChanged<int> onChanged) {
+  Widget _buildNumberPage(
+    String title,
+    int value,
+    int min,
+    int max,
+    ValueChanged<int> onChanged,
+  ) {
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -122,11 +238,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         children: [
           const Icon(Icons.calendar_today, size: 64, color: Color(0xFFE94560)),
           const SizedBox(height: 24),
-          Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
-          Text('$value 岁', style: const TextStyle(fontSize: 32, color: Color(0xFFE94560))),
-          Slider(value: value.toDouble(), min: min.toDouble(), max: max.toDouble(),
-              onChanged: (v) => onChanged(v.toInt())),
+          Text(
+            '$value 岁',
+            style: const TextStyle(fontSize: 32, color: Color(0xFFE94560)),
+          ),
+          Slider(
+            value: value.toDouble(),
+            min: min.toDouble(),
+            max: max.toDouble(),
+            onChanged: (v) => onChanged(v.toInt()),
+          ),
         ],
       ),
     );
@@ -140,17 +266,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         children: [
           const Icon(Icons.person, size: 64, color: Color(0xFFE94560)),
           const SizedBox(height: 24),
-          const Text('你的性别？', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const Text(
+            '你的性别？',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 32),
           Row(
             children: [
-              Expanded(
-                child: _genderCard('男', 'male', Icons.male),
-              ),
+              Expanded(child: _genderCard('男', 'male', Icons.male)),
               const SizedBox(width: 16),
-              Expanded(
-                child: _genderCard('女', 'female', Icons.female),
-              ),
+              Expanded(child: _genderCard('女', 'female', Icons.female)),
             ],
           ),
         ],
@@ -167,7 +292,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFE94560) : const Color(0xFF16213E),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: selected ? const Color(0xFFE94560) : const Color(0xFF0F3460), width: 2),
+          border: Border.all(
+            color: selected ? const Color(0xFFE94560) : const Color(0xFF0F3460),
+            width: 2,
+          ),
         ),
         child: Column(
           children: [

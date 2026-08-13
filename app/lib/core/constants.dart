@@ -15,6 +15,10 @@ class AppConstants {
     'AUTH_CREDENTIAL_PROVIDER',
     defaultValue: 'offline_password',
   );
+  static const String privacyNoticeVersion = String.fromEnvironment(
+    'PRIVACY_NOTICE_VERSION',
+    defaultValue: 'controlled-trial-sensitive-health-v1',
+  );
   static const bool controlledTrialAuth = authMode == 'controlled_trial';
   static const String clientPlatform = 'android';
   static const int clientVersionCode = int.fromEnvironment(

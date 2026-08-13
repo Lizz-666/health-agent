@@ -85,13 +85,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onOnboarding = state.matchedLocation == '/onboarding';
 
       if (!authState.isLoggedIn && !onLogin) return '/login';
-      if (authState.isLoggedIn && onLogin) return '/today';
       if (authState.isLoggedIn &&
-          userState.profile != null &&
-          userState.profile!.hasProfile != true &&
+          (authState.isNewUser ||
+              (userState.profile != null &&
+                  userState.profile!.hasProfile != true)) &&
           !onOnboarding) {
         return '/onboarding';
       }
+      if (authState.isLoggedIn && onLogin) return '/today';
       return null;
     },
     routes: [
