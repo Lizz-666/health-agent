@@ -9,7 +9,9 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.auth import service as auth_service
 from app.auth.models import (
@@ -497,6 +499,60 @@ async def test_postgresql_identity_deletion_leaves_only_unlinkable_marker(
 def test_postgresql_0014_downgrade_and_upgrade(pg_dsn):
     if not pg_available:
         pytest.skip(skip_reason)
+
+    async def seed_identity() -> UUID:
+        engine = create_async_engine(pg_dsn, poolclass=NullPool)
+        session_factory = async_sessionmaker(
+            engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+        try:
+            async with session_factory() as session:
+                provisioned = await auth_service.provision_trial_account(
+                    session,
+                    account_name="synthetic-pg-migration",
+                    password=PASSWORD,
+                )
+                return UUID(provisioned.user_id)
+        finally:
+            await engine.dispose()
+
+    async def assert_identity_preserved(user_id: UUID) -> None:
+        engine = create_async_engine(pg_dsn, poolclass=NullPool)
+        try:
+            async with engine.begin() as connection:
+                assert (
+                    await connection.scalar(
+                        text("SELECT id FROM users WHERE id = :user_id"),
+                        {"user_id": user_id},
+                    )
+                ) == user_id
+                assert (
+                    await connection.scalar(
+                        text(
+                            "SELECT user_id FROM trial_credentials "
+                            "WHERE login_id = 'synthetic-pg-migration'"
+                        )
+                    )
+                ) == user_id
+                assert (
+                    await connection.scalar(
+                        text(
+                            "SELECT count(*) FROM trial_invitations "
+                            "WHERE user_id = :user_id"
+                        ),
+                        {"user_id": user_id},
+                    )
+                ) == 1
+                await connection.execute(
+                    text("DELETE FROM users WHERE id = :user_id"),
+                    {"user_id": user_id},
+                )
+        finally:
+            await engine.dispose()
+
+    user_id = asyncio.run(seed_identity())
     env = dict(os.environ)
     env["DATABASE_URL"] = pg_dsn
     downgrade = subprocess.run(
@@ -506,12 +562,15 @@ def test_postgresql_0014_downgrade_and_upgrade(pg_dsn):
         capture_output=True,
         text=True,
     )
-    assert downgrade.returncode == 0, downgrade.stderr
-    upgrade = subprocess.run(
-        [sys.executable, "-m", "alembic", "upgrade", "head"],
-        cwd=str(BACKEND_DIR),
-        env=env,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        assert downgrade.returncode == 0, downgrade.stderr
+    finally:
+        upgrade = subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            cwd=str(BACKEND_DIR),
+            env=env,
+            capture_output=True,
+            text=True,
+        )
     assert upgrade.returncode == 0, upgrade.stderr
+    asyncio.run(assert_identity_preserved(user_id))

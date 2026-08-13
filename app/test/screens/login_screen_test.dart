@@ -17,6 +17,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posture_app/core/api_client.dart';
+import 'package:posture_app/providers/auth_provider.dart';
 import 'package:posture_app/screens/auth/login_screen.dart';
 
 Widget _wrap() => const ProviderScope(child: MaterialApp(home: LoginScreen()));
@@ -97,5 +99,26 @@ void main() {
         hasTapAction: true,
       ),
     );
+  });
+
+  testWidgets('client incompatibility blocks authentication with stable copy', (
+    tester,
+  ) async {
+    final api = ApiClient();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [apiClientProvider.overrideWithValue(api)],
+        child: const MaterialApp(home: LoginScreen()),
+      ),
+    );
+    await tester.pump();
+
+    api.onClientIncompatible?.call();
+    await tester.pump();
+
+    expect(find.byKey(const Key('client-incompatible-block')), findsOneWidget);
+    expect(find.text('当前应用版本不兼容，请更新后重试'), findsOneWidget);
+    expect(find.byKey(const Key('login-submit')), findsNothing);
+    expect(find.byKey(const Key('trial-auth-submit')), findsNothing);
   });
 }

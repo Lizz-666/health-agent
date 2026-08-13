@@ -16,6 +16,11 @@ class AppConstants {
     defaultValue: 'offline_password',
   );
   static const bool controlledTrialAuth = authMode == 'controlled_trial';
+  static const String clientPlatform = 'android';
+  static const int clientVersionCode = int.fromEnvironment(
+    'CLIENT_VERSION_CODE',
+    defaultValue: 1,
+  );
   static const String appName = '体态分析';
   static const Duration httpTimeout = Duration(seconds: 30);
   static const String devAdminPhone = String.fromEnvironment('DEV_ADMIN_PHONE');

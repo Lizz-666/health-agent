@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     AUTH_LOGIN_WINDOW_MINUTES: int = 15
     PRIVACY_AUDIT_HMAC_KEY: str = ""
     PRIVACY_NOTICE_VERSION: str = "controlled-trial-sensitive-health-v1"
+    MIN_ANDROID_CLIENT_VERSION_CODE: int = 1
+    MAX_ANDROID_CLIENT_VERSION_CODE: int = 1
 
     ALIBABA_CLOUD_ACCESS_KEY_ID: str = ""
     ALIBABA_CLOUD_ACCESS_KEY_SECRET: str = ""
@@ -134,6 +136,12 @@ class Settings(BaseSettings):
             errors.append("JWT_ISSUER and JWT_AUDIENCE are required")
         if self.JWT_ISSUER == "posture-app" or self.JWT_AUDIENCE == "posture-app-client":
             errors.append("JWT_ISSUER and JWT_AUDIENCE must not use repository defaults")
+        if (
+            self.MIN_ANDROID_CLIENT_VERSION_CODE < 1
+            or self.MAX_ANDROID_CLIENT_VERSION_CODE
+            < self.MIN_ANDROID_CLIENT_VERSION_CODE
+        ):
+            errors.append("client version window must be positive and ordered")
         if self.ALGORITHM != "HS256":
             errors.append("ALGORITHM must be HS256")
         if not 1 <= self.ACCESS_TOKEN_EXPIRE_MINUTES <= 15:

@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posture_app/core/api_client.dart';
+import 'package:posture_app/core/constants.dart';
+import 'package:posture_app/core/storage.dart';
 import 'package:posture_app/providers/activity_grid_provider.dart';
 import 'package:posture_app/providers/agent_provider.dart';
 import 'package:posture_app/providers/assessment_provider.dart';
@@ -27,6 +30,77 @@ ApiClient _apiWith(FakeDioAdapter adapter) {
 }
 
 void main() {
+  test(
+    'controlled-trial logout carries client version and clears tokens',
+    () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      await AppStorage.saveTokens('synthetic-access', 'synthetic-refresh');
+      final adapter = FakeDioAdapter()
+        ..register(
+          'POST',
+          '/auth/trial/logout',
+          (options) => Response(requestOptions: options, statusCode: 204),
+        );
+      final api = _apiWith(adapter);
+      final notifier = AuthNotifier(api, controlledTrialAuth: true);
+      addTearDown(notifier.dispose);
+
+      await notifier.logout();
+
+      final request = adapter.calls.single;
+      expect(request.data, {'refresh_token': 'synthetic-refresh'});
+      expect(request.headers['X-Client-Platform'], AppConstants.clientPlatform);
+      expect(
+        request.headers['X-Client-Version-Code'],
+        AppConstants.clientVersionCode.toString(),
+      );
+      expect(await AppStorage.getAccessToken(), isNull);
+      expect(await AppStorage.getRefreshToken(), isNull);
+    },
+  );
+
+  test('controlled-trial duplicate submit sends only one request', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final gate = Completer<Response>();
+    final adapter = FakeDioAdapter()
+      ..register('POST', '/auth/trial/activate', (_) => gate.future);
+    final api = _apiWith(adapter);
+    final notifier = AuthNotifier(api);
+    addTearDown(notifier.dispose);
+
+    final first = notifier.trialAuthenticate(
+      activate: true,
+      accountName: 'synthetic-trial-01',
+      credential: 'synthetic-credential',
+      invitationCode: 'synthetic_invitation_0000000000000001',
+    );
+    await Future<void>.delayed(Duration.zero);
+    final duplicate = await notifier.trialAuthenticate(
+      activate: true,
+      accountName: 'synthetic-trial-01',
+      credential: 'synthetic-credential',
+      invitationCode: 'synthetic_invitation_0000000000000001',
+    );
+    gate.complete(
+      Response(
+        requestOptions: RequestOptions(path: '/auth/trial/activate'),
+        statusCode: 200,
+        data: {
+          'access_token': 'access',
+          'refresh_token': 'refresh',
+          'is_new_user': true,
+        },
+      ),
+    );
+
+    expect(duplicate, isFalse);
+    expect(await first, isTrue);
+    expect(
+      adapter.calls.where((call) => call.path.endsWith('/auth/trial/activate')),
+      hasLength(1),
+    );
+  });
+
   test('auth failure clears Phase 6 nutrition state', () async {
     final adapter = FakeDioAdapter()
       ..registerJson('GET', '/nutrition/eligibility', (_) => eligibilityJson())

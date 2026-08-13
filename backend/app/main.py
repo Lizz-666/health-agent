@@ -14,6 +14,7 @@ from app.agent.schemas import AgentTurnResponse
 from app.auth.router import router as auth_router
 from app.core.exceptions import AppException
 from app.core.config import settings
+from app.core.compatibility import reject_incompatible_client
 from app.core.observability import (
     SecurityEventCode,
     SecurityEventOutcome,
@@ -39,6 +40,7 @@ def _request_path(request: Request) -> str:
     """Use the ASGI routing path, never a URL rebuilt from the Host header."""
     scope = getattr(request, "scope", {}) or {}
     return str(scope.get("path") or "")
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -81,6 +83,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def client_compatibility(request: Request, call_next):
+    rejection = reject_incompatible_client(request)
+    if rejection is not None:
+        return rejection
+    return await call_next(request)
 
 
 @app.middleware("http")

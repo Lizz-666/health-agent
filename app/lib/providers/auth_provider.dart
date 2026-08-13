@@ -24,6 +24,7 @@ class AuthState {
   final String? error;
   final bool isNewUser;
   final int countdown;
+  final bool clientIncompatible;
 
   const AuthState({
     this.isLoggedIn = false,
@@ -31,6 +32,7 @@ class AuthState {
     this.error,
     this.isNewUser = false,
     this.countdown = 0,
+    this.clientIncompatible = false,
   });
 
   AuthState copyWith({
@@ -41,24 +43,39 @@ class AuthState {
     int? countdown,
     bool clearError = false,
     bool clearisNewUser = false,
+    bool? clientIncompatible,
   }) => AuthState(
     isLoggedIn: isLoggedIn ?? this.isLoggedIn,
     isLoading: isLoading ?? this.isLoading,
     error: clearError ? null : (error ?? this.error),
     isNewUser: clearisNewUser ? false : (isNewUser ?? this.isNewUser),
     countdown: countdown ?? this.countdown,
+    clientIncompatible: clientIncompatible ?? this.clientIncompatible,
   );
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _api;
   final void Function() _resetSessionState;
+  final bool _controlledTrialAuth;
   Timer? _timer;
+  bool _trialAuthenticationInFlight = false;
 
-  AuthNotifier(this._api, {void Function()? resetSessionState})
-    : _resetSessionState = resetSessionState ?? _noop,
-      super(const AuthState()) {
+  AuthNotifier(
+    this._api, {
+    void Function()? resetSessionState,
+    bool? controlledTrialAuth,
+  }) : _resetSessionState = resetSessionState ?? _noop,
+       _controlledTrialAuth =
+           controlledTrialAuth ?? AppConstants.controlledTrialAuth,
+       super(const AuthState()) {
     _api.onAuthFailed = _onAuthFailed;
+    _api.onClientIncompatible = _onClientIncompatible;
+  }
+
+  void _onClientIncompatible() {
+    _resetSessionState();
+    state = const AuthState(clientIncompatible: true);
   }
 
   void _onAuthFailed() {
@@ -129,18 +146,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
-    if (AppConstants.controlledTrialAuth) {
+    if (_controlledTrialAuth) {
       final refreshToken = await AppStorage.getRefreshToken();
       if (refreshToken != null) {
         try {
-          await Dio(
-            BaseOptions(
-              baseUrl: AppConstants.apiBaseUrl,
-              connectTimeout: AppConstants.httpTimeout,
-              receiveTimeout: AppConstants.httpTimeout,
-              headers: {'Content-Type': 'application/json'},
-            ),
-          ).post(
+          await _api.dio.post(
             '/auth/trial/logout',
             data: {'refresh_token': refreshToken},
           );
@@ -151,7 +161,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
     await AppStorage.clearTokens();
     _resetSessionState();
-    state = const AuthState();
+    state = AuthState(clientIncompatible: state.clientIncompatible);
   }
 
   Future<bool> trialAuthenticate({
@@ -160,6 +170,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String credential,
     String? invitationCode,
   }) async {
+    if (_trialAuthenticationInFlight) return false;
+    _trialAuthenticationInFlight = true;
     try {
       state = state.copyWith(isLoading: true, clearError: true);
       final deviceKey = await AppStorage.getOrCreateTrialDeviceKey();
@@ -191,6 +203,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {
       state = state.copyWith(isLoading: false, error: '认证失败，请重试');
       return false;
+    } finally {
+      _trialAuthenticationInFlight = false;
     }
   }
 

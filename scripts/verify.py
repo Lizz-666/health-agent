@@ -135,6 +135,10 @@ FAST_TEST_TARGETS = [
     "tests/test_trial_privacy.py",
     "tests/test_security_observability.py",
     "tests/test_phase9_security.py",
+    # Phase 9 Gate 3B: client compatibility, reliability matrix, and real HTTP.
+    "tests/test_client_compatibility.py",
+    "tests/test_phase9_matrix.py",
+    "tests/test_phase9_http_journey.py",
 ]
 
 

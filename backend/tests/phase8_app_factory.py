@@ -14,6 +14,7 @@ from app.agent.router import get_agent_provider, router as agent_router
 from app.agent.schemas import AgentTurnResponse
 from app.auth.router import router as auth_router
 from app.core.exceptions import AppException
+from app.core.compatibility import reject_incompatible_client
 from app.db.database import get_db
 from app.health.router import router as health_router
 from app.nutrition.router import router as nutrition_router
@@ -32,6 +33,9 @@ def create_phase8_test_app(
     get_provider_override: Callable,
     control=None,
     lifespan=None,
+    extra_routers=(),
+    health_mode: str = "synthetic-phase8-test",
+    enforce_client_compatibility: bool = False,
 ) -> FastAPI:
     """Assemble every production router with explicit test dependencies."""
     test_app = FastAPI(title="Synthetic Phase 8 Test App", lifespan=lifespan)
@@ -83,6 +87,15 @@ def create_phase8_test_app(
             },
         )
 
+    if enforce_client_compatibility:
+
+        @test_app.middleware("http")
+        async def client_compatibility(request: Request, call_next):
+            rejection = reject_incompatible_client(request)
+            if rejection is not None:
+                return rejection
+            return await call_next(request)
+
     for router in (
         auth_router,
         user_router,
@@ -92,12 +105,13 @@ def create_phase8_test_app(
         training_router,
         nutrition_router,
         agent_router,
+        *extra_routers,
     ):
         test_app.include_router(router)
 
     @test_app.get("/health")
     async def health():
-        return {"status": "ok", "mode": "synthetic-phase8-test"}
+        return {"status": "ok", "mode": health_mode}
 
     if control is not None:
         control.install(test_app)

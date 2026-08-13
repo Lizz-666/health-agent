@@ -72,6 +72,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(authProvider);
+    if (state.clientIncompatible) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Semantics(
+              key: const Key('client-incompatible-block'),
+              liveRegion: true,
+              child: const Text('当前应用版本不兼容，请更新后重试'),
+            ),
+          ),
+        ),
+      );
+    }
     if (AppConstants.controlledTrialAuth) {
       if (!AppConstants.controlledTrialConfigurationValid) {
         return Scaffold(
