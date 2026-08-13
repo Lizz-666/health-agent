@@ -183,7 +183,12 @@ Future<void> _activate(WidgetTester tester) async {
     find.byKey(const Key('trial-credential-input')),
     _credential,
   );
-  await tester.tap(find.byKey(const Key('trial-auth-submit')));
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pumpAndSettle();
+  final submit = find.byKey(const Key('trial-auth-submit'));
+  await tester.ensureVisible(submit);
+  await tester.pumpAndSettle();
+  await tester.tap(submit);
   await _pumpUntil(tester, find.byKey(const Key('trial-session-ready')));
 }
 
