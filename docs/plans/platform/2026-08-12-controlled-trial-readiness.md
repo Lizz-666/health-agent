@@ -219,6 +219,43 @@ flutter test
 **Matrix:** 当前 API 34 + 一个较低受支持 API；正常/慢网/断网/服务不可达；token 过期；
 跨午夜/周界 `Asia/Shanghai`；重复提交；客户端/服务端不兼容；升级和可恢复回滚。
 
+**Gate 3B frozen execution contract (2026-08-13):**
+
+- 设备矩阵固定为 Android API 34 和 API 28；两者均高于应用 `minSdk 24`。API 34
+  执行完整受控账号、慢响应、撤销/过期、版本不兼容和不可达回放；API 28 至少执行
+  受控账号核心流程、后台恢复与不可达回放。设备证据必须记录 emulator ID、API、ABI、
+  exact SHA 和每条用例计数，不提交 APK、截图、数据库或日志产物。
+- 候选 Flutter 请求统一发送稳定 Android platform/version-code 头。只有
+  `controlled_trial_candidate` 服务端强制校验；缺失、格式错误、低于最小版本或高于
+  当前兼容上限均在进入业务路由前返回 `426` 稳定中文码，不产生领域写入。客户端收到
+  `426` 后清除 token 和全部用户态并阻断继续认证，不显示原始响应。
+- 401 并发请求共享一次 refresh；refresh 旋转失败、重放、会话撤销或账号/设备失效时
+  清除 token 及全部用户域缓存，不把失败转换为成功。原请求仅在 refresh 成功后重放一次；
+  业务写请求继续复用原 idempotency key。
+- Phase 9 synthetic server 只绑定 loopback、只使用可丢弃 SQLite 和固定合成账号/邀请码/
+  凭据；runner 输出仅 exact SHA、稳定 checkpoint/transitions 和计数。覆盖激活、邀请码
+  重放、设备冲突、refresh rotation/replay、慢响应后显式重试、撤销后拒绝、版本矩阵和
+  零意外写入。CI 不接触 live provider、照片、生产 secret 或网络服务。
+- `Asia/Shanghai` 以注入 UTC 时钟验证跨 `23:59:59 -> 00:00:00` 日界和周日到周一周界；
+  客户端日期不覆盖服务端推导。迁移仅在可丢弃 PostgreSQL 演练 `0013 -> head` 数据保留
+  和服务关闭状态的 downgrade/re-upgrade；运行中不得 downgrade 到移除同意/删除标记的
+  `0013`，应用回滚只能回到仍兼容 `0014/head` 的版本。
+
+**Exact allowlist:**
+
+- production: `backend/app/main.py`, `backend/app/core/config.py`,
+  `backend/app/core/compatibility.py`, `app/lib/core/constants.dart`,
+  `app/lib/core/api_client.dart`, `app/lib/providers/auth_provider.dart`,
+  `app/lib/screens/auth/login_screen.dart`;
+- tests/harness: `backend/tests/phase8_app_factory.py`, `backend/tests/phase9_*`,
+  `backend/tests/test_client_compatibility.py`, `backend/tests/test_trial_privacy.py`,
+  `app/test/core/api_client_test.dart`, `app/test/providers/auth_session_reset_test.dart`,
+  `app/test/screens/login_screen_test.dart`, `app/integration_test/phase9_*`,
+  `scripts/phase9.py`, `scripts/verify.py`, `.github/workflows/ci.yml`;
+- evidence: this plan, `docs/agent/ACTIVE_TASKS.md`, Phase 9 operations/Android matrix and
+  Gate 3 report only. No migration, domain model, health/safety policy, dependency, live/photo or
+  unrelated UI change is allowed without a findings-first scope amendment.
+
 **Acceptance commands:**
 
 ```powershell
