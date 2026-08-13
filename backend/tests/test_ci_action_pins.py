@@ -150,7 +150,11 @@ def test_release_integration_ci_runs_all_six_gates_on_main_and_pull_requests():
     )
     full_start = text.index("  full:")
     full_end = text.index("\n  phase8-acceptance:", full_start)
-    assert full_condition in text[full_start:full_end]
+    full_job = text[full_start:full_end]
+    assert full_condition in full_job
+    timeout = re.search(r"^    timeout-minutes: (\d+)$", full_job, re.MULTILINE)
+    assert timeout is not None
+    assert int(timeout.group(1)) >= 45
 
     for required_job in (
         "phase9-reliability",

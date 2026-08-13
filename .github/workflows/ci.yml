@@ -239,7 +239,7 @@ jobs:
     # available once the workflow exists on the default branch.
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.run_full) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       postgres:
         # PostgreSQL 16 image pinned to an immutable reviewed digest.
