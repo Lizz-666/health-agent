@@ -8,6 +8,8 @@ Gate 4 输入基线：`1783573067d6eb599591ead8fc938a909ab08d43`
 
 Gate 4 接受实现：`4d013120cbe499b55d008679915d7eb0a3740701`
 
+最终已验证 Phase 9 代码基线：`7f801255b0ecfab50b92f959a4f093a7919126a2`
+
 分支：`codex/phase9-implementation`
 
 > 状态：Phase 9 Android 小范围受控试用候选版工程验收通过。本报告不授权 merge、写
@@ -74,6 +76,14 @@ network error 和显式重试，不显示成功/调整/写入状态。API 34/28 
 
 此前 run `31685813557` 未启用 `run_full`，Full 被条件跳过，因此明确不作为严格 Gate 4 证据。
 承载本报告和状态更新的 closure exact SHA 必须再运行同一严格 workflow；失败则本验收立即失效。
+
+后续 onboarding/navigation 修复后的最终代码基线 `7f801255b0ecfab50b92f959a4f093a7919126a2`
+由严格 workflow-dispatch run
+[`31701841156`](https://github.com/Lizz-666/health-agent/actions/runs/31701841156)
+自证，六个 job 全部成功：Fast 1052 passed/14 条件 skip、Flutter 539、Full 1816/0/0、
+PostgreSQL 33/33、Phase 8 HTTP 11/11 + eval 13/13、Phase 9 security 19/19、Phase 9
+reliability HTTP 11/11 + 时区 2/2。该 run 不改写上文 Android API 34/28 设备回放绑定的 Gate 4
+接受实现 SHA；后续提交的设备重跑仍需单独证据。
 
 ## 决定
 

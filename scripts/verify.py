@@ -139,6 +139,8 @@ FAST_TEST_TARGETS = [
     "tests/test_client_compatibility.py",
     "tests/test_phase9_matrix.py",
     "tests/test_phase9_http_journey.py",
+    # Release integration: automatic CI gates and Android candidate hardening.
+    "tests/test_release_configuration.py",
 ]
 
 

@@ -1,4 +1,4 @@
-# Shared CI for the health-agent (Phase 3 foundation, extended for Phase 4).
+# Shared CI for the health-agent release-integration baseline.
 #
 # Layered verification per docs/product/roadmap.md section 13.1 and the
 # Phase 3/Phase 4 implementation plans:
@@ -7,8 +7,10 @@
 #   - full    : ruff + COMPLETE backend tests on a real PostgreSQL 16 service,
 #               enforcing exact PG execution and zero skips.
 #
-# Triggers: push to main and codex/phase3-* branches, any pull_request (this is
-# the CI surface for the Phase 4 draft PR's head branch), and manual dispatch.
+# Triggers: every pull request, push to main, and manual exact-SHA dispatch.
+# Pull requests and main run all six required engineering gates. Manual runs
+# may omit Full unless run_full is selected, so they can still provide a fast
+# exact-SHA checkpoint without weakening the PR/main contract.
 #
 # Constraints:
 #   - Least permissions: contents: read only. No deployment, release, package
@@ -33,7 +35,6 @@ on:
   push:
     branches:
       - "main"
-      - "codex/phase3-*"
   pull_request:
   workflow_dispatch:
     inputs:
@@ -63,7 +64,7 @@ env:
 jobs:
   phase9-reliability:
     name: Phase 9 reliability (synthetic HTTP + matrix)
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -236,7 +237,7 @@ jobs:
     name: Full (complete tests + PostgreSQL 16)
     # Every PR gets the authoritative integration gate. Manual dispatch remains
     # available once the workflow exists on the default branch.
-    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.run_full) }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.run_full) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -312,9 +313,10 @@ jobs:
 
   phase8-acceptance:
     name: Phase 8 acceptance (synthetic HTTP + eval)
-    # This explicit, non-live acceptance surface is run for exact-SHA manual
-    # gates. It has no services, production credentials, photos, or cloud AI.
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    # This explicit, non-live acceptance surface is mandatory on PR/main and is
+    # also available for exact-SHA manual gates. It has no production secrets,
+    # real health data, photos, or cloud AI.
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

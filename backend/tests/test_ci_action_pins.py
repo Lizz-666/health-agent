@@ -122,6 +122,47 @@ def test_flutter_test_pipeline_propagates_failures_through_tee():
     assert "flutter test 2>&1 | tee ../flutter-test.log" in step
 
 
+def test_release_integration_ci_runs_all_six_gates_on_main_and_pull_requests():
+    text = CI_PATH.read_text(encoding="utf-8")
+
+    assert 'branches:\n      - "main"' in text
+    assert '"codex/phase3-*"' not in text
+    assert "pull_request:" in text
+
+    automatic_or_manual = (
+        "if: ${{ github.event_name == 'push' || "
+        "github.event_name == 'pull_request' || "
+        "github.event_name == 'workflow_dispatch' }}"
+    )
+    for job_name in ("phase9-reliability", "phase8-acceptance"):
+        start = text.index(f"  {job_name}:")
+        next_job_match = re.search(r"^  [a-z0-9-]+:\s*$", text[start + 3 :], re.MULTILINE)
+        next_job = (
+            -1 if next_job_match is None else start + 3 + next_job_match.start()
+        )
+        job = text[start:] if next_job == -1 else text[start:next_job]
+        assert automatic_or_manual in job
+
+    full_condition = (
+        "if: ${{ github.event_name == 'push' || "
+        "github.event_name == 'pull_request' || "
+        "(github.event_name == 'workflow_dispatch' && inputs.run_full) }}"
+    )
+    full_start = text.index("  full:")
+    full_end = text.index("\n  phase8-acceptance:", full_start)
+    assert full_condition in text[full_start:full_end]
+
+    for required_job in (
+        "phase9-reliability",
+        "phase9-security",
+        "fast",
+        "flutter",
+        "full",
+        "phase8-acceptance",
+    ):
+        assert f"  {required_job}:" in text
+
+
 def test_ci_summary_logs_are_written_outside_the_worktree():
     text = CI_PATH.read_text(encoding="utf-8")
     for name in ("fast", "full"):

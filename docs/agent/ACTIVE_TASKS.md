@@ -5,9 +5,16 @@
 
 ## Current Initiative
 
+- 阶段：Release Integration，状态 `in_progress`。唯一基线为最终已验证 Phase 9 SHA
+  `7f801255b0ecfab50b92f959a4f093a7919126a2`；分支 `codex/release-integration`，worktree
+  `C:\Users\Lenovo\Desktop\develop\health-worktrees\release-integration`。范围仅限统一 CI 门、
+  最终证据/运行文档同步和 Android release 配置硬化；不修改健康规则、业务 API、迁移、
+  live AI/照片门，不授权 push、PR、部署、真实数据或分发。
 - 阶段：Phase 9 Android 小范围受控试用候选准备，状态 `verified`；Gate 4 接受实现
   `4d013120cbe499b55d008679915d7eb0a3740701` 的严格 CI `31686265174` 六个 job 全部成功，
-  退出审计 closure 必须由自身 exact-SHA CI 自证。唯一业务基线仍为 Phase 8 exact closure
+  最终代码基线 `7f801255b0ecfab50b92f959a4f093a7919126a2` 的严格 CI `31701841156`
+  亦六个 job 全部成功。Android API 34/28 设备证据仍绑定 Gate 4 接受实现，不改写为在最终代码
+  基线重跑。唯一业务基线仍为 Phase 8 exact closure
   `2ae03345a93d8cc22d0e47fcac415411798df48b`；Gate 1 接受实现
   `407ce9ce5de3f53140db8660505e8c15cf94e628` 可追溯到 Gate 0 closure。
 - Phase 9 已批准产品方向：中国大陆一般健康成年人、Android 非公开小范围候选；运营
@@ -65,6 +72,7 @@
 
 | Task | Executor | Branch / worktree | Base SHA | Status | Scope and coordination note |
 | --- | --- | --- | --- | --- | --- |
+| Release Integration | Codex sole writer, cold reviewer, and local integrator | `codex/release-integration` / `C:\Users\Lenovo\Desktop\develop\health-worktrees\release-integration` | `7f801255b0ecfab50b92f959a4f093a7919126a2` | `in_progress` | 收敛 PR/main 六项 CI 门、同步 Phase 9 final exact-SHA 证据和运行文档、移除 Android release debug 签名/明文/相机权限；验证后本地提交，不 push、不创建 PR、不改远程分支保护。 |
 | Phase 9 Task 0 | Codex specification, architecture, safety/privacy audit, task split, cold review, CI, and Gate 0 closure | `codex/phase9-controlled-trial` / current worktree | `2ae03345a93d8cc22d0e47fcac415411798df48b` | `committed` | 文档候选 `b828b046baaa8c74186396481b52713828586570` 本地 Fast/Flutter 通过；metadata 候选 `af508a795c340226fae1ddabec0a42f13a9fd192` 的严格 CI `31559582176` 为 Fast 1015/0/11、Flutter 493、Full 1745/0/0、PG 28/28、Phase8 11/11 + 13/13。仅 7 个 Gate 0 文档文件，无业务代码；最终 status commit 必须通过自身 exact-SHA CI 才可宣布 Gate 0 verified。 |
 | Phase 9 Task 1 | Codex sole identity/auth/config writer, cold reviewer, CI operator, and Gate 1 acceptor | `codex/phase9-implementation` / `C:\Users\Lenovo\Desktop\develop\health-worktrees\phase9-implementation` | Gate 0 exact closure `5cdd43bc808bc08897c05e31f22941239812f294` | `verified` | 接受实现 `407ce9ce5de3f53140db8660505e8c15cf94e628`：唯一邀请码、独立非联系方式账号、单活动设备、session rotation/revocation、provider-neutral auth 和候选配置 fail-closed 已完成；本地 Full `1731/0/38` 条件 PG skips，严格 CI `31569996543` 为 Full `1769/0/0`、PG `30/30`，Fast/Flutter/Full/Phase8 全绿；P0/P1/P2 为零。报告 `docs/reports/phase9-gate1-review-2026-08-12.md`。 |
 | Phase 9 Task 2 | Codex sole privacy/security/operations writer and Gate 2 acceptor | same implementation branch/worktree | Gate 1 closure `9be5db1d6d8bcf70b08115b0432969b5aabe3011` | `verified` | 接受实现 `80135bc3aa551a0fe7c1f2898ab5cebe61f67ab3`：版本化同意、本人脱敏导出、身份纳入原子删除、完整性独立删除账本、恢复复活阻断、稳定码日志、跨平台 hash lock、exact VEX、secret/artifact 门和事故 runbook 已完成。本地 Full `1747/0/50` 条件 skip、Flutter `498`；严格 CI `31622194153` 为 Fast `1034/0/14`、Flutter `498`、Full `1798/0/0`、PostgreSQL `33/33`、Phase8 `11/11 + 13/13`、Phase9 security `19/19`，全部成功；P0/P1/P2 为零。报告 `docs/reports/phase9-gate2-review-2026-08-13.md`；外部审查仍 not obtained。 |

@@ -5,13 +5,18 @@
 
 ## 1. 候选启动前置
 
-1. exact SHA 的 Fast、Flutter、Full、Phase8 和 Phase9 security CI 全绿；P0/P1/P2 为零。
+1. exact SHA 的 Fast、Flutter、Full、Phase 8 acceptance、Phase 9 security 和 Phase 9
+   reliability 六个 CI job 全绿；P0/P1/P2 为零。
 2. Python 3.12.13，依赖从 `backend/requirements.lock` 使用 `--require-hashes` 安装；迁移到 `0014`。
 3. `DEPLOYMENT_PROFILE=controlled_trial_candidate`、`AUTH_MODE=controlled_trial`、独立非默认 JWT/
    auth HMAC/privacy HMAC/purge keyring；access 1-15 分钟；issuer/audience 非默认。
 4. `DEV_MODE=false`、无开发账号、`PHOTO_ANALYSIS_ENABLED=false`、`AGENT_RUNTIME_ENABLED=false`。
 5. 不向日志、工单、截图或 CI artifact 写入真实凭据、账号、健康正文、照片或对象键。
 6. 真实部署前另行批准 TLS/域名、数据库/备份地域、最小权限、监控和事故负责人。
+7. Android release 构建必须由 `ANDROID_RELEASE_STORE_FILE`、
+   `ANDROID_RELEASE_STORE_PASSWORD`、`ANDROID_RELEASE_KEY_ALIAS`、
+   `ANDROID_RELEASE_KEY_PASSWORD` 注入独立签名；缺失时构建必须失败。release manifest 禁用
+   cleartext 且不声明相机权限；debug/profile 的本机 HTTP 例外不得进入候选包。
 
 ## 2. 日常合成检查
 
