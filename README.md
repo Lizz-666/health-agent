@@ -245,6 +245,7 @@ start ms-settings:developers   # 打开设置并启用开发者模式
 
 | 验证项 | 结果 | 日期 |
 | --- | --- | --- |
+| Release Integration exact-SHA CI | `43a54b0`，PR #6 run `31714419165`，六个 job 全部成功；Full 1821/0/0、PG 33/33 | 2026-08-13 |
 | 最新 Phase 9 exact-SHA CI | `7f80125`，run `31701841156`，六个 job 全部成功 | 2026-08-13 |
 | 后端严格 Full / PostgreSQL 16 | 1816 passed，0 failed，0 skipped；PG 33/33 | 2026-08-13 |
 | Fast / Flutter | Fast 1052 passed、14 条件 skip；analyze 无问题、539 tests | 2026-08-13 |
