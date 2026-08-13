@@ -75,6 +75,28 @@ def test_unknown_response_code_is_not_reflected():
     assert "code=unknown" in str(error.value)
 
 
+def test_matrix_runner_uses_and_cleans_an_isolated_database(monkeypatch, tmp_path):
+    matrix_db = tmp_path / "phase9_matrix.db"
+    observed = {}
+
+    def fake_run(*_args, **kwargs):
+        observed["test_db_url"] = kwargs["env"]["TEST_DB_URL"]
+        matrix_db.write_text("synthetic", encoding="utf-8")
+        Path(f"{matrix_db}-journal").write_text("synthetic", encoding="utf-8")
+        return SimpleNamespace(returncode=0, stdout="2 passed", stderr="")
+
+    monkeypatch.setattr(phase9, "MATRIX_DB", matrix_db)
+    monkeypatch.setattr(phase9.subprocess, "run", fake_run)
+    monkeypatch.setattr(phase9, "_emit", lambda *_args, **_kwargs: None)
+
+    assert phase9._run_matrix() == 0
+    assert observed["test_db_url"] == (
+        f"sqlite+aiosqlite:///{matrix_db.as_posix()}"
+    )
+    assert not matrix_db.exists()
+    assert not Path(f"{matrix_db}-journal").exists()
+
+
 def test_real_localhost_http_journey_is_sanitized_and_cleans_up():
     assert not DEVICE_DB.exists()
     result = subprocess.run(

@@ -22,6 +22,7 @@ import httpx
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BACKEND_DIR = REPO_ROOT / "backend"
 DEVICE_DB = BACKEND_DIR / "phase9_acceptance.db"
+MATRIX_DB = BACKEND_DIR / "phase9_matrix.db"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8875
 CONTROL_HEADER = "X-Phase9-Control-Token"
@@ -457,11 +458,15 @@ def _server_command(host: str, port: int) -> List[str]:
     ]
 
 
-def _remove_device_db() -> None:
+def _remove_sqlite_files(database: Path) -> None:
     for suffix in ("", "-journal", "-wal", "-shm"):
-        path = Path(str(DEVICE_DB) + suffix)
+        path = Path(str(database) + suffix)
         if path.exists():
             path.unlink()
+
+
+def _remove_device_db() -> None:
+    _remove_sqlite_files(DEVICE_DB)
 
 
 def wait_ready(base_url: str, process: subprocess.Popen, timeout: float) -> None:
@@ -531,14 +536,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _run_matrix() -> int:
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/test_phase9_matrix.py", "-q"],
-        cwd=BACKEND_DIR,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
+    environment = os.environ.copy()
+    environment["TEST_DB_URL"] = (
+        f"sqlite+aiosqlite:///{MATRIX_DB.as_posix()}"
     )
+    _remove_sqlite_files(MATRIX_DB)
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", "tests/test_phase9_matrix.py", "-q"],
+            cwd=BACKEND_DIR,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    finally:
+        _remove_sqlite_files(MATRIX_DB)
     if result.returncode != 0:
         raise Phase9Error(f"matrix verification failed code={result.returncode}")
     _emit(
