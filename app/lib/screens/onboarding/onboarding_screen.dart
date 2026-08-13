@@ -1,7 +1,6 @@
 // app/lib/screens/onboarding/onboarding_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 
@@ -52,13 +51,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         );
     if (ok && mounted) {
       ref.read(authProvider.notifier).clearisNewUser();
-      context.go('/today');
     }
   }
 
   Future<void> _skip() async {
     ref.read(authProvider.notifier).clearisNewUser();
-    if (mounted) context.go('/today');
   }
 
   @override

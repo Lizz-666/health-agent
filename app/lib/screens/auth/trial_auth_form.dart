@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
@@ -40,7 +39,7 @@ class _TrialAuthScreenState extends ConsumerState<TrialAuthScreen> {
       _showError('请输入有效的邀请码');
       return;
     }
-    final success = await ref
+    await ref
         .read(authProvider.notifier)
         .trialAuthenticate(
           activate: _action == TrialAuthAction.activate,
@@ -48,8 +47,6 @@ class _TrialAuthScreenState extends ConsumerState<TrialAuthScreen> {
           credential: credential,
           invitationCode: invitation,
         );
-    if (!success || !mounted) return;
-    context.go(ref.read(authProvider).isNewUser ? '/onboarding' : '/today');
   }
 
   void _showError(String message) {

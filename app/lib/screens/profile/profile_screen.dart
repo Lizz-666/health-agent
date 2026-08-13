@@ -87,7 +87,6 @@ class ProfileScreen extends ConsumerWidget {
               child: OutlinedButton(
                 onPressed: () async {
                   await ref.read(authProvider.notifier).logout();
-                  if (context.mounted) context.go('/login');
                 },
                 style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFFF1744)),
                 child: const Text('退出登录'),

@@ -13,6 +13,12 @@ class _LoggedInAuthNotifier extends AuthNotifier {
   }
 }
 
+class _NewUserAuthNotifier extends AuthNotifier {
+  _NewUserAuthNotifier(super.api) {
+    state = const AuthState(isLoggedIn: true, isNewUser: true);
+  }
+}
+
 ApiClient _apiWith(FakeDioAdapter adapter) {
   final api = ApiClient()..dio.interceptors.clear();
   api.dio.httpClientAdapter = adapter;
@@ -30,6 +36,37 @@ ProviderContainer _container(FakeDioAdapter adapter) {
 }
 
 void main() {
+  testWidgets('auth redirect owns onboarding completion navigation', (
+    tester,
+  ) async {
+    final adapter = FakeDioAdapter();
+    final api = _apiWith(adapter);
+    final container = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(api),
+        authProvider.overrideWith((_) => _NewUserAuthNotifier(api)),
+      ],
+    );
+    addTearDown(container.dispose);
+    final router = container.read(routerProvider);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, '/onboarding');
+
+    container.read(authProvider.notifier).clearisNewUser();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(router.routeInformationProvider.value.uri.path, '/today');
+    expect(find.byType(Navigator), findsWidgets);
+  });
+
   testWidgets('legacy root redirects to preserved posture route', (
     tester,
   ) async {

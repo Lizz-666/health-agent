@@ -1,7 +1,6 @@
 // app/lib/screens/auth/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
 import 'trial_auth_form.dart';
@@ -44,29 +43,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ).showSnackBar(const SnackBar(content: Text('请输入验证码')));
       return;
     }
-    final ok = await ref.read(authProvider.notifier).login(phone, code);
-    if (ok && mounted) {
-      final state = ref.read(authProvider);
-      if (state.isNewUser) {
-        context.go('/onboarding');
-      } else {
-        context.go('/today');
-      }
-    }
+    await ref.read(authProvider.notifier).login(phone, code);
   }
 
   Future<void> _devLogin() async {
-    final ok = await ref
+    await ref
         .read(authProvider.notifier)
         .devLogin(AppConstants.devAdminPhone, AppConstants.devAdminPassword);
-    if (ok && mounted) {
-      final state = ref.read(authProvider);
-      if (state.isNewUser) {
-        context.go('/onboarding');
-      } else {
-        context.go('/today');
-      }
-    }
   }
 
   @override

@@ -15,6 +15,22 @@ class _NewUserAuthNotifier extends AuthNotifier {
   }
 }
 
+class _AuthRefresh extends ChangeNotifier {
+  _AuthRefresh(ProviderContainer container) {
+    _subscription = container.listen<AuthState>(authProvider, (_, _) {
+      notifyListeners();
+    });
+  }
+
+  late final ProviderSubscription<AuthState> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.close();
+    super.dispose();
+  }
+}
+
 ApiClient _apiWith(FakeDioAdapter adapter) {
   final api = ApiClient()..dio.interceptors.clear();
   api.dio.httpClientAdapter = adapter;
@@ -47,8 +63,20 @@ Future<ProviderContainer> _pump(
     ],
   );
   addTearDown(container.dispose);
+  final refresh = _AuthRefresh(container);
+  addTearDown(refresh.dispose);
   final router = GoRouter(
     initialLocation: '/onboarding',
+    refreshListenable: refresh,
+    redirect: (_, state) {
+      final auth = container.read(authProvider);
+      if (auth.isLoggedIn &&
+          !auth.isNewUser &&
+          state.matchedLocation == '/onboarding') {
+        return '/today';
+      }
+      return null;
+    },
     routes: [
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
       GoRoute(

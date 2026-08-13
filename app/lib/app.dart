@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'core/theme.dart';
 import 'models/agent.dart';
 import 'providers/auth_provider.dart';
-import 'providers/user_provider.dart';
 import 'screens/agent/agent_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
@@ -63,7 +62,6 @@ class _AuthNotifier extends ChangeNotifier {
   final Ref _ref;
   _AuthNotifier(this._ref) {
     _ref.listen(authProvider, (_, _) => notifyListeners());
-    _ref.listen(userProvider, (_, _) => notifyListeners());
   }
 }
 
@@ -80,19 +78,18 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: notifier,
     redirect: (context, state) {
       final authState = ref.read(authProvider);
-      final userState = ref.read(userProvider);
       final onLogin = state.matchedLocation == '/login';
       final onOnboarding = state.matchedLocation == '/onboarding';
 
       if (!authState.isLoggedIn && !onLogin) return '/login';
-      if (authState.isLoggedIn &&
-          (authState.isNewUser ||
-              (userState.profile != null &&
-                  userState.profile!.hasProfile != true)) &&
-          !onOnboarding) {
+      if (authState.isLoggedIn && authState.isNewUser && !onOnboarding) {
         return '/onboarding';
       }
-      if (authState.isLoggedIn && onLogin) return '/today';
+      if (authState.isLoggedIn &&
+          !authState.isNewUser &&
+          (onLogin || onOnboarding)) {
+        return '/today';
+      }
       return null;
     },
     routes: [
