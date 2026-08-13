@@ -2,8 +2,8 @@
 
 体态评估为核心的个人健康教练，Flutter + FastAPI 架构。
 
-当前阶段：Phase 0-9 已完成合成数据工程验收，正在进行 Release Integration。最新已验证
-Phase 9 代码基线为 `7f801255b0ecfab50b92f959a4f093a7919126a2`；这不是部署、真实测试者、
+当前阶段：Phase 0-9 已完成合成数据工程验收，Release Integration 已合并到受保护的 `main`。
+最新已验证主线 SHA 为 `1667532db7317e3f4f8f0efe524f8800fb369088`；这不是部署、真实测试者、
 真实健康数据、分发或公开发布批准。详见
 `docs/reports/phase9-codex-exit-audit-2026-08-13.md` 和 `docs/product/public-release-gate.md`。
 
@@ -245,7 +245,7 @@ start ms-settings:developers   # 打开设置并启用开发者模式
 
 | 验证项 | 结果 | 日期 |
 | --- | --- | --- |
-| Release Integration exact-SHA CI | `43a54b0`，PR #6 run `31714419165`，六个 job 全部成功；Full 1821/0/0、PG 33/33 | 2026-08-13 |
+| Release Integration `main` exact-SHA CI | `1667532d`，push run `31719916067`，六个 job 全部成功；Full 1821/0/0、PG 33/33 | 2026-08-14 |
 | 最新 Phase 9 exact-SHA CI | `7f80125`，run `31701841156`，六个 job 全部成功 | 2026-08-13 |
 | 后端严格 Full / PostgreSQL 16 | 1816 passed，0 failed，0 skipped；PG 33/33 | 2026-08-13 |
 | Fast / Flutter | Fast 1052 passed、14 条件 skip；analyze 无问题、539 tests | 2026-08-13 |
