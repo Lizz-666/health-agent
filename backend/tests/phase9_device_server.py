@@ -14,6 +14,7 @@ if configured_test_db not in (None, PHASE9_DB_URL):
     raise RuntimeError("phase9_device_server refuses externally configured TEST_DB_URL")
 os.environ["TEST_DB_URL"] = PHASE9_DB_URL
 
+from tests.conftest import TestSession, test_engine  # noqa: E402
 from app.core.config import settings  # noqa: E402
 
 settings.DEPLOYMENT_PROFILE = "controlled_trial_candidate"
@@ -35,7 +36,6 @@ settings.MIN_ANDROID_CLIENT_VERSION_CODE = 1
 settings.MAX_ANDROID_CLIENT_VERSION_CODE = 1
 
 from app.privacy.router import router as privacy_router  # noqa: E402
-from tests.conftest import TestSession, test_engine  # noqa: E402
 from tests.phase8_app_factory import create_phase8_test_app  # noqa: E402
 from tests.phase8_fixtures import ProviderController  # noqa: E402
 from tests.phase8_loopback import install_loopback_guard  # noqa: E402
