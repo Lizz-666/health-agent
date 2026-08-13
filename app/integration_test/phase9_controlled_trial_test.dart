@@ -157,6 +157,19 @@ Future<void> _pumpUntil(
   throw TestFailure('Timed out waiting for the expected widget');
 }
 
+Future<void> _pumpUntilGone(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 30),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 200));
+    if (finder.evaluate().isEmpty) return;
+  }
+  throw TestFailure('Timed out waiting for the stale widget to disappear');
+}
+
 Future<void> _activate(WidgetTester tester) async {
   await tester.enterText(
     find.byKey(const Key('trial-account-input')),
@@ -225,6 +238,7 @@ void main() {
       throwsA(isA<DioException>()),
     );
     await _pumpUntil(tester, find.byKey(const Key('trial-auth-submit')));
+    await _pumpUntilGone(tester, find.byKey(const Key('trial-session-ready')));
 
     expect(await AppStorage.getAccessToken(), isNull);
     expect(await AppStorage.getRefreshToken(), isNull);
@@ -243,6 +257,7 @@ void main() {
       throwsA(isA<DioException>()),
     );
     await _pumpUntil(tester, find.byKey(const Key('trial-auth-submit')));
+    await _pumpUntilGone(tester, find.byKey(const Key('trial-session-ready')));
 
     expect(await AppStorage.getAccessToken(), isNull);
     expect(await AppStorage.getRefreshToken(), isNull);
