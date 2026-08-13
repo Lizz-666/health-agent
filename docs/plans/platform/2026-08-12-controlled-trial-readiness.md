@@ -277,6 +277,9 @@ Full `1816/0/0`、PostgreSQL `33/33`、Phase 8 `11/11 + 13/13`、Phase 9 securit
 reliability `11/11 + 2/2`，全部成功。P0/P1/P2 为零，Task 3B 接受；本结论必须由承载此
 状态的 closure exact-SHA CI 再自证，失败即失效。
 
+Gate 3B closure `1783573067d6eb599591ead8fc938a909ab08d43` 的严格 CI `31676368735`
+已按相同计数全部成功，Task 3B 状态正式生效。Gate 4 以该 exact SHA 为唯一输入基线。
+
 ## 6. Gate 4: 集成候选退出
 
 ### Task 4: 最终 E2E、冷审、CI 与退出审计
