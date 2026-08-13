@@ -45,6 +45,17 @@ SECONDARY = {
     "device_key": "synthetic-device-key-0000000000000002",
 }
 OTHER_DEVICE = "synthetic-device-key-0000000000000099"
+CONSENT = {
+    "action": "grant",
+    "notice_version": "controlled-trial-sensitive-health-v1",
+}
+HEALTH_PROFILE = {
+    "fitness_goal": "basic_strength",
+    "training_experience": "some_experience",
+    "weekly_frequency": 3,
+    "session_duration_minutes": 30,
+    "equipment": {"bodyweight": True, "resistance_band": False},
+}
 SAFE_ERROR_CODES = frozenset(
     {
         "activation_failed",
@@ -252,6 +263,34 @@ def run_http_journey(base_url: str) -> Dict[str, Any]:
             raise Phase9Error("primary account profile identity is unavailable")
         checks.append("primary_invitation_activation")
 
+        primary_headers = _auth_headers(access)
+        consent = api.request(
+            "POST",
+            "/api/v1/privacy/consent",
+            headers=primary_headers,
+            body=CONSENT,
+        )
+        if consent.get("active") is not True:
+            raise Phase9Error("primary consent did not become active")
+        written_profile = api.request(
+            "PUT",
+            "/api/v1/health/profile",
+            headers=primary_headers,
+            body=HEALTH_PROFILE,
+        )
+        if written_profile.get("configured") is not True:
+            raise Phase9Error("primary health profile write was not acknowledged")
+        read_profile = api.request(
+            "GET", "/api/v1/health/profile", headers=primary_headers
+        )
+        stored = read_profile.get("profile")
+        if (
+            read_profile.get("configured") is not True
+            or not isinstance(stored, dict)
+            or stored.get("fitness_goal") != HEALTH_PROFILE["fitness_goal"]
+        ):
+            raise Phase9Error("primary health profile did not round trip")
+
         _expect_code(
             api,
             "POST",
@@ -283,7 +322,24 @@ def run_http_journey(base_url: str) -> Dict[str, Any]:
         )
         if secondary_profile.get("id") == primary_id:
             raise Phase9Error("independent accounts resolved to the same identity")
-        checks.append("independent_account_isolation")
+        secondary_headers = _auth_headers(secondary_access)
+        secondary_consent = api.request(
+            "POST",
+            "/api/v1/privacy/consent",
+            headers=secondary_headers,
+            body=CONSENT,
+        )
+        if secondary_consent.get("active") is not True:
+            raise Phase9Error("secondary consent did not become active")
+        secondary_health = api.request(
+            "GET", "/api/v1/health/profile", headers=secondary_headers
+        )
+        if (
+            secondary_health.get("configured") is not False
+            or secondary_health.get("profile") is not None
+        ):
+            raise Phase9Error("secondary account observed primary health data")
+        checks.append("controlled_trial_core_journey_isolated")
 
         rotated = api.request(
             "POST", "/api/v1/auth/refresh", body={"refresh_token": refresh}
@@ -351,10 +407,7 @@ def run_http_journey(base_url: str) -> Dict[str, Any]:
             status=426,
             code="client_version_incompatible",
             headers=_auth_headers(rotated_access),
-            body={
-                "action": "grant",
-                "notice_version": "controlled-trial-sensitive-health-v1",
-            },
+            body=CONSENT,
         )
         after_compat = _evidence(api)
         if before_compat.get("table_counts") != after_compat.get("table_counts"):

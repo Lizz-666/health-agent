@@ -17,6 +17,13 @@ const String _controlToken = 'phase9-local-control-only';
 const String _account = 'synthetic-trial-01';
 const String _credential = 'Synthetic-trial-passphrase-01';
 const String _invitation = 'synthetic_trial_invitation_0000000000000001';
+const Map<String, dynamic> _healthProfile = {
+  'fitness_goal': 'basic_strength',
+  'training_experience': 'some_experience',
+  'weekly_frequency': 3,
+  'session_duration_minutes': 30,
+  'equipment': {'bodyweight': true, 'resistance_band': false},
+};
 
 String _origin() {
   const suffix = '/api/v1';
@@ -208,6 +215,28 @@ void main() {
     final boot = await _boot(tester);
     await _activate(tester);
     expect(await AppStorage.hasToken(), isTrue);
+
+    final api = boot.container.read(apiClientProvider).dio;
+    final consent = await api.post<dynamic>(
+      '/privacy/consent',
+      data: {
+        'action': 'grant',
+        'notice_version': 'controlled-trial-sensitive-health-v1',
+      },
+    );
+    expect((consent.data as Map<String, dynamic>)['active'], isTrue);
+    final written = await api.put<dynamic>(
+      '/health/profile',
+      data: _healthProfile,
+    );
+    expect((written.data as Map<String, dynamic>)['configured'], isTrue);
+    final read = await api.get<dynamic>('/health/profile');
+    final health = read.data as Map<String, dynamic>;
+    expect(health['configured'], isTrue);
+    expect(
+      (health['profile'] as Map<String, dynamic>)['fitness_goal'],
+      _healthProfile['fitness_goal'],
+    );
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pump(const Duration(milliseconds: 200));

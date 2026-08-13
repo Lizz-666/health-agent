@@ -124,6 +124,7 @@ def test_real_localhost_http_journey_is_sanitized_and_cleans_up():
         "residual_tables": 0,
         "tables_observed": evidence["counts"]["tables_observed"],
     }
+    assert "controlled_trial_core_journey_isolated" in evidence["transitions"]
     assert "client_incompatibility_zero_writes" in evidence["transitions"]
     assert "expired_session_blocked" in evidence["transitions"]
     combined = result.stdout + result.stderr
