@@ -269,6 +269,14 @@ flutter test integration_test/phase9_controlled_trial_test.dart -d <emulator>
 
 命令和文件名在 Gate 2 冻结后可按真实实现调整，但必须在计划和报告中同步。
 
+**Execution status (2026-08-13):** 本地接受实现
+`9c5670714fd113061948c1daf2315f3e2dbde9e1` 已完成 HTTP `11/11`、时区 `2/2`、
+Flutter `531/531`、PostgreSQL `33/33`，并在 Android API 34/API 28 各完成主路径 `4/4`
+与不可达 `1/1`。实现 exact-SHA CI `31674663884` 为 Fast `1052/0/14`、Flutter `531`、
+Full `1816/0/0`、PostgreSQL `33/33`、Phase 8 `11/11 + 13/13`、Phase 9 security `19/19`、
+reliability `11/11 + 2/2`，全部成功。P0/P1/P2 为零，Task 3B 接受；本结论必须由承载此
+状态的 closure exact-SHA CI 再自证，失败即失效。
+
 ## 6. Gate 4: 集成候选退出
 
 ### Task 4: 最终 E2E、冷审、CI 与退出审计
