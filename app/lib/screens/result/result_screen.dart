@@ -72,6 +72,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
     final profileState = ref.watch(postureProfileProvider);
 
     return Scaffold(
+      key: const Key('result-screen'),
       appBar: AppBar(title: const Text('评估结果')),
       body: Column(
         children: [
@@ -463,6 +464,7 @@ class _Unavailable extends StatelessWidget {
         if (onRetry != null) ...[
           const SizedBox(height: 8),
           OutlinedButton.icon(
+            key: const Key('result-entry-retry'),
             onPressed: onRetry,
             icon: const Icon(Icons.refresh, size: 18),
             label: const Text('重试'),

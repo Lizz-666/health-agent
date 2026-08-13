@@ -28,3 +28,32 @@ class RefreshRequest(BaseModel):
 class DevLoginRequest(BaseModel):
     phone: str
     password: str
+
+
+class TrialActivateRequest(BaseModel):
+    invitation_code: str = Field(
+        ..., min_length=32, max_length=128, pattern=r"^[A-Za-z0-9_-]+$"
+    )
+    account_name: str = Field(
+        ..., min_length=4, max_length=64, pattern=r"^[a-z0-9][a-z0-9._-]+$"
+    )
+    provider_id: str = Field(
+        default="offline_password", min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$"
+    )
+    credential: str = Field(..., min_length=6, max_length=128)
+    device_key: str = Field(..., min_length=32, max_length=128)
+
+
+class TrialLoginRequest(BaseModel):
+    account_name: str = Field(
+        ..., min_length=4, max_length=64, pattern=r"^[a-z0-9][a-z0-9._-]+$"
+    )
+    provider_id: str = Field(
+        default="offline_password", min_length=3, max_length=32, pattern=r"^[a-z0-9_]+$"
+    )
+    credential: str = Field(..., min_length=6, max_length=128)
+    device_key: str = Field(..., min_length=32, max_length=128)
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str

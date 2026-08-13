@@ -49,11 +49,17 @@ from uuid import UUID
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppException
+from app.agent.models import (
+    AgentActionProposal,
+    AgentCloudConsent,
+    AgentRun,
+    AgentToolEvent,
+)
 from app.posture.models import (
     IdempotencyRecord,
     PostureAssessmentEvent,
@@ -177,6 +183,18 @@ class FakeObjectStore(ObjectStore):
             raise ObjectStoreError(f"simulated delete failure: {object_key}")
         # success (existed) or 404 (already absent) — both verified deletions
         self._deleted.append(object_key)
+
+
+class FailClosedObjectStore(ObjectStore):
+    """Candidate adapter while photo storage remains disabled.
+
+    An account with no photo objects can be deleted normally. If persisted
+    object keys exist, deletion must stop until a reviewed real adapter is
+    configured; treating those keys as absent would fabricate deletion proof.
+    """
+
+    async def delete_object(self, object_key: str) -> None:
+        raise ObjectStoreError("object deletion adapter is not configured")
 
 
 # --------------------------------------------------------------------------- #
@@ -567,6 +585,13 @@ async def _has_purgeable_data(db: AsyncSession, user_id: UUID) -> bool:
     idempotency_records. If ANY exist → proceed with purge. Only if ALL are
     empty → no-op (hardening fix #7).
     """
+    from app.auth.models import TrialCredential
+
+    trial_identity = await db.scalar(
+        select(TrialCredential.user_id).where(TrialCredential.user_id == user_id)
+    )
+    if trial_identity is not None:
+        return True
     for model in (
         PostureAssessmentEvent,
         PostureProfileEntry,
@@ -582,6 +607,61 @@ async def _has_purgeable_data(db: AsyncSession, user_id: UUID) -> bool:
             )
         ).first()
         if row is not None:
+            return True
+    # Phase 5 Agent tables (PK columns are not named ``id``): an account that
+    # only ever used the Agent still has purgeable data and must be processed.
+    for agent_model, pk_col in (
+        (AgentCloudConsent, AgentCloudConsent.consent_id),
+        (AgentRun, AgentRun.run_id),
+        (AgentToolEvent, AgentToolEvent.event_id),
+        (AgentActionProposal, AgentActionProposal.proposal_id),
+    ):
+        row = (
+            await db.execute(
+                select(pk_col).where(agent_model.user_id == user_id).limit(1)
+            )
+        ).first()
+        if row is not None:
+            return True
+    # Phase 7 adaptive execution rows can outlive their idempotency TTL and
+    # therefore must independently make an account purge non-empty.
+    from app.training.models import (
+        PostureRecheckDismissal,
+        TrainingDayAdjustment,
+        TrainingWeeklyReview,
+    )
+
+    for adaptive_model, pk_col in (
+        (TrainingDayAdjustment, TrainingDayAdjustment.adjustment_id),
+        (TrainingWeeklyReview, TrainingWeeklyReview.review_id),
+        (PostureRecheckDismissal, PostureRecheckDismissal.dismissal_id),
+    ):
+        adaptive = (
+            await db.execute(
+                select(pk_col).where(adaptive_model.user_id == user_id).limit(1)
+            )
+        ).first()
+        if adaptive is not None:
+            return True
+    # Phase 8 closes the historical account-deletion gap: independently owned
+    # base health/training/nutrition rows must make the broad scope non-empty.
+    from app.health.models import DailyCheckIn, HealthProfile, WeightRecord
+    from app.nutrition.models import NutritionRecommendation
+    from app.training.models import TrainingPlanVersion
+
+    for domain_model, pk_col in (
+        (HealthProfile, HealthProfile.id),
+        (DailyCheckIn, DailyCheckIn.id),
+        (WeightRecord, WeightRecord.id),
+        (TrainingPlanVersion, TrainingPlanVersion.plan_version_id),
+        (NutritionRecommendation, NutritionRecommendation.recommendation_id),
+    ):
+        domain_row = (
+            await db.execute(
+                select(pk_col).where(domain_model.user_id == user_id).limit(1)
+            )
+        ).first()
+        if domain_row is not None:
             return True
     return False
 
@@ -684,6 +764,34 @@ async def _delete_db_health_data(db: AsyncSession, user_id: UUID) -> List[str]:
         delete(PostureSafetySignal).where(PostureSafetySignal.user_id == user_id)
     )
     done.append("delete_safety_signals")
+    from app.training.persistence import delete_all_training_data
+
+    await delete_all_training_data(db, str(user_id), commit=False)
+    done.append("delete_training_data")
+    from app.nutrition.persistence import delete_all_nutrition_data
+
+    await delete_all_nutrition_data(db, str(user_id), commit=False)
+    done.append("delete_nutrition_data")
+    from app.health.service import delete_all_health_data
+
+    await delete_all_health_data(db, str(user_id))
+    done.append("delete_health_data")
+    # Delete Agent children before their runs. Shared idempotency is removed
+    # after every domain helper so no later helper can recreate or depend on it.
+    await db.execute(
+        delete(AgentToolEvent).where(AgentToolEvent.user_id == user_id)
+    )
+    done.append("delete_agent_tool_events")
+    await db.execute(
+        delete(AgentActionProposal).where(AgentActionProposal.user_id == user_id)
+    )
+    done.append("delete_agent_action_proposals")
+    await db.execute(delete(AgentRun).where(AgentRun.user_id == user_id))
+    done.append("delete_agent_runs")
+    await db.execute(
+        delete(AgentCloudConsent).where(AgentCloudConsent.user_id == user_id)
+    )
+    done.append("delete_agent_cloud_consents")
     await db.execute(
         delete(IdempotencyRecord).where(IdempotencyRecord.user_id == user_id)
     )
@@ -831,6 +939,12 @@ async def _finalize_purge(
     else:
         object_delete_status = _object_delete_status_for(photo_keys)
     assert object_delete_status in _TOMBSTONE_COMPLETED_STATUSES
+    from app.privacy.service import finalize_trial_identity_deletion, is_trial_identity
+
+    trial_account = bool(
+        op.user_id is not None and await is_trial_identity(db, op.user_id)
+    )
+    deleted_user_id = op.user_id
     tombstone = PosturePurgeTombstone(
         receipt_id=_uuid.uuid4(),
         deleted_at=datetime.now(timezone.utc),
@@ -839,6 +953,8 @@ async def _finalize_purge(
         object_delete_status=object_delete_status,
     )
     db.add(tombstone)
+    if trial_account and deleted_user_id is not None:
+        await finalize_trial_identity_deletion(db, deleted_user_id)
     op.status = "completed"
     op.user_id = None
     op.target_event_ids = None
@@ -879,6 +995,12 @@ async def _delete_oss_objects(
     # an expired-lease worker cannot execute the same live operation in parallel.
     if op.user_id is not None:
         await acquire_user_transaction_lock(db, str(op.user_id))
+        # A retry worker may have completed while this caller waited for the
+        # lock. Refresh before touching OSS so stale ORM state cannot replay
+        # an already completed external deletion.
+        await db.refresh(op)
+        if op.status in TERMINAL_STATUSES or op.user_id is None:
+            return True
     try:
         for key in photo_keys:
             await object_store.delete_object(key)
@@ -1057,6 +1179,10 @@ async def run_purge(
         op.encrypted_object_keys = None
     op.target_event_ids = event_ids or None
     op.target_signal_ids = signal_ids or None
+    if scope == PurgeScope.ACCOUNT_DELETION:
+        from app.privacy.service import freeze_trial_identity_for_deletion
+
+        await freeze_trial_identity_for_deletion(db, user_uuid)
     # Keep the initial freezing lease. If the process crashes after this commit
     # but before publishing oss_deleting, run_due_purge_jobs can reclaim the
     # operation and resume from the persisted freezing phase.

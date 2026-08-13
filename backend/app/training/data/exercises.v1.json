@@ -1,0 +1,3667 @@
+{
+ "catalog_id": "phase3-home-training-v1",
+ "content_version": "2026-07-26-v1",
+ "schema_version": "v1",
+ "published_at": "2026-07-26",
+ "policy_compatibility": [
+  "v1"
+ ],
+ "source_manifest_version": "v1",
+ "exercises": [
+  {
+   "exercise_id": "ex_warmup_march_in_place",
+   "names": {
+    "name_en": "March in Place",
+    "name_zh": "原地踏步"
+   },
+   "training_roles": [
+    "warmup"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "general_wellness",
+    "fat_loss"
+   ],
+   "movement_patterns": [
+    "cardio"
+   ],
+   "movement_purposes": [
+    "cardiovascular_warmup"
+   ],
+   "primary_muscles": [
+    "hip_flexors",
+    "quadriceps"
+   ],
+   "secondary_muscles": [
+    "calves"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "knee_pain",
+     "display_text_en": "Stop on sharp knee pain.",
+     "display_text_zh": "出现剧烈Knee疼痛时停止。"
+    },
+    {
+     "code": "chest_pain",
+     "display_text_en": "Stop on sharp chest pain.",
+     "display_text_zh": "出现剧烈Chest疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Stand tall and march, lifting knees to hip height.",
+    "Swing arms naturally with the legs."
+   ],
+   "form_cues": [
+    "Stay tall",
+    "Breathe steadily"
+   ],
+   "common_mistakes": [
+    "Leaning forward",
+    "Holding breath"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 40,
+    "duration_seconds_max": 90,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 60,
+    "recovery_hours_min": 24,
+    "weekly_sessions_max": 4,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_warmup_march_in_place.svg",
+    "alt_text_en": "March in Place illustration.",
+    "alt_text_zh": "原地踏步示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "a4c426c73147cab4c34620601f2de1e7ceefe3df25cc54063c63e9e5fefc0d6b",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/7660/exercise-at-home-with-youtube-videos-to-avoid-and-videos-to-watch/",
+      "license": null,
+      "scope": "Item review for ex_warmup_march_in_place (March in Place). March-in-place warm-up review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_warmup_arm_circles",
+   "names": {
+    "name_en": "Arm Circles",
+    "name_zh": "手臂环绕"
+   },
+   "training_roles": [
+    "warmup",
+    "mobility"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "mobility",
+    "general_wellness"
+   ],
+   "movement_patterns": [
+    "shoulder_mobility"
+   ],
+   "movement_purposes": [
+    "scapular_mobility",
+    "shoulder_mobility"
+   ],
+   "primary_muscles": [
+    "deltoids"
+   ],
+   "secondary_muscles": [
+    "rotator_cuff"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "shoulder_thorax"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury"
+    ],
+    "body_regions": [
+     "shoulder"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "shoulder_pain",
+     "display_text_en": "Stop on sharp shoulder pain.",
+     "display_text_zh": "出现剧烈Shoulder疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Raise arms to shoulder height.",
+    "Draw small circles, widening over time."
+   ],
+   "form_cues": [
+    "Keep shoulders relaxed",
+    "Move smoothly"
+   ],
+   "common_mistakes": [
+    "Shrugging shoulders"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 30,
+    "duration_seconds_max": 45,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 30,
+    "recovery_hours_min": 24,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_warmup_arm_circles.svg",
+    "alt_text_en": "Arm Circles illustration.",
+    "alt_text_zh": "手臂环绕示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "62ca56f8ceb6f7cc249d7a0e2d1038979af2a6f7166b9df623f25482b960e964",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/5779/the-common-mistakes-people-make-when-warming-up/",
+      "license": null,
+      "scope": "Item review for ex_warmup_arm_circles (Arm Circles). Arm-circle warm-up review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_warmup_leg_swing",
+   "names": {
+    "name_en": "Leg Swings",
+    "name_zh": "腿部摆动"
+   },
+   "training_roles": [
+    "warmup",
+    "mobility"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "mobility"
+   ],
+   "movement_patterns": [
+    "hip_mobility"
+   ],
+   "movement_purposes": [
+    "hip_mobility"
+   ],
+   "primary_muscles": [
+    "hamstrings",
+    "hip_flexors"
+   ],
+   "secondary_muscles": [],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "lower_limb",
+    "pelvis_spine"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury"
+    ],
+    "body_regions": [
+     "hip"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "hip_pain",
+     "display_text_en": "Stop on sharp hip pain.",
+     "display_text_zh": "出现剧烈Hip疼痛时停止。"
+    },
+    {
+     "code": "lower_back_pain",
+     "display_text_en": "Stop on sharp lower back pain.",
+     "display_text_zh": "出现剧烈Lower back疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Stand beside a wall for light support.",
+    "Swing one leg forward and back through a comfortable range."
+   ],
+   "form_cues": [
+    "Keep torso still",
+    "Control the swing"
+   ],
+   "common_mistakes": [
+    "Forcing the range"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 30,
+    "duration_seconds_max": 45,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 30,
+    "recovery_hours_min": 24,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_warmup_leg_swing.svg",
+    "alt_text_en": "Leg Swings illustration.",
+    "alt_text_zh": "腿部摆动示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "c1d5b4e49e98f3cf8a92fd5b7cc27eb1f5b9d3d154530d4602f5cda5efb577a6",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/6289/4-stretches-to-prevent-injury/",
+      "license": null,
+      "scope": "Item review for ex_warmup_leg_swing (Leg Swings). Leg-swing dynamic warm-up review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_warmup_band_pull_apart",
+   "names": {
+    "name_en": "Band Pull-Apart",
+    "name_zh": "弹力带拉开"
+   },
+   "training_roles": [
+    "warmup",
+    "corrective"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "posture_improvement",
+    "general_wellness"
+   ],
+   "movement_patterns": [
+    "shoulder_mobility"
+   ],
+   "movement_purposes": [
+    "scapular_mobility",
+    "upper_pull_strength"
+   ],
+   "primary_muscles": [
+    "rhomboids",
+    "rear_deltoid"
+   ],
+   "secondary_muscles": [
+    "trapezius"
+   ],
+   "equipment": [
+    "resistance_band"
+   ],
+   "applicable_posture_signals": [
+    "shoulder_thorax",
+    "head_neck"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "shoulder"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "shoulder_pain",
+     "display_text_en": "Stop on sharp shoulder pain.",
+     "display_text_zh": "出现剧烈Shoulder疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Hold the band at chest height with arms extended.",
+    "Pull the band apart, squeezing shoulder blades together."
+   ],
+   "form_cues": [
+    "Soft elbows",
+    "Slow return"
+   ],
+   "common_mistakes": [
+    "Raising the shoulders"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 10,
+    "reps_max": 20,
+    "rest_seconds_min": 20,
+    "rest_seconds_max": 40,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 15,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_warmup_band_pull_apart.svg",
+    "alt_text_en": "Band Pull-Apart illustration.",
+    "alt_text_zh": "弹力带拉开示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "26bb5a9bfe1b3a712aff08f7dd4d9b101e7fcb706ffb8b387e5bd1ffc8150042",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/equipment/resistance-bands-cables/",
+      "license": null,
+      "scope": "Item review for ex_warmup_band_pull_apart (Band Pull-Apart). Resistance-band pull-apart equipment and movement review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_mobility_cat_cow",
+   "names": {
+    "name_en": "Cat-Cow",
+    "name_zh": "猫牛式"
+   },
+   "training_roles": [
+    "warmup",
+    "mobility",
+    "recovery"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "mobility",
+    "posture_improvement"
+   ],
+   "movement_patterns": [
+    "spinal_mobility"
+   ],
+   "movement_purposes": [
+    "spine_mobility"
+   ],
+   "primary_muscles": [
+    "erector_spinae"
+   ],
+   "secondary_muscles": [
+    "core"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "pelvis_spine",
+    "head_neck"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "spine"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "spine_pain",
+     "display_text_en": "Stop on sharp spine pain.",
+     "display_text_zh": "出现剧烈Spine疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Begin on hands and knees.",
+    "Inhale and gently arch the spine.",
+    "Exhale and round the spine."
+   ],
+   "form_cues": [
+    "Move segment by segment",
+    "Match breath to movement"
+   ],
+   "common_mistakes": [
+    "Rushing",
+    "Holding breath"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [
+    "ex_recovery_child_pose"
+   ],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 30,
+    "duration_seconds_max": 60,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 45,
+    "recovery_hours_min": 24,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_mobility_cat_cow.svg",
+    "alt_text_en": "Cat-Cow illustration.",
+    "alt_text_zh": "猫牛式示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "574dd042a3acd5e7ea5293a785608bf4c3c2f846feb7006dbf71c4823b97a18f",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/15/cat-cow/",
+      "license": null,
+      "scope": "Item review for ex_mobility_cat_cow (Cat-Cow). Cat-Cow setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_mobility_thoracic_rotation",
+   "names": {
+    "name_en": "Thoracic Rotation",
+    "name_zh": "胸椎旋转"
+   },
+   "training_roles": [
+    "mobility",
+    "corrective"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "mobility",
+    "posture_improvement"
+   ],
+   "movement_patterns": [
+    "spinal_mobility"
+   ],
+   "movement_purposes": [
+    "spine_mobility",
+    "scapular_mobility"
+   ],
+   "primary_muscles": [
+    "rotator_cuff",
+    "erector_spinae"
+   ],
+   "secondary_muscles": [
+    "obliques"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "shoulder_thorax",
+    "pelvis_spine"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "spine"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "spine_pain",
+     "display_text_en": "Stop on sharp spine pain.",
+     "display_text_zh": "出现剧烈Spine疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Sit tall with arms crossed.",
+    "Rotate the upper back to one side.",
+    "Return and repeat to the other side."
+   ],
+   "form_cues": [
+    "Rotate from the upper back",
+    "Keep hips still"
+   ],
+   "common_mistakes": [
+    "Twisting from the lower back"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 30,
+    "duration_seconds_max": 45,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 30,
+    "recovery_hours_min": 24,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_mobility_thoracic_rotation.svg",
+    "alt_text_en": "Thoracic Rotation illustration.",
+    "alt_text_zh": "胸椎旋转示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "8a813e7a5683d2c479dd560c01966bbc97203ad951ca5cfda1141f2cd935033b",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/5779/the-common-mistakes-people-make-when-warming-up/",
+      "license": null,
+      "scope": "Item review for ex_mobility_thoracic_rotation (Thoracic Rotation). Thoracic-rotation warm-up review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_mobility_worlds_greatest_stretch",
+   "names": {
+    "name_en": "World's Greatest Stretch",
+    "name_zh": "最大幅度拉伸"
+   },
+   "training_roles": [
+    "mobility"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "mobility",
+    "fat_loss"
+   ],
+   "movement_patterns": [
+    "hip_mobility",
+    "spinal_mobility"
+   ],
+   "movement_purposes": [
+    "hip_mobility",
+    "spine_mobility"
+   ],
+   "primary_muscles": [
+    "hip_flexors",
+    "hamstrings"
+   ],
+   "secondary_muscles": [
+    "calves",
+    "obliques"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "lower_limb",
+    "pelvis_spine"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "hip",
+     "knee"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "hip_pain",
+     "display_text_en": "Stop on sharp hip pain.",
+     "display_text_zh": "出现剧烈Hip疼痛时停止。"
+    },
+    {
+     "code": "knee_pain",
+     "display_text_en": "Stop on sharp knee pain.",
+     "display_text_zh": "出现剧烈Knee疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Step into a deep lunge.",
+    "Place the opposite hand inside the front foot.",
+    "Rotate the chest toward the front knee."
+   ],
+   "form_cues": [
+    "Keep front knee over the ankle",
+    "Move within comfort"
+   ],
+   "common_mistakes": [
+    "Forcing the range"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 20,
+    "duration_seconds_max": 40,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 30,
+    "recovery_hours_min": 12,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_mobility_worlds_greatest_stretch.svg",
+    "alt_text_en": "World's Greatest Stretch illustration.",
+    "alt_text_zh": "最大幅度拉伸示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "4025f8840d999efe678e37e254d2ed9997f0e65e2d444ee05104d8c5224aa2fb",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/6289/4-stretches-to-prevent-injury/",
+      "license": null,
+      "scope": "Item review for ex_mobility_worlds_greatest_stretch (World's Greatest Stretch). World's Greatest Stretch movement review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_mobility_hip_flexor_stretch",
+   "names": {
+    "name_en": "Hip Flexor Stretch",
+    "name_zh": "髋屈肌拉伸"
+   },
+   "training_roles": [
+    "mobility",
+    "recovery"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "mobility",
+    "posture_improvement"
+   ],
+   "movement_patterns": [
+    "hip_mobility"
+   ],
+   "movement_purposes": [
+    "hip_mobility"
+   ],
+   "primary_muscles": [
+    "hip_flexors"
+   ],
+   "secondary_muscles": [
+    "quadriceps"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "pelvis_spine",
+    "lower_limb"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "hip"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "hip_pain",
+     "display_text_en": "Stop on sharp hip pain.",
+     "display_text_zh": "出现剧烈Hip疼痛时停止。"
+    },
+    {
+     "code": "knee_pain",
+     "display_text_en": "Stop on sharp knee pain.",
+     "display_text_zh": "出现剧烈Knee疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Kneel in a lunge position.",
+    "Tuck the tailbone gently.",
+    "Shift forward until a stretch is felt at the front of the hip."
+   ],
+   "form_cues": [
+    "Keep torso tall",
+    "Tuck the tailbone"
+   ],
+   "common_mistakes": [
+    "Arching the lower back"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 20,
+    "duration_seconds_max": 40,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 30,
+    "recovery_hours_min": 12,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_mobility_hip_flexor_stretch.svg",
+    "alt_text_en": "Hip Flexor Stretch illustration.",
+    "alt_text_zh": "髋屈肌拉伸示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "151974088333bee01f1f6464e4c6005e965db8f664c846bc649fabcda10177e8",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/142/kneeling-hip-flexor-stretch/",
+      "license": null,
+      "scope": "Item review for ex_mobility_hip_flexor_stretch (Hip Flexor Stretch). Kneeling hip-flexor stretch setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_mobility_neck_nods",
+   "names": {
+    "name_en": "Neck Nods",
+    "name_zh": "颈部点头"
+   },
+   "training_roles": [
+    "mobility",
+    "corrective"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "mobility",
+    "posture_improvement"
+   ],
+   "movement_patterns": [
+    "neck_mobility"
+   ],
+   "movement_purposes": [
+    "neck_mobility"
+   ],
+   "primary_muscles": [
+    "sternocleidomastoid"
+   ],
+   "secondary_muscles": [
+    "upper_trapezius"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "head_neck"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "major_chronic_condition"
+    ],
+    "body_regions": [
+     "neck"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "neurological_symptom",
+     "display_text_en": "Stop on numbness, dizziness or radiating pain.",
+     "display_text_zh": "出现麻木、眩晕或放射痛时停止。"
+    },
+    {
+     "code": "neck_pain",
+     "display_text_en": "Stop on sharp neck pain.",
+     "display_text_zh": "出现剧烈Neck疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Sit tall.",
+    "Slowly nod the chin toward the chest.",
+    "Return to neutral."
+   ],
+   "form_cues": [
+    "Move slowly",
+    "Keep shoulders relaxed"
+   ],
+   "common_mistakes": [
+    "Forcing the range"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 20,
+    "duration_seconds_max": 30,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 20,
+    "recovery_hours_min": 12,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_mobility_neck_nods.svg",
+    "alt_text_en": "Neck Nods illustration.",
+    "alt_text_zh": "颈部点头示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "fa2d2b5f7239c2f3fd359e7cbe69a0d2d20077cd8f410c767324f5865c1a561b",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/experience/beginner/",
+      "license": null,
+      "scope": "Item review for ex_mobility_neck_nods (Neck Nods). Beginner neck-mobility scope review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_strength_bodyweight_squat",
+   "names": {
+    "name_en": "Bodyweight Squat",
+    "name_zh": "徒手深蹲"
+   },
+   "training_roles": [
+    "strength"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "basic_strength",
+    "fat_loss",
+    "general_wellness"
+   ],
+   "movement_patterns": [
+    "squat"
+   ],
+   "movement_purposes": [
+    "lower_push_strength"
+   ],
+   "primary_muscles": [
+    "quadriceps",
+    "gluteals"
+   ],
+   "secondary_muscles": [
+    "hamstrings",
+    "core"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "lower_limb"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "knee"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "knee_pain",
+     "display_text_en": "Stop on sharp knee pain.",
+     "display_text_zh": "出现剧烈Knee疼痛时停止。"
+    },
+    {
+     "code": "lower_back_pain",
+     "display_text_en": "Stop on sharp lower back pain.",
+     "display_text_zh": "出现剧烈Lower back疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Stand with feet shoulder-width apart.",
+    "Lower hips back and down until thighs are near parallel.",
+    "Drive through the heels to stand."
+   ],
+   "form_cues": [
+    "Keep chest tall",
+    "Knees track over toes"
+   ],
+   "common_mistakes": [
+    "Heels lifting",
+    "Knees collapsing inward"
+   ],
+   "progression_ids": [
+    "ex_strength_lunge"
+   ],
+   "regression_ids": [],
+   "substitution_ids": [
+    "ex_strength_glute_bridge"
+   ],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 8,
+    "reps_max": 15,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 12,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_strength_bodyweight_squat.svg",
+    "alt_text_en": "Bodyweight Squat illustration.",
+    "alt_text_zh": "徒手深蹲示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "8138e49706ad0dd7f2da6478d3ce65dd1ce48daf3e4a5dffaa80a948fb48f124",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/135/bodyweight-squat/",
+      "license": null,
+      "scope": "Item review for ex_strength_bodyweight_squat (Bodyweight Squat). Bodyweight squat setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment",
+     "primaryMuscles"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_strength_glute_bridge",
+   "names": {
+    "name_en": "Glute Bridge",
+    "name_zh": "臀桥"
+   },
+   "training_roles": [
+    "strength",
+    "corrective"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "posture_improvement",
+    "basic_strength"
+   ],
+   "movement_patterns": [
+    "hip_hinge"
+   ],
+   "movement_purposes": [
+    "hip_extension",
+    "posterior_chain"
+   ],
+   "primary_muscles": [
+    "gluteals"
+   ],
+   "secondary_muscles": [
+    "hamstrings",
+    "core"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "pelvis_spine",
+    "lower_limb"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "lower_back"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "lower_back_pain",
+     "display_text_en": "Stop on sharp lower back pain.",
+     "display_text_zh": "出现剧烈Lower back疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Lie on the back with knees bent.",
+    "Press heels down and lift the hips.",
+    "Lower with control."
+   ],
+   "form_cues": [
+    "Squeeze the glutes at the top",
+    "Keep ribs down"
+   ],
+   "common_mistakes": [
+    "Overarching the back"
+   ],
+   "progression_ids": [
+    "ex_strength_bodyweight_squat"
+   ],
+   "regression_ids": [],
+   "substitution_ids": [
+    "ex_strength_bodyweight_squat"
+   ],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 8,
+    "reps_max": 15,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 12,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_strength_glute_bridge.svg",
+    "alt_text_en": "Glute Bridge illustration.",
+    "alt_text_zh": "臀桥示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "710c297e14cb3b2e8741dc89150372dc8d5a6e6d22e7b4afcd9523d79f161dd2",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/49/glute-bridge/",
+      "license": null,
+      "scope": "Item review for ex_strength_glute_bridge (Glute Bridge). Glute bridge setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_strength_push_up",
+   "names": {
+    "name_en": "Push-Up",
+    "name_zh": "俯卧撑"
+   },
+   "training_roles": [
+    "strength"
+   ],
+   "difficulty": "intermediate",
+   "goals": [
+    "basic_strength",
+    "fat_loss"
+   ],
+   "movement_patterns": [
+    "horizontal_push"
+   ],
+   "movement_purposes": [
+    "horizontal_push"
+   ],
+   "primary_muscles": [
+    "chest",
+    "triceps"
+   ],
+   "secondary_muscles": [
+    "core",
+    "front_deltoid"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "shoulder_thorax"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "wrist",
+     "shoulder"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "wrist_pain",
+     "display_text_en": "Stop on sharp wrist pain.",
+     "display_text_zh": "出现剧烈Wrist疼痛时停止。"
+    },
+    {
+     "code": "shoulder_pain",
+     "display_text_en": "Stop on sharp shoulder pain.",
+     "display_text_zh": "出现剧烈Shoulder疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Start in a plank with hands under shoulders.",
+    "Lower the chest toward the floor.",
+    "Press back up."
+   ],
+   "form_cues": [
+    "Keep a straight line",
+    "Elbows about 45 degrees"
+   ],
+   "common_mistakes": [
+    "Sagging hips",
+    "Flaring elbows"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 5,
+    "reps_max": 12,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 8,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_strength_push_up.svg",
+    "alt_text_en": "Push-Up illustration.",
+    "alt_text_zh": "俯卧撑示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "312f85c102e8fa28afbaf4a8ece9a6ad16220d2dcc271fecb5c891bda27e4118",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/41/push-up/",
+      "license": null,
+      "scope": "Item review for ex_strength_push_up (Push-Up). Push-up setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_strength_plank",
+   "names": {
+    "name_en": "Plank",
+    "name_zh": "平板支撑"
+   },
+   "training_roles": [
+    "strength",
+    "corrective"
+   ],
+   "difficulty": "intermediate",
+   "goals": [
+    "basic_strength",
+    "posture_improvement"
+   ],
+   "movement_patterns": [
+    "core_anti_extension"
+   ],
+   "movement_purposes": [
+    "core_anti_extension"
+   ],
+   "primary_muscles": [
+    "core"
+   ],
+   "secondary_muscles": [
+    "shoulders",
+    "gluteals"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "pelvis_spine",
+    "shoulder_thorax"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "wrist",
+     "shoulder"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "wrist_pain",
+     "display_text_en": "Stop on sharp wrist pain.",
+     "display_text_zh": "出现剧烈Wrist疼痛时停止。"
+    },
+    {
+     "code": "lower_back_pain",
+     "display_text_en": "Stop on sharp lower back pain.",
+     "display_text_zh": "出现剧烈Lower back疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Rest on forearms and toes.",
+    "Form a straight line head to heels.",
+    "Brace the core and breathe."
+   ],
+   "form_cues": [
+    "Squeeze the glutes",
+    "Keep neck neutral"
+   ],
+   "common_mistakes": [
+    "Sagging hips",
+    "Holding breath"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 20,
+    "duration_seconds_max": 45,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 30,
+    "recovery_hours_min": 24,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_strength_plank.svg",
+    "alt_text_en": "Plank illustration.",
+    "alt_text_zh": "平板支撑示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "764b06564805768a4a98cd50b1f0f68c95a852f1cc92510e12ec8bf94f607ff3",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/32/front-plank/",
+      "license": null,
+      "scope": "Item review for ex_strength_plank (Plank). Front plank setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_strength_lunge",
+   "names": {
+    "name_en": "Lunge",
+    "name_zh": "弓步蹲"
+   },
+   "training_roles": [
+    "strength"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "basic_strength",
+    "fat_loss"
+   ],
+   "movement_patterns": [
+    "squat"
+   ],
+   "movement_purposes": [
+    "lower_push_strength"
+   ],
+   "primary_muscles": [
+    "quadriceps",
+    "gluteals"
+   ],
+   "secondary_muscles": [
+    "hamstrings",
+    "calves"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "lower_limb"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "knee"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "knee_pain",
+     "display_text_en": "Stop on sharp knee pain.",
+     "display_text_zh": "出现剧烈Knee疼痛时停止。"
+    },
+    {
+     "code": "lower_back_pain",
+     "display_text_en": "Stop on sharp lower back pain.",
+     "display_text_zh": "出现剧烈Lower back疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Step forward and lower until both knees bend about 90 degrees.",
+    "Push through the front heel to return."
+   ],
+   "form_cues": [
+    "Keep torso tall",
+    "Front knee over the ankle"
+   ],
+   "common_mistakes": [
+    "Front knee caving in",
+    "Leaning forward"
+   ],
+   "progression_ids": [],
+   "regression_ids": [
+    "ex_strength_bodyweight_squat"
+   ],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 6,
+    "reps_max": 12,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 10,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_strength_lunge.svg",
+    "alt_text_en": "Lunge illustration.",
+    "alt_text_zh": "弓步蹲示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "4102b0ea4cb03cbcb8e9b047054ea984e4e08e0a1790562b5039ac310d7ea81c",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/94/forward-lunge/",
+      "license": null,
+      "scope": "Item review for ex_strength_lunge (Lunge). Forward lunge setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_strength_band_seated_row",
+   "names": {
+    "name_en": "Band Seated Row",
+    "name_zh": "弹力带坐姿划船"
+   },
+   "training_roles": [
+    "strength",
+    "corrective"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "posture_improvement",
+    "basic_strength"
+   ],
+   "movement_patterns": [
+    "pull"
+   ],
+   "movement_purposes": [
+    "upper_pull_strength"
+   ],
+   "primary_muscles": [
+    "latissimus_dorsi",
+    "rhomboids"
+   ],
+   "secondary_muscles": [
+    "biceps",
+    "rear_deltoid"
+   ],
+   "equipment": [
+    "resistance_band"
+   ],
+   "applicable_posture_signals": [
+    "shoulder_thorax"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "shoulder"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "shoulder_pain",
+     "display_text_en": "Stop on sharp shoulder pain.",
+     "display_text_zh": "出现剧烈Shoulder疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Sit with legs extended and the band around the feet.",
+    "Pull the handles to the hips, squeezing the shoulder blades.",
+    "Return with control."
+   ],
+   "form_cues": [
+    "Straight back",
+    "Squeeze the shoulder blades"
+   ],
+   "common_mistakes": [
+    "Rounding the back",
+    "Using momentum"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [
+    "ex_corrective_band_face_pull"
+   ],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 8,
+    "reps_max": 15,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 12,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_strength_band_seated_row.svg",
+    "alt_text_en": "Band Seated Row illustration.",
+    "alt_text_zh": "弹力带坐姿划船示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "bd1a5ad678a7db4996cbffb8015815ca3c10bdb24ff6c41dca30a7492cd38b3a",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/48/seated-row/",
+      "license": null,
+      "scope": "Item review for ex_strength_band_seated_row (Band Seated Row). Seated row setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment",
+     "primaryMuscles"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_strength_band_front_press",
+   "names": {
+    "name_en": "Band Front Press",
+    "name_zh": "弹力带前推"
+   },
+   "training_roles": [
+    "strength"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "basic_strength",
+    "fat_loss"
+   ],
+   "movement_patterns": [
+    "horizontal_push"
+   ],
+   "movement_purposes": [
+    "horizontal_push"
+   ],
+   "primary_muscles": [
+    "chest",
+    "front_deltoid"
+   ],
+   "secondary_muscles": [
+    "triceps"
+   ],
+   "equipment": [
+    "resistance_band"
+   ],
+   "applicable_posture_signals": [
+    "shoulder_thorax"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "shoulder"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "shoulder_pain",
+     "display_text_en": "Stop on sharp shoulder pain.",
+     "display_text_zh": "出现剧烈Shoulder疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Anchor the band behind the back at chest height.",
+    "Press the handles forward until arms are extended.",
+    "Return slowly."
+   ],
+   "form_cues": [
+    "Brace the core",
+    "Even pressure"
+   ],
+   "common_mistakes": [
+    "Locking the elbows hard"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 8,
+    "reps_max": 15,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 12,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_strength_band_front_press.svg",
+    "alt_text_en": "Band Front Press illustration.",
+    "alt_text_zh": "弹力带前推示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "ab27bfdf276910f828adb950aabe8b6f997b2078be551c03a73b670684e6c756",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/equipment/resistance-bands-cables/",
+      "license": null,
+      "scope": "Item review for ex_strength_band_front_press (Band Front Press). Resistance-band front press equipment and movement review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_strength_band_bicep_curl",
+   "names": {
+    "name_en": "Band Bicep Curl",
+    "name_zh": "弹力带弯举"
+   },
+   "training_roles": [
+    "strength"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "basic_strength",
+    "general_wellness"
+   ],
+   "movement_patterns": [
+    "elbow_flexion"
+   ],
+   "movement_purposes": [
+    "elbow_flexion"
+   ],
+   "primary_muscles": [
+    "biceps"
+   ],
+   "secondary_muscles": [
+    "forearms"
+   ],
+   "equipment": [
+    "resistance_band"
+   ],
+   "applicable_posture_signals": [],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "elbow"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "elbow_pain",
+     "display_text_en": "Stop on sharp elbow pain.",
+     "display_text_zh": "出现剧烈Elbow疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Stand on the middle of the band.",
+    "Curl the handles up keeping elbows fixed.",
+    "Lower with control."
+   ],
+   "form_cues": [
+    "Keep elbows still",
+    "Stand tall"
+   ],
+   "common_mistakes": [
+    "Swinging the body"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 8,
+    "reps_max": 15,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 12,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_strength_band_bicep_curl.svg",
+    "alt_text_en": "Band Bicep Curl illustration.",
+    "alt_text_zh": "弹力带弯举示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "70628c6a7a910179464f15fcd50340665e9938e738548523b23a7916f0a0db58",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/322/standing-bicep-curl/",
+      "license": null,
+      "scope": "Item review for ex_strength_band_bicep_curl (Band Bicep Curl). Standing band bicep curl setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_corrective_wall_angel",
+   "names": {
+    "name_en": "Wall Angel",
+    "name_zh": "墙壁天使"
+   },
+   "training_roles": [
+    "corrective",
+    "mobility"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "posture_improvement",
+    "mobility"
+   ],
+   "movement_patterns": [
+    "scapular_mobility"
+   ],
+   "movement_purposes": [
+    "scapular_mobility",
+    "shoulder_mobility"
+   ],
+   "primary_muscles": [
+    "rhomboids",
+    "rotator_cuff"
+   ],
+   "secondary_muscles": [
+    "trapezius"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "shoulder_thorax",
+    "head_neck"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "shoulder"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "shoulder_pain",
+     "display_text_en": "Stop on sharp shoulder pain.",
+     "display_text_zh": "出现剧烈Shoulder疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Stand with back, head and arms against a wall, elbows bent.",
+    "Slide the arms up the wall.",
+    "Return slowly."
+   ],
+   "form_cues": [
+    "Keep wrists and elbows on the wall",
+    "Keep ribs down"
+   ],
+   "common_mistakes": [
+    "Arching the back"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 6,
+    "reps_max": 12,
+    "rest_seconds_min": 20,
+    "rest_seconds_max": 40,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 10,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_corrective_wall_angel.svg",
+    "alt_text_en": "Wall Angel illustration.",
+    "alt_text_zh": "墙壁天使示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "66ee4d3041cbdd5b374f9bd945cbcd3211ddc0340ab57c2f45ecbdbc91189537",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/124/supine-snow-angel-wipers-exercise/",
+      "license": null,
+      "scope": "Item review for ex_corrective_wall_angel (Wall Angel). Snow-angel movement used to review wall-angel form intent. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_corrective_dead_bug",
+   "names": {
+    "name_en": "Dead Bug",
+    "name_zh": "死虫式"
+   },
+   "training_roles": [
+    "corrective",
+    "strength"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "posture_improvement",
+    "basic_strength"
+   ],
+   "movement_patterns": [
+    "core_coordination"
+   ],
+   "movement_purposes": [
+    "core_anti_extension",
+    "core_coordination"
+   ],
+   "primary_muscles": [
+    "core"
+   ],
+   "secondary_muscles": [
+    "hip_flexors"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "pelvis_spine"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "lower_back"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "lower_back_pain",
+     "display_text_en": "Stop on sharp lower back pain.",
+     "display_text_zh": "出现剧烈Lower back疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Lie on the back, arms up, knees over hips.",
+    "Lower one arm and the opposite leg.",
+    "Return and switch sides."
+   ],
+   "form_cues": [
+    "Keep the lower back flat",
+    "Move slowly"
+   ],
+   "common_mistakes": [
+    "Arching the back"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 6,
+    "reps_max": 12,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 10,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_corrective_dead_bug.svg",
+    "alt_text_en": "Dead Bug illustration.",
+    "alt_text_zh": "死虫式示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "e8ed92cc3e85122478747b2816fd954f84706c171606f2f208b057885c26142c",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/147/supine-dead-bug/",
+      "license": null,
+      "scope": "Item review for ex_corrective_dead_bug (Dead Bug). Supine dead-bug setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_corrective_bird_dog",
+   "names": {
+    "name_en": "Bird-Dog",
+    "name_zh": "鸟狗式"
+   },
+   "training_roles": [
+    "corrective",
+    "strength"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "posture_improvement",
+    "basic_strength"
+   ],
+   "movement_patterns": [
+    "core_anti_rotation"
+   ],
+   "movement_purposes": [
+    "core_anti_rotation",
+    "core_coordination"
+   ],
+   "primary_muscles": [
+    "core",
+    "gluteals"
+   ],
+   "secondary_muscles": [
+    "shoulders",
+    "upper_back"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "pelvis_spine",
+    "shoulder_thorax"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "lower_back"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "lower_back_pain",
+     "display_text_en": "Stop on sharp lower back pain.",
+     "display_text_zh": "出现剧烈Lower back疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Begin on hands and knees.",
+    "Extend one arm and the opposite leg.",
+    "Return and switch sides."
+   ],
+   "form_cues": [
+    "Keep hips level",
+    "Brace the core"
+   ],
+   "common_mistakes": [
+    "Twisting the hips"
+   ],
+   "progression_ids": [
+    "ex_strength_plank"
+   ],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 6,
+    "reps_max": 12,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 10,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_corrective_bird_dog.svg",
+    "alt_text_en": "Bird-Dog illustration.",
+    "alt_text_zh": "鸟狗式示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "7b1fe31ea45835a7921ae782bc7ab43f64e3f478a70ab84ecfac903ee0655090",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/14/bird-dog/",
+      "license": null,
+      "scope": "Item review for ex_corrective_bird_dog (Bird-Dog). Bird-dog setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_corrective_band_face_pull",
+   "names": {
+    "name_en": "Band Face Pull",
+    "name_zh": "弹力带面拉"
+   },
+   "training_roles": [
+    "corrective",
+    "strength"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "posture_improvement",
+    "general_wellness"
+   ],
+   "movement_patterns": [
+    "horizontal_pull"
+   ],
+   "movement_purposes": [
+    "scapular_mobility",
+    "upper_pull_strength"
+   ],
+   "primary_muscles": [
+    "rear_deltoid",
+    "rhomboids"
+   ],
+   "secondary_muscles": [
+    "rotator_cuff"
+   ],
+   "equipment": [
+    "resistance_band"
+   ],
+   "applicable_posture_signals": [
+    "shoulder_thorax",
+    "head_neck"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "shoulder"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "shoulder_pain",
+     "display_text_en": "Stop on sharp shoulder pain.",
+     "display_text_zh": "出现剧烈Shoulder疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Hold the band at face height.",
+    "Pull the band toward the face, spreading the arms.",
+    "Return with control."
+   ],
+   "form_cues": [
+    "Lead with the elbows",
+    "Keep shoulders down"
+   ],
+   "common_mistakes": [
+    "Raising the shoulders"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [
+    "ex_strength_band_seated_row"
+   ],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 10,
+    "reps_max": 20,
+    "rest_seconds_min": 20,
+    "rest_seconds_max": 40,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 15,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce range or use a support if movement feels unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_corrective_band_face_pull.svg",
+    "alt_text_en": "Band Face Pull illustration.",
+    "alt_text_zh": "弹力带面拉示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "48dafdf7e349911c964f55aa8ef05d457349064b45a9049de567c1cd014f5725",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/equipment/resistance-bands-cables/",
+      "license": null,
+      "scope": "Item review for ex_corrective_band_face_pull (Band Face Pull). Resistance-band face-pull equipment and movement review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_recovery_child_pose",
+   "names": {
+    "name_en": "Child's Pose",
+    "name_zh": "婴儿式"
+   },
+   "training_roles": [
+    "recovery",
+    "mobility"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "mobility",
+    "general_wellness"
+   ],
+   "movement_patterns": [
+    "spinal_mobility",
+    "hip_mobility"
+   ],
+   "movement_purposes": [
+    "spine_mobility",
+    "hip_mobility"
+   ],
+   "primary_muscles": [
+    "lower_back",
+    "latissimus_dorsi"
+   ],
+   "secondary_muscles": [
+    "hips"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "pelvis_spine",
+    "head_neck"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "knee"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "knee_pain",
+     "display_text_en": "Stop on sharp knee pain.",
+     "display_text_zh": "出现剧烈Knee疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Kneel and sit the hips back toward the heels.",
+    "Reach the arms forward and rest the forehead down.",
+    "Breathe and relax."
+   ],
+   "form_cues": [
+    "Breathe slowly",
+    "Let the back round gently"
+   ],
+   "common_mistakes": [
+    "Forcing the range"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [
+    "ex_mobility_cat_cow"
+   ],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 30,
+    "duration_seconds_max": 60,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 45,
+    "recovery_hours_min": 0,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_recovery_child_pose.svg",
+    "alt_text_en": "Child's Pose illustration.",
+    "alt_text_zh": "婴儿式示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "610b7d61436440e15cc2e95e1ad8cdd43f1260769ced116b8921b2d22c027c5c",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/227/childs-pose/",
+      "license": null,
+      "scope": "Item review for ex_recovery_child_pose (Child's Pose). Child's Pose setup and form review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_recovery_deep_breathing",
+   "names": {
+    "name_en": "Deep Breathing",
+    "name_zh": "深呼吸"
+   },
+   "training_roles": [
+    "recovery",
+    "warmup"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "general_wellness",
+    "mobility"
+   ],
+   "movement_patterns": [
+    "respiratory"
+   ],
+   "movement_purposes": [
+    "respiratory_recovery"
+   ],
+   "primary_muscles": [
+    "diaphragm"
+   ],
+   "secondary_muscles": [],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "head_neck"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [],
+    "body_regions": [],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "dizziness",
+     "display_text_en": "Stop if feeling lightheaded.",
+     "display_text_zh": "感到眩晕时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Sit or lie comfortably.",
+    "Inhale slowly through the nose into the belly.",
+    "Exhale slowly."
+   ],
+   "form_cues": [
+    "Keep shoulders relaxed",
+    "Breathe smoothly"
+   ],
+   "common_mistakes": [
+    "Forcing the breath"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 60,
+    "duration_seconds_max": 180,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 90,
+    "recovery_hours_min": 0,
+    "weekly_sessions_max": 7,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_recovery_deep_breathing.svg",
+    "alt_text_en": "Deep Breathing illustration.",
+    "alt_text_zh": "深呼吸示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "6c364f64c489fe723d39a48d6e3ca3b2e40c4b380e5e30734694e99a08596036",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/continuing-education/certified/july-2024/8662/stress-and-low-back-pain-breaking-the-cycle/",
+      "license": null,
+      "scope": "Item review for ex_recovery_deep_breathing (Deep Breathing). Diaphragmatic breathing practice review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  },
+  {
+   "exercise_id": "ex_recovery_band_hamstring_stretch",
+   "names": {
+    "name_en": "Band Hamstring Stretch",
+    "name_zh": "弹力带腘绳肌拉伸"
+   },
+   "training_roles": [
+    "recovery",
+    "mobility"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "mobility",
+    "posture_improvement"
+   ],
+   "movement_patterns": [
+    "hip_mobility"
+   ],
+   "movement_purposes": [
+    "posterior_chain",
+    "hip_mobility"
+   ],
+   "primary_muscles": [
+    "hamstrings"
+   ],
+   "secondary_muscles": [
+    "calves"
+   ],
+   "equipment": [
+    "resistance_band"
+   ],
+   "applicable_posture_signals": [
+    "lower_limb",
+    "pelvis_spine"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition",
+     "pregnancy_or_postpartum"
+    ],
+    "body_regions": [
+     "hip"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "lower_back_pain",
+     "display_text_en": "Stop on sharp lower back pain.",
+     "display_text_zh": "出现剧烈Lower back疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Lie on the back and loop the band around one foot.",
+    "Extend the leg up and gently pull.",
+    "Keep the knee soft."
+   ],
+   "form_cues": [
+    "Keep the opposite leg down",
+    "Move within comfort"
+   ],
+   "common_mistakes": [
+    "Forcing the range"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 20,
+    "duration_seconds_max": 45,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 30,
+    "recovery_hours_min": 0,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort arises"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_recovery_band_hamstring_stretch.svg",
+    "alt_text_en": "Band Hamstring Stretch illustration.",
+    "alt_text_zh": "弹力带腘绳肌拉伸示意图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "project-svg-generator-v1",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "8bbef241619091271601eaca8c5a421191821f2b512b222e614713377c1f3c17",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": null,
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-references-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness official exercise references",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/blog/3761/how-to-improve-flexibility-and-maintain-it/",
+      "license": null,
+      "scope": "Item review for ex_recovery_band_hamstring_stretch (Band Hamstring Stretch). Hamstring flexibility practice review. Healthy-adult reference only; not clinical or rehabilitation guidance.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "acsm-resistance-training-2026",
+      "source_type": "position_stand",
+      "name": "ACSM Position Stand 2026: Resistance Training Prescription (Healthy Adults)",
+      "pinned_version": "2026 official position stand; ACSM summary published 2026-03-17",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/",
+      "license": null,
+      "scope": "Healthy-adult training prescription envelope only; not an item-specific form or rehabilitation source.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "2026-07-26-v1"
+   }
+  }
+ ]
+}

@@ -4,7 +4,8 @@ from pydantic import BaseModel, Field
 
 class UserProfileResponse(BaseModel):
     id: str
-    phone: str
+    phone: Optional[str] = None
+    account_name: Optional[str] = None
     nickname: Optional[str] = None
     height: Optional[float] = None
     weight: Optional[float] = None

@@ -56,10 +56,18 @@ def _offline_downgrade_sql() -> str:
     return proc.stdout
 
 
-# 全部表名（重命名后的 events 表 + 6 个新表 + 平台表）。
+# 全部表名（重命名后的 events 表 + 6 个新表 + 平台表 + Phase 2 health_profiles
+# + Phase 2 health_checkins + Phase 2 weight_records + Phase 4 training tables）。
 ALL_TABLES = {
     "users",
     "verification_codes",
+    "trial_credentials",
+    "trial_invitations",
+    "trial_device_enrollments",
+    "auth_sessions",
+    "auth_attempts",
+    "sensitive_health_consent_events",
+    "account_deletion_markers",
     "posture_assessment_events",
     "posture_profile_entries",
     "posture_user_goals",
@@ -67,6 +75,27 @@ ALL_TABLES = {
     "idempotency_records",
     "posture_purge_tombstones",
     "purge_operations",
+    "health_profiles",
+    "health_checkins",
+    "weight_records",
+    # Phase 4 four-week training plan MVP (migration 0007).
+    "training_plan_versions",
+    "training_sessions",
+    "training_prescriptions",
+    "training_session_feedback",
+    "training_session_substitutions",
+    # Phase 5 Agent MVP (migration 0008).
+    "agent_cloud_consents",
+    "agent_runs",
+    "agent_tool_events",
+    "agent_action_proposals",
+    # Phase 6 nutrition recommendation versions (migration 0010).
+    "nutrition_recommendations",
+    # Phase 7 adaptive execution/review foundations (migration 0011).
+    "training_day_adjustments",
+    "training_day_adjustment_items",
+    "training_weekly_reviews",
+    "posture_recheck_dismissals",
 }
 
 # Phase 1 expand 阶段新增的 6 张表。
@@ -86,12 +115,12 @@ NEW_TABLES = {
 
 
 def test_single_head():
-    """Alembic 只有一个 head，且为 0003_posture_contract。"""
+    """Alembic 只有一个 head。"""
     proc = _run_alembic("heads")
     assert proc.returncode == 0, proc.stderr
     head_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert len(head_lines) == 1, f"expected exactly one head, got: {head_lines}"
-    assert head_lines[0].split()[0] == "0003_posture_contract", head_lines[0]
+    assert head_lines[0].split()[0] == "0014_controlled_trial_privacy", head_lines[0]
 
 
 def test_head_chains_to_initial_schema():
@@ -99,6 +128,7 @@ def test_head_chains_to_initial_schema():
     proc = _run_alembic("history")
     assert proc.returncode == 0, proc.stderr
     out = proc.stdout
+    assert "0004_health_profile_tracking" in out
     assert "0003_posture_contract" in out
     assert "0002" in out
     assert "0001_initial_schema" in out
@@ -219,6 +249,10 @@ def test_migration_tables_match_base_metadata():
     from app.db.base import Base
     import app.auth.models  # noqa: F401
     import app.posture.models  # noqa: F401
+    import app.health.models  # noqa: F401
+    import app.training.models  # noqa: F401
+    import app.agent.models  # noqa: F401
+    import app.nutrition.models  # noqa: F401
 
     metadata_tables = set(Base.metadata.tables.keys())
     assert metadata_tables == ALL_TABLES
@@ -235,6 +269,18 @@ def test_migration_tables_match_base_metadata():
     assert created | (
         {"posture_assessment_events"} if renamed_ok else set()
     ) == metadata_tables
+
+
+def test_alembic_env_imports_health_models():
+    """Alembic target metadata must include Phase 2 health models."""
+    env_text = (BACKEND_DIR / "alembic" / "env.py").read_text(encoding="utf-8")
+    assert "import app.health.models" in env_text
+
+
+def test_alembic_env_imports_agent_models():
+    """Alembic target metadata must include Phase 5 Agent models."""
+    env_text = (BACKEND_DIR / "alembic" / "env.py").read_text(encoding="utf-8")
+    assert "import app.agent.models" in env_text
 
 
 def test_assessment_event_columns_nullable_in_metadata():
@@ -437,6 +483,41 @@ def test_orm_users_has_no_unique_constraint():
     idx = indexes[0]
     assert idx.name == "ix_users_phone"
     assert idx.unique is True
+    assert users.c.phone.nullable is True
+
+
+def test_0013_controlled_trial_auth_upgrade_and_downgrade_contract():
+    upgrade = _run_alembic(
+        "upgrade", "0012_review_draft_origins:0013_controlled_trial_auth", "--sql"
+    )
+    assert upgrade.returncode == 0, upgrade.stderr
+    sql = upgrade.stdout
+    for table in (
+        "trial_credentials",
+        "trial_invitations",
+        "trial_device_enrollments",
+        "auth_sessions",
+        "auth_attempts",
+    ):
+        assert f"CREATE TABLE {table}" in sql
+    assert "ALTER COLUMN phone DROP NOT NULL" in sql
+    assert "CREATE INDEX ix_trial_invitations_user_id" in sql
+    assert "CREATE UNIQUE INDEX ix_trial_device_enrollments_user_id" in sql
+    assert "ON DELETE CASCADE" in sql
+
+    downgrade = _run_alembic(
+        "downgrade", "0013_controlled_trial_auth:0012_review_draft_origins", "--sql"
+    )
+    assert downgrade.returncode == 0, downgrade.stderr
+    for table in (
+        "auth_attempts",
+        "auth_sessions",
+        "trial_device_enrollments",
+        "trial_invitations",
+        "trial_credentials",
+    ):
+        assert f"DROP TABLE {table}" in downgrade.stdout
+    assert "ALTER COLUMN phone SET NOT NULL" in downgrade.stdout
 
 
 def test_new_models_unique_constraints():
@@ -469,8 +550,9 @@ def test_metadata_indexes_match_offline_sql():
     migration 用 ``op.create_index`` / ``sa.UniqueConstraint`` 定义权威索引集；
     models.py 的 ``index=True`` / ``Index(...)`` / ``UniqueConstraint(...)``
     必须产生完全相同的集合，否则 SQLite ``create_all`` 测试 schema 与真实 PG
-    迁移结果会漂移。仅比较 posture 相关表（不含 users/verification_codes/
-    alembic_version，它们由 0001 定义且已有专门测试覆盖）。
+    迁移结果会漂移。仅比较领域相关表（posture + Phase 2 health；不含
+    users/verification_codes/alembic_version，它们由 0001 定义且已有专门
+    测试覆盖）。
     """
     import re
 
@@ -479,8 +561,11 @@ def test_metadata_indexes_match_offline_sql():
     from app.db.base import Base
     import app.auth.models  # noqa: F401
     import app.posture.models  # noqa: F401
+    import app.health.models  # noqa: F401
+    import app.training.models  # noqa: F401
+    import app.agent.models  # noqa: F401
 
-    posture_tables = {
+    domain_tables = {
         "posture_assessment_events",
         "posture_profile_entries",
         "posture_user_goals",
@@ -488,11 +573,45 @@ def test_metadata_indexes_match_offline_sql():
         "idempotency_records",
         "posture_purge_tombstones",
         "purge_operations",
+        "health_profiles",
+        "health_checkins",
+        "weight_records",
+        # Phase 4 training tables (migration 0007).
+        "training_plan_versions",
+        "training_sessions",
+        "training_prescriptions",
+        "training_session_feedback",
+        "training_session_substitutions",
+        # Phase 5 Agent tables (migration 0008).
+        "agent_cloud_consents",
+        "agent_runs",
+        "agent_tool_events",
+        "agent_action_proposals",
+        # Phase 6 nutrition recommendation versions (migration 0010).
+        "nutrition_recommendations",
+        # Phase 7 adaptive execution/review foundations (migration 0011).
+        "training_day_adjustments",
+        "training_day_adjustment_items",
+        "training_weekly_reviews",
+        "posture_recheck_dismissals",
+        # Phase 9 controlled-trial privacy (migration 0014).
+        "sensitive_health_consent_events",
+        "account_deletion_markers",
     }
+
+    # Indexes that exist ONLY in the migration SQL, by design (ADR-0002): the
+    # "at most one active plan per user" partial UNIQUE index is materialized in
+    # migration 0007 on PostgreSQL. It is intentionally NOT declared on the
+    # model, because SQLAlchemy's ``postgresql_where`` is silently dropped by
+    # ``create_all`` on SQLite while keeping ``unique=True`` (which would wrongly
+    # enforce UNIQUE(user_id) for ALL rows on the SQLite test DB). persistence.py
+    # enforces the invariant at the application level; a ``requires_pg`` test
+    # proves the DB-level guarantee where the migration actually runs.
+    SQL_ONLY_INDEXES = {"uq_training_plan_versions_one_active"}
 
     # 1. Base.metadata 中的索引名 + 命名 UNIQUE 约束名。
     metadata_names = set()
-    for tname in posture_tables:
+    for tname in domain_tables:
         table = Base.metadata.tables[tname]
         for idx in table.indexes:
             assert idx.name, f"index on {tname} has no name"
@@ -501,20 +620,28 @@ def test_metadata_indexes_match_offline_sql():
             if isinstance(cons, UniqueConstraint) and cons.name:
                 metadata_names.add(cons.name)
 
-    # 2. offline upgrade SQL 中的 CREATE [UNIQUE] INDEX 名（限定 posture 表）
-    #    + 命名 UNIQUE 约束名（全 SQL 中仅这两张 posture 表声明了命名 UNIQUE）。
+    # 2. offline upgrade SQL 中的 CREATE [UNIQUE] INDEX 名（限定领域表）
+    #    + 命名 UNIQUE 约束名（全 SQL 中 posture 两表、health_profiles 与
+    #    health_checkins 表声明了命名 UNIQUE，均纳入比较）。
     sql = _offline_upgrade_sql()
     sql_names = set()
     for m in re.finditer(r"CREATE (?:UNIQUE )?INDEX (\w+) ON (\w+)", sql):
-        if m.group(2) in posture_tables:
+        if m.group(2) in domain_tables:
             sql_names.add(m.group(1))
     for m in re.finditer(r"CONSTRAINT (\w+) UNIQUE \(", sql):
         sql_names.add(m.group(1))
 
-    assert metadata_names == sql_names, (
+    metadata_only = metadata_names - sql_names
+    sql_only = sql_names - metadata_names
+    assert metadata_only == set(), (
+        "index/unique-constraint drift: names in metadata but not in SQL: "
+        f"{sorted(metadata_only)}"
+    )
+    assert sql_only == SQL_ONLY_INDEXES, (
         "index/unique-constraint drift between Base.metadata and migration SQL:\n"
-        f"  only in metadata: {sorted(metadata_names - sql_names)}\n"
-        f"  only in migration SQL: {sorted(sql_names - metadata_names)}"
+        f"  only in metadata: {sorted(metadata_only)}\n"
+        f"  only in migration SQL (expected only {sorted(SQL_ONLY_INDEXES)}): "
+        f"{sorted(sql_only)}"
     )
 
 
@@ -672,3 +799,407 @@ def test_0003_metadata_no_method_result_columns():
     col_names = set(events.c.keys())
     assert "method" not in col_names, "method must not exist in metadata after 0003"
     assert "result" not in col_names, "result must not exist in metadata after 0003"
+
+
+# ---------------------------------------------------------------------------
+# 0004_health_profile_tracking specific tests (Phase 2 Task 1)
+# ---------------------------------------------------------------------------
+
+
+def _offline_upgrade_0004_sql() -> str:
+    proc = _run_alembic("upgrade", "0003_posture_contract:0004_health_profile_tracking", "--sql")
+    assert proc.returncode == 0, f"alembic upgrade 0003:0004 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def _offline_downgrade_0004_sql() -> str:
+    proc = _run_alembic("downgrade", "0004_health_profile_tracking:0003_posture_contract", "--sql")
+    assert proc.returncode == 0, f"alembic downgrade 0004:0003 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def test_0004_upgrade_creates_health_profiles_table():
+    """0004 upgrade creates health_profiles with required columns and constraints."""
+    sql = _offline_upgrade_0004_sql()
+    assert "CREATE TABLE health_profiles" in sql
+
+    # Required columns exist.
+    for col in (
+        "id",
+        "user_id",
+        "fitness_goal",
+        "training_experience",
+        "weekly_frequency",
+        "session_duration_minutes",
+        "equipment",
+        "pain_injury_limitations",
+        "risk_screen",
+        "allergies",
+        "diet_exclusions",
+        "version",
+        "created_at",
+        "updated_at",
+    ):
+        assert col in sql, f"missing column {col} in health_profiles"
+
+    # Optional training fields are nullable (no NOT NULL); version is NOT NULL.
+    assert "weekly_frequency INTEGER" in sql
+    assert "weekly_frequency INTEGER NOT NULL" not in sql
+    assert "session_duration_minutes INTEGER" in sql
+    assert "session_duration_minutes INTEGER NOT NULL" not in sql
+    assert "version INTEGER NOT NULL" in sql
+
+    # JSONB payloads (proves PostgreSQL dialect, not the SQLite patch).
+    assert "equipment JSONB" in sql
+    assert "risk_screen JSONB" in sql
+
+    # PK + FK + UNIQUE(user_id).
+    assert "PRIMARY KEY (id)" in sql
+    assert "FOREIGN KEY(user_id) REFERENCES users (id)" in sql
+    assert "CONSTRAINT uq_health_profiles_user_id UNIQUE (user_id)" in sql
+
+
+def test_0004_downgrade_drops_health_profiles_table():
+    """0004 downgrade drops the health_profiles table."""
+    sql = _offline_downgrade_0004_sql()
+    assert "DROP TABLE health_profiles" in sql
+
+
+def test_0004_health_profiles_unique_constraint_in_metadata():
+    """ORM health_profiles carries the named UNIQUE(user_id) constraint and
+    nullable optional fields (missing stays missing)."""
+    from sqlalchemy import UniqueConstraint
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+    import app.health.models  # noqa: F401
+
+    table = Base.metadata.tables["health_profiles"]
+
+    uniq = {
+        tuple(c.name for c in uc.columns)
+        for uc in table.constraints
+        if isinstance(uc, UniqueConstraint)
+    }
+    assert ("user_id",) in uniq
+
+    # Optional fields stay nullable in metadata.
+    for col in (
+        "fitness_goal",
+        "training_experience",
+        "weekly_frequency",
+        "session_duration_minutes",
+        "equipment",
+        "pain_injury_limitations",
+        "risk_screen",
+        "allergies",
+        "diet_exclusions",
+    ):
+        assert table.c[col].nullable is True, f"{col} must be nullable"
+
+    # version and user_id are NOT NULL.
+    assert table.c["version"].nullable is False
+    assert table.c["user_id"].nullable is False
+
+
+# ---------------------------------------------------------------------------
+# 0005_health_checkins specific tests (Phase 2 Task 3)
+# ---------------------------------------------------------------------------
+
+
+def _offline_upgrade_0005_sql() -> str:
+    proc = _run_alembic("upgrade", "0004_health_profile_tracking:0005_health_checkins", "--sql")
+    assert proc.returncode == 0, f"alembic upgrade 0004:0005 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def _offline_downgrade_0005_sql() -> str:
+    proc = _run_alembic("downgrade", "0005_health_checkins:0004_health_profile_tracking", "--sql")
+    assert proc.returncode == 0, f"alembic downgrade 0005:0004 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def test_0005_upgrade_creates_health_checkins_table():
+    """0005 upgrade creates health_checkins with required columns and the
+    per-user daily uniqueness constraint."""
+    sql = _offline_upgrade_0005_sql()
+    assert "CREATE TABLE health_checkins" in sql
+
+    # Required columns exist.
+    for col in (
+        "id",
+        "user_id",
+        "local_date",
+        "sleep_quality",
+        "energy",
+        "muscle_soreness",
+        "available_time",
+        "daily_status",
+        "abnormal_pain",
+        "pain_followup",
+        "risk_summary",
+        "risk_version",
+        "created_at",
+        "updated_at",
+    ):
+        assert col in sql, f"missing column {col} in health_checkins"
+
+    # Core completed-check-in fields are NOT NULL; pain_followup is nullable.
+    assert "abnormal_pain BOOLEAN NOT NULL" in sql
+    assert "daily_status VARCHAR(30) NOT NULL" in sql
+    assert "risk_summary VARCHAR(30) NOT NULL" in sql
+    assert "local_date DATE NOT NULL" in sql
+    assert "pain_followup JSONB" in sql
+    assert "pain_followup JSONB NOT NULL" not in sql
+
+    # PK + FK + UNIQUE(user_id, local_date) daily uniqueness.
+    assert "PRIMARY KEY (id)" in sql
+    assert "FOREIGN KEY(user_id) REFERENCES users (id)" in sql
+    assert (
+        "CONSTRAINT uq_health_checkins_user_date UNIQUE (user_id, local_date)"
+        in sql
+    )
+
+
+def test_0005_downgrade_drops_health_checkins_table():
+    """0005 downgrade drops the health_checkins table."""
+    sql = _offline_downgrade_0005_sql()
+    assert "DROP TABLE health_checkins" in sql
+
+
+def test_0005_health_checkins_unique_constraint_in_metadata():
+    """ORM health_checkins carries UNIQUE(user_id, local_date) (daily
+    uniqueness) and the deterministic stored safety fields are NOT NULL."""
+    from sqlalchemy import UniqueConstraint
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+    import app.health.models  # noqa: F401
+
+    table = Base.metadata.tables["health_checkins"]
+
+    uniq = {
+        tuple(c.name for c in uc.columns)
+        for uc in table.constraints
+        if isinstance(uc, UniqueConstraint)
+    }
+    assert ("user_id", "local_date") in uniq
+
+    # pain_followup is nullable; the deterministic stored safety fields are not.
+    assert table.c["pain_followup"].nullable is True
+    for col in (
+        "local_date",
+        "daily_status",
+        "abnormal_pain",
+        "risk_summary",
+        "risk_version",
+        "user_id",
+    ):
+        assert table.c[col].nullable is False, f"{col} must be NOT NULL"
+
+
+# ---------------------------------------------------------------------------
+# 0006_health_weight_tracking specific tests (Phase 2 Task 4)
+# ---------------------------------------------------------------------------
+
+
+def _offline_upgrade_0006_sql() -> str:
+    proc = _run_alembic("upgrade", "0005_health_checkins:0006_health_weight_tracking", "--sql")
+    assert proc.returncode == 0, f"alembic upgrade 0005:0006 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def _offline_downgrade_0006_sql() -> str:
+    proc = _run_alembic("downgrade", "0006_health_weight_tracking:0005_health_checkins", "--sql")
+    assert proc.returncode == 0, f"alembic downgrade 0006:0005 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def test_0006_upgrade_creates_weight_records_table():
+    """0006 upgrade creates weight_records with required columns, the manual
+    source default, and the per-user trend index."""
+    sql = _offline_upgrade_0006_sql()
+    assert "CREATE TABLE weight_records" in sql
+
+    for col in (
+        "id",
+        "user_id",
+        "recorded_at",
+        "weight_kg",
+        "source",
+        "note",
+        "created_at",
+        "updated_at",
+    ):
+        assert col in sql, f"missing column {col} in weight_records"
+
+    # weight_kg is NUMERIC(6,2); recorded_at is a timestamp; note nullable.
+    assert "weight_kg NUMERIC(6, 2) NOT NULL" in sql
+    assert "recorded_at TIMESTAMP WITHOUT TIME ZONE" not in sql  # tz-aware
+    assert "source VARCHAR(20)" in sql
+    assert "DEFAULT 'manual'" in sql  # server-set manual source
+
+    # PK + FK; no UNIQUE constraint (multiple records per user).
+    assert "PRIMARY KEY (id)" in sql
+    assert "FOREIGN KEY(user_id) REFERENCES users (id)" in sql
+    assert "UNIQUE" not in sql.split("CREATE TABLE weight_records")[1].split(")")[0]
+
+    # Composite trend index exists.
+    assert "CREATE INDEX ix_weight_records_user_recorded_at" in sql
+    assert "ON weight_records (user_id, recorded_at)" in sql
+
+
+def test_0006_downgrade_drops_weight_records_table():
+    """0006 downgrade drops the weight_records table and its index."""
+    sql = _offline_downgrade_0006_sql()
+    assert "DROP TABLE weight_records" in sql
+    assert "DROP INDEX ix_weight_records_user_recorded_at" in sql
+
+
+def test_0006_weight_records_index_in_metadata():
+    """ORM weight_records carries the named (user_id, recorded_at) index and
+    nullable note; weight_kg / recorded_at / source are NOT NULL."""
+    from app.db.base import Base
+    import app.auth.models  # noqa: F401
+    import app.posture.models  # noqa: F401
+    import app.health.models  # noqa: F401
+
+    table = Base.metadata.tables["weight_records"]
+
+    index_names = {idx.name for idx in table.indexes}
+    assert "ix_weight_records_user_recorded_at" in index_names
+
+    assert table.c["note"].nullable is True
+    for col in ("user_id", "recorded_at", "weight_kg", "source"):
+        assert table.c[col].nullable is False, f"{col} must be NOT NULL"
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 Agent MVP (migration 0008)
+# ---------------------------------------------------------------------------
+
+
+def _offline_upgrade_0008_sql() -> str:
+    proc = _run_alembic("upgrade", "0007_training_plans:0008_agent_mvp", "--sql")
+    assert proc.returncode == 0, f"alembic upgrade 0007:0008 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def _offline_downgrade_0008_sql() -> str:
+    proc = _run_alembic("downgrade", "0008_agent_mvp:0007_training_plans", "--sql")
+    assert proc.returncode == 0, f"alembic downgrade 0008:0007 failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def test_0008_upgrade_creates_four_agent_tables():
+    """0008 upgrade single-head-extends 0007 and creates the four Agent tables
+    with their PK/FK/UNIQUE/CHECK/ownership-index invariants."""
+    sql = _offline_upgrade_0008_sql()
+    for table in (
+        "agent_cloud_consents",
+        "agent_runs",
+        "agent_tool_events",
+        "agent_action_proposals",
+    ):
+        assert f"CREATE TABLE {table}" in sql, f"missing CREATE TABLE {table}"
+
+    # consent: unique (user_id, purpose, sequence_no) + status CHECK + ownership index.
+    consent = sql.split("CREATE TABLE agent_cloud_consents")[1]
+    assert "PRIMARY KEY (consent_id)" in consent
+    assert "FOREIGN KEY(user_id) REFERENCES users (id)" in consent
+    assert "CONSTRAINT uq_agent_cloud_consents_user_purpose_seq UNIQUE" in consent
+    assert "sequence_no" in consent and "provider_id" in consent
+    assert "CHECK (status IN ('granted', 'withdrawn'))" in consent
+    assert "CREATE INDEX ix_agent_cloud_consents_user" in sql
+
+    # runs: unique (user_id, client_turn_id) + ownership + expiry indexes.
+    assert "CONSTRAINT uq_agent_runs_user_turn UNIQUE" in sql
+    assert "CREATE INDEX ix_agent_runs_user" in sql
+    assert "CREATE INDEX ix_agent_runs_expires_at" in sql
+
+    # tool_events: FK to runs with ondelete CASCADE + ownership index.
+    te = sql.split("CREATE TABLE agent_tool_events")[1]
+    assert "FOREIGN KEY(run_id) REFERENCES agent_runs (run_id)" in te
+    assert "ON DELETE CASCADE" in te
+    assert "CREATE INDEX ix_agent_tool_events_run" in sql
+    assert "CREATE INDEX ix_agent_tool_events_user" in sql
+
+    # proposals: status CHECK (closed lifecycle) + nullable arguments_json +
+    # user/status + run + expiry indexes.
+    pp = sql.split("CREATE TABLE agent_action_proposals")[1]
+    assert "arguments_json JSON" in pp  # JSONB renders as JSON in offline SQL
+    assert "arguments_hash" in pp
+    assert "iana_timezone VARCHAR(60) NOT NULL" in pp
+    assert "CONSTRAINT uq_agent_action_proposals_run UNIQUE (run_id)" in pp
+    assert (
+        "CHECK (status IN ('pending', 'executed', 'invalidated', 'expired', 'cancelled'))"
+        in pp
+    )
+    assert "CREATE INDEX ix_agent_action_proposals_user_status" in sql
+    assert "CREATE INDEX ix_agent_action_proposals_run" in sql
+    assert "CREATE INDEX ix_agent_action_proposals_expires_at" in sql
+
+    # No raw-text/context/prompt/provider-payload column names leak in.
+    for forbidden in (
+        "user_message",
+        "assistant_message",
+        "raw_context",
+        "prompt_text",
+        "provider_request",
+        "provider_response",
+        "tool_result_payload",
+    ):
+        assert forbidden not in sql, f"forbidden raw payload column {forbidden}"
+
+
+def test_0008_downgrade_drops_four_agent_tables():
+    """0008 downgrade drops indexes then the four tables in dependency order."""
+    sql = _offline_downgrade_0008_sql()
+    for table in (
+        "agent_action_proposals",
+        "agent_tool_events",
+        "agent_runs",
+        "agent_cloud_consents",
+    ):
+        assert f"DROP TABLE {table}" in sql, f"missing DROP TABLE {table}"
+    # Posture/health/training tables are NOT touched by the Agent downgrade.
+    for untouched in ("training_plan_versions", "health_checkins", "weight_records"):
+        assert f"DROP TABLE {untouched}" not in sql
+
+
+def test_0008_agent_models_metadata_parity():
+    """Agent ORM metadata matches the migration: ownership indexes, named UNIQUE
+    constraints, nullable arguments_json, and the cascade tool_events FK."""
+    from app.db.base import Base
+    import app.agent.models  # noqa: F401
+
+    consents = Base.metadata.tables["agent_cloud_consents"]
+    assert "ix_agent_cloud_consents_user" in {i.name for i in consents.indexes}
+    assert "uq_agent_cloud_consents_user_purpose_seq" in {
+        c.name for c in consents.constraints if c.name
+    }
+    assert consents.c["sequence_no"].nullable is False
+
+    proposals = Base.metadata.tables["agent_action_proposals"]
+    assert proposals.c["arguments_json"].nullable is True
+    assert proposals.c["arguments_hash"].nullable is False
+    assert proposals.c["iana_timezone"].nullable is False
+    assert proposals.c["result_ref"].nullable is True
+    assert "ix_agent_action_proposals_user_status" in {
+        i.name for i in proposals.indexes
+    }
+    assert "uq_agent_action_proposals_run" in {
+        c.name for c in proposals.constraints if c.name
+    }
+
+    events = Base.metadata.tables["agent_tool_events"]
+    # The tool_events -> runs FK is declared ondelete CASCADE.
+    te_fk = next(
+        fk for fk in events.foreign_keys if fk.column.table.name == "agent_runs"
+    )
+    assert te_fk.ondelete == "CASCADE"
+
+    runs = Base.metadata.tables["agent_runs"]
+    assert "uq_agent_runs_user_turn" in {c.name for c in runs.constraints if c.name}
+    assert "ix_agent_runs_expires_at" in {i.name for i in runs.indexes}
+    assert runs.c["expires_at"].nullable is False

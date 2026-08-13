@@ -559,9 +559,14 @@ class _PrioritiesSection extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton(
-                  // Always disabled. Never calls any plan API.
-                  onPressed: null,
-                  child: const Text('生成改善计划（后续开放）'),
+                  // Enabled only when the server gate can_generate_plan is true
+                  // (confirmed posture goals present). Navigates to the Phase 4
+                  // plan tab; the plan/safety logic lives entirely server-side.
+                  onPressed:
+                      (state.confirmedGoals?.canGeneratePlan ?? false)
+                          ? () => context.go('/plan')
+                          : null,
+                  child: const Text('生成改善计划'),
                 ),
               ],
             ),

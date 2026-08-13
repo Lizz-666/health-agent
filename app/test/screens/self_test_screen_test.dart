@@ -217,4 +217,41 @@ void main() {
     expect(SelfTestScreen.photoDialogDescription, isNot(contains('更准确')));
     expect(SelfTestScreen.photoDialogDescription, contains('参考'));
   });
+
+  testWidgets(
+    'Phase 8 anchors: self-test pages and the three answer actions carry stable keys',
+    (tester) async {
+      final adapter = FakeDioAdapter();
+      adapter.registerJson(
+        'GET',
+        '/posture/issues/HN-01',
+        (_) => _legacyIssueDetail,
+      );
+      await tester.pumpWidget(_wrap(_apiWith(adapter)));
+      await tester.pumpAndSettle();
+
+      // The paged self-test surface is anchored.
+      expect(find.byKey(const Key('self-test-pages')), findsOneWidget);
+
+      // Advance to the answer page and assert all three answer anchors.
+      await tester.drag(
+        find.byKey(const Key('self-test-pages')),
+        const Offset(-600, 0),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('self-test-answer-negative')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('self-test-answer-positive')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('self-test-answer-uncertain')),
+        findsOneWidget,
+      );
+    },
+  );
 }

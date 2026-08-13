@@ -1,9 +1,9 @@
 # 个人体态健康教练 Agent 总路线图
 
 > 日期：2026-06-12
-> 最近修订：2026-07-15（补充外部资产来源、许可、版本和代码引入边界）
+> 最近修订：2026-08-13（Phase 9 Android 受控试用候选版工程验收）
 > 基线：现有 Flutter + FastAPI 体态分析 MVP
-> 目标：个人开发版可运行闭环
+> 目标：从个人开发闭环推进到受控试用候选准备
 
 ## 1. 路线图目标
 
@@ -86,6 +86,7 @@ flowchart TB
 | 6. 饮食推荐 MVP | 获得训练日/休息日三餐与替换建议 | 营养计算、食物库、份量模板和图片 |
 | 7. 弹性闭环与综合复盘 | 漏练、疲劳和趋势变化后得到合理调整 | 自动小调整、周复盘、体态复查和综合建议 |
 | 8. 个人开发版验收 | 完整核心流程可在 Android 本地运行 | 端到端验证、评测集、数据重置和演示数据 |
+| 9. 受控试用候选准备 | 形成可供后续非公开小范围试用评估的 Android 候选版 | 邀请账号、隐私安全运维证据、中文化、可访问性和设备可靠性 |
 
 ## 4. 阶段 0：基线收敛
 
@@ -125,7 +126,9 @@ flowchart TB
 - 新环境可按明确命令启动前后端（README 含 DATABASE_URL → `alembic upgrade head` → uvicorn 完整顺序）
 - 当前体态主流程可运行（真实 PostgreSQL + 真实后端 + Android 完整业务冒烟通过）
 - 测试和分析结果有新鲜证据（后端 81 passed、Flutter analyze 无问题、Flutter test 7 passed）
-- 运行时和配置方式已确定（Python 3.9.13、Flutter 3.44.0、PostgreSQL 16、Alembic、Dart-define）
+- Phase 0 基线运行时曾为 Python 3.9.13；Phase 9 Gate 2 因已知依赖漏洞修复将候选后端提升为
+  Python 3.12.13，并使用带哈希运行时/dev 锁文件。Flutter 3.44.0、PostgreSQL 16、Alembic
+  和 Dart-define 保持不变。
 - 数据模式和真实敏感数据启用门已记录，照片分析默认关闭
 - 详见 `docs/specs/platform/2026-06-12-baseline-contract.md` 和 `docs/plans/platform/2026-06-12-baseline-convergence.md`
 
@@ -220,7 +223,23 @@ flowchart TB
 - 切换账号或退出后不残留上一用户的健康数据
 - 用户可查阅、更正和删除真实健康档案，保存期限规则可验证
 
+### 完成状态
+
+**阶段 2 已完成（2026-07-26 Final Closure）。** 完成依据：自动化验证、PostgreSQL 16 真实迁移/集成、Android Pixel 6 AVD 构建/安装/启动证据齐备；Phase 2 业务流由 HTTP 实时旅程 + Flutter widget 测试覆盖。**Android 人工逐屏业务回放由用户决定跳过，作为接受的残余风险**，不写作“人工逐屏冒烟通过”。证据与逐条核对见 `docs/reports/phase2-exit-audit-2026-07-26.md`。
+
+- 后端 `798 passed`（含真实 PostgreSQL 16 集成，0 skipped）；Phase 2 E2E `6 passed`；迁移单一头 `0006_health_weight_tracking`。
+- 后端 ruff `app tests` clean；一次性 PG16 容器裸 CLI `alembic upgrade head/current` 通过；真实 PG16 集成 `11 passed`，0 skipped。
+- Flutter `analyze` 无问题；`flutter test` `300 passed`。
+- Android（Task 8B）：Pixel 6 AVD（Android 14/API34）真实 `flutter run` 构建、安装、启动（`com.health.posture_app/.MainActivity` resumed）；一次性 `postgres:16` + uvicorn 实时全链路旅程 15/15 PASSED；300 widget 测试覆盖每屏 UI 行为。
+- 接受的残余风险：Android 人工逐屏业务回放（登录→我的健康档案→今日签到→异常疼痛追问→体重→趋势/网格→登出/账号切换）未执行，用户明确决定跳过并接受。App 与后端联通由 Android 启动、同端口实时旅程、`10.0.2.2` 到 `127.0.0.1` 映射间接证明。
+
 ## 7. 阶段 3：训练知识与安全引擎
+
+> 状态（2026-07-26）：**已完成、验证并本地集成。**
+> OpenCode 完成 Tasks 1-7 后，Codex 对完整 diff 做独立终验，首次交付未通过；阻断项在 `423bf55` 关闭。新鲜本地证据为 `989 passed`、0 failed、0 skipped、PostgreSQL expected/actual `13/13`、ruff 与 diff 检查通过。远程 GitHub CI 未授权、未运行；退出与协作实验评价见 `docs/reports/phase3-exit-audit-2026-07-26.md`。
+> 当前规格：`docs/specs/training/2026-07-26-training-knowledge-safety-engine.md`。
+> 当前计划：`docs/plans/training/2026-07-26-training-knowledge-safety-engine.md`。
+> Phase 3 的整阶段单次委派实验表明编码速度高但终验返工集中；后续采用每 2-3 个相关 Task 一个实现批次，并在安全契约边界安排 Codex 验收。
 
 ### 目标
 
@@ -310,6 +329,14 @@ flowchart TB
 
 ## 9. 阶段 5：Agent MVP
 
+> 状态（2026-07-30）：**阶段 5 已完成并通过 Gate 4 独立验收**。
+> 接受实现 SHA `517d548`；本地严格 Full `1387 passed`、PostgreSQL
+> `20/20`、Flutter `361 passed`，exact-SHA CI run `30517131521` 的
+> Fast/Flutter/Full 全通过，Android 合成 enabled/unconsented/disabled
+> 流程通过。证据见 `docs/reports/phase5-codex-exit-audit-2026-07-30.md`。
+> 当前规格：`docs/specs/agent/2026-07-28-agent-mvp.md`。
+> 当前计划：`docs/plans/agent/2026-07-28-agent-mvp.md`。
+
 ### 目标
 
 让按钮操作与聊天操作调用同一套领域能力，避免形成两套业务逻辑。
@@ -320,6 +347,8 @@ flowchart TB
 - `Context Resolver` 按入口和意图组装最小上下文
 - 只保存结构化档案和确认后的状态，不把完整聊天作为长期记忆
 - 所有推荐和调整 Tool 在执行副作用前重新运行资格与风险安全门
+- 所有 Agent 发起的写入先形成短期类型化提案，再由独立鉴权端点取得用户明确确认；模型不能替用户确认
+- 云模型调用默认关闭，只有提供者边界告知、当前用户独立同意、撤回/删除路径和隐私门均满足后才能启用
 - 首批 Tools：
   - 健康档案查询
   - 每日签到和体重记录
@@ -327,15 +356,15 @@ flowchart TB
   - 训练计划草案生成
   - 今日训练查询
   - 动作替换
-  - 当日小调整
+  - 当日小调整（Phase 5 仅编排 Phase 4 已有的用户主动替换和结构化反馈；自动缩短、顺延、恢复性调整仍属于 Phase 7）
   - 训练结果记录
-  - 风险分类与计划校验
+  - 风险分类与计划校验（服务端强制包装，不作为模型可选择或跳过的 Tool）
 - Tool 调用授权、幂等和审计
 - 重要调整的差异展示和确认
 
 ### 上下文策略
 
-客户端传递入口类型和实体 ID，后端按需组合：
+客户端只传递入口类型和实体 ID，后端验证所有权并按需选择下列字段的最小子集；不是每次都发送完整组合：
 
 ```text
 档案摘要
@@ -354,8 +383,21 @@ flowchart TB
 - Prompt 注入不能绕过安全 Tool
 - 对话与按钮生成的计划使用相同服务和校验器
 - 模型失败不会被解释为正常、健康或已成功执行
+- 未取得当前云模型处理同意时不会调用外部模型，撤回或删除后不保留完整聊天或待执行提案
+
+**阶段 5 已完成（2026-07-30）。** 该结论仅适用于个人开发版和合成
+验收数据；live provider 真实健康数据处理、公开发布合规、持久调度清理和
+平台级完整账号删除仍是退出审计中明确记录的后续门，不被本完成状态覆盖。
 
 ## 10. 阶段 6：饮食推荐 MVP
+
+**阶段 6 已完成工程验收（2026-08-02）。** 接受实现 SHA 为 `1ff8395`；
+本地严格 Full 为 1569 passed、0 skipped（PostgreSQL 23/23），Flutter
+analyze 无问题且 384 tests，Android API 34 上启用/禁用营养流程 2/2、APK
+构建/安装/启动通过；exact-SHA CI run `30730437996` 的 Fast/Flutter/Full
+全通过。运行时保持默认关闭，只批准合成数据个人开发验证；真实健康数据、治疗性
+营养和公开发布不在本完成状态内。逐条证据见
+`docs/reports/phase6-codex-exit-audit-2026-08-02.md`。
 
 ### 目标
 
@@ -406,6 +448,14 @@ flowchart TB
 
 ## 11. 阶段 7：弹性闭环与综合复盘
 
+> 状态（2026-08-09）：**阶段 7 已完成并通过 Gate 4 独立验收**。
+> 接受实现 SHA 为 `7bee078b3456c71ea902446e3d92a8cd9d6c1e06`；本地 Full
+> `1627 passed / 38` 个条件 PostgreSQL skips、Flutter `472`、Android API 34
+> enabled/unavailable `2/2`，严格 exact-SHA CI run `31273365507` 为
+> `1665 passed / 0 skipped`、PostgreSQL `27/27`，Fast/Flutter/Full 全通过。
+> 该状态仅覆盖合成数据个人开发版，不授权 merge、部署、真实健康数据处理或公开发布。
+> 逐条证据见 `docs/reports/phase7-codex-exit-audit-2026-08-09.md`。
+
 ### 目标
 
 让系统根据现实执行情况做出保守、可解释的调整。
@@ -437,6 +487,15 @@ flowchart TB
 - 用户能查看调整原因和历史版本
 
 ## 12. 阶段 8：个人开发版验收
+
+> 状态（2026-08-11）：**阶段 8 已完成个人开发版工程验收**。Gate 4 接受实现
+> SHA `6c4e48bdd5a878012bc3a6377d40f76c5799fa2f`；本地 Full 1715 passed / 30
+> 条件 PostgreSQL skips、Flutter 493、Android API 34 正常 8/8 + 不可达 1/1。
+> 文档候选 `fe6f18481235aea6d246c1a8166d28b2ca901483` 的 strict exact-SHA CI run
+> `31506247788` 为 1745 passed / 0 skipped、PostgreSQL 28/28，Fast/Flutter/
+> Full/Phase8 全通过。该验收仅覆盖合成数据 Android 个人开发版，不授权 merge、
+> 部署、真实数据、照片、生产凭据、live AI 或公开发布。公开发布另见
+> `docs/product/public-release-gate.md`。
 
 ### 目标
 
@@ -480,7 +539,63 @@ flowchart TB
 
 面向中国大陆公众发布不属于当前个人开发版验收，但必须另设发布门：评估并实现适用的 AI 生成合成内容显式标识、导出文件标识保留、隐式元数据、来源追踪、用户协议说明、应用商店审核材料，以及发布时现行法规要求的备案、安全评估和隐私合规工作。
 
-## 13. 跨阶段质量门
+## 13. 阶段 9：Android 小范围受控试用候选准备
+
+> 状态（2026-08-13）：**Phase 9 Android 小范围受控试用候选版工程验收通过**。
+> 唯一业务基线为 Phase 8 closure
+> `2ae03345a93d8cc22d0e47fcac415411798df48b`。当前只批准中国大陆一般健康
+> 成年人、Android 非公开小范围候选准备；Gate 0-4 仍只用合成数据，live AI 和
+> 真实照片保持关闭。当前不授权真实试用、部署、分发或公开发布。
+> Gate 3B closure 为 `1783573067d6eb599591ead8fc938a909ab08d43`，严格 exact-SHA CI
+> `31676368735` 的 Fast/Flutter/Full/Phase8/Phase9 security/reliability 六个 job 全部成功。
+> Gate 4 接受实现为 `4d013120cbe499b55d008679915d7eb0a3740701`，严格 CI
+> `31686265174` 六个 job 全部成功；退出审计见
+> `docs/reports/phase9-codex-exit-audit-2026-08-13.md`。这不是部署、真实试用或发布批准。
+> 当前规格：`docs/specs/platform/2026-08-12-controlled-trial-readiness.md`。
+> 当前计划：`docs/plans/platform/2026-08-12-controlled-trial-readiness.md`。
+
+### 目标
+
+在 Phase 8 可重复 Android 本地验收基础上，建立未来小范围受控试用需要的生产意图
+身份边界、隐私和安全证据、中文化、可访问性、设备可靠性及运营准备。
+
+### 已批准方向
+
+- 目标地区为中国大陆，目标受众为一般健康成年人，候选渠道为 Android 非公开分发。
+- 身份采用“唯一邀请码 + 每名测试者独立的单机内测账号”，凭据线下发放；邀请、
+  内部用户身份、credential provider、设备登记和会话分离。
+- 鉴权接口保持 provider-neutral，未来可用短信验证码替换凭据验证方式，不改变
+  用户 ID、授权、数据所有权、同意或删除契约。
+- 暂不购买短信/邮件或启动外部审查；Codex 执行内部工程、安全、隐私和健康边界
+  预审，但不能替代律师、健康专业人员或独立渗透测试意见。
+- 外部专业审查未取得期间，真实健康数据试用、面向外部测试者的正式启动和公开发布
+  保持 blocked。
+
+### Gate
+
+1. Gate 0：只读审计、产品决策、规格、计划、ADR 和任务边界关闭。
+2. Gate 1：邀请账号、单活动设备、会话和生产意图配置 fail-closed。
+3. Gate 2：数据流、同意/删除/备份、威胁模型、供应链、监控和事故响应证据。
+4. Gate 3：核心流程中文化、可访问性、Android 设备/网络/时区/升级回滚矩阵。
+5. Gate 4：完整合成 E2E、Android 回放、冷审和 exact-SHA CI 退出验收。
+
+### 退出标准
+
+- 邀请、独立账号、单活动设备、会话撤销和跨账号隔离通过合成验证。
+- 候选配置不能启用开发登录、默认 secret、共享账号、live AI 或照片路径。
+- 隐私、安全、供应链、监控、事故响应、升级和回滚证据可审查。
+- 核心流程完成中文化、200% 大字、TalkBack、关键对比度和目标 Android 矩阵验证。
+- 本地 Full、Flutter、Phase 8 regression、Phase 9 synthetic E2E、Android 和同一
+  exact SHA 的 GitHub CI 通过，且无未解决 P0/P1/P2。
+- 退出结论只能是 `controlled-trial candidate`；真实试用仍需新的用户授权。
+
+### 不包含
+
+- 真实健康数据、照片、手机号、邮箱或真实测试者凭据。
+- live AI、短信/邮件发送、生产云服务、部署、应用商店或公众下载。
+- 法律合规批准、健康专业批准、独立安全认证或公开发布批准。
+
+## 14. 跨阶段质量门
 
 每个阶段完成前必须验证：
 
@@ -503,15 +618,48 @@ flowchart TB
 
 不能仅因为页面存在或模型能返回文本就判定功能完成。
 
-## 14. 当前优先级
+### 14.1 分层验证与 GitHub CI 策略
+
+目标是在不阻塞本地开发反馈的前提下，减少 Codex/OpenCode 重复运行全量测试、等待环境安装和读取长日志的成本。CI 是统一验证门和集成兜底，不替代本地相关测试、Codex 真实 diff 审查、安全判断或人工冒烟。本策略只覆盖 CI；自动部署、发布和其他 CD 外部写入仍需用户明确授权。
+
+验证分为三层：
+
+| 层级 | 触发时机 | 必需内容 | 结果用途 |
+| --- | --- | --- | --- |
+| Local focused | 每个 Task 实现和审查期间 | 受影响测试、lint/analyze、`git diff --check`；迁移、安全或契约变更增加对应专项验证 | 保持快速反馈；实现报告和 Codex 审查的最低证据 |
+| Fast CI | 已审查候选 commit push 后 | 静态检查、路径相关测试、OpenAPI/schema 检查、敏感文件检查；目标 3-6 分钟但不作为硬验收时限 | 发现环境差异和遗漏；普通 Task 的远程候选验证 |
+| Full CI | 高风险 Task、集成节点、Phase 退出或手动触发 | 后端与 Flutter 全量测试、真实 PostgreSQL/迁移演练、安全与隐私套件、必要构建和 E2E | 合并与阶段退出证据；仍不能替代目标设备人工冒烟 |
+
+每个 Phase 的实施计划必须为每个 Task 标明 Local、Fast CI 和 Full CI 要求。默认矩阵如下：
+
+| Task 类型 | Local focused | Fast CI | Full CI |
+| --- | --- | --- | --- |
+| 纯文档/治理 | 链接、格式、状态一致性和 diff check | 可与下一候选批次合并 | 通常不需要 |
+| 普通局部后端或 Flutter | 必须 | 候选分支必须 | 可延后到最近集成节点 |
+| API/OpenAPI/跨端契约 | 必须 | 必须 | 契约两端集成后必须 |
+| 迁移、鉴权、隐私、健康安全、AI 边界 | 必须 | 必须 | 候选 commit 和集成后均必须 |
+| 多个无高风险依赖的相邻 Task | 各自必须 | 各自或小批次 | 可在共同集成节点运行一次 |
+| Phase 最终 E2E/退出审计 | 目标流程先本地验证 | 必须 | 必须；另执行计划规定的人工/设备验证 |
+
+执行约束：
+
+- 不为每个 Task 复制 workflow；使用共享验证脚本和可复用 workflow，以路径和风险标签选择 job。
+- 实现 Agent 不等待或高频轮询 CI；CI 完成后，Codex 先读取结论摘要，仅在失败定位需要时读取对应 job 的局部日志。
+- CI 必须生成短摘要，至少包含 commit SHA、job、结果、失败测试、第一处有效错误和报告 artifact；测试默认安静输出，并保留 JUnit 等机器可读报告。
+- 同一分支只保留最新运行，取消过时 run；依赖缓存用于节省时间，不缓存敏感数据，并为 job 设置超时。
+- 第三方 Action 固定到审查过的 commit SHA，默认 `contents: read` 最小权限；只使用合成数据，不接入生产密钥、真实健康数据或真实照片。
+- 路径过滤不能单独豁免共享 schema、基础配置、迁移、安全、鉴权或隐私测试；风险标签优先于路径优化。
+- CI 证据只对被验证的 commit SHA 有效。rebase、冲突修复、集成或实质改动后必须重跑相应层级。
+- 仓库尚未配置 GitHub Actions 时，计划中列出的本地验证仍是当前证据；不能把“计划采用 CI”写成“CI 已通过”。CI 落地应使用独立平台 Task，并在审查后再申请 push/PR 授权。
+
+从阶段 3 起，在第一个需要远程候选验证的实现 Task push 前，先建立独立 CI foundation Task：提供共享本地验证入口、Fast CI、手动/集成触发的 Full CI 和短摘要 artifact；不包含自动部署。后续 Phase 只扩展验证矩阵，不复制整套 workflow。
+
+## 15. 当前优先级
 
 立即执行顺序：
 
-1. 阶段 0：基线收敛
-2. 阶段 1：体态核心产品化
-3. 阶段 2：健康档案、签到与趋势
-4. 阶段 3 和阶段 4：训练知识、安全引擎及计划 MVP
+1. 阶段 9 Gate 0：关闭受控试用候选范围、身份架构和发布阻断。
+2. 阶段 9 Gate 1：完成邀请账号与生产意图鉴权边界。
+3. 阶段 9 Gate 2-4：依次完成隐私安全运维、可访问性可靠性和集成退出验收。
 
-Agent 对话层和饮食推荐不应先于这些可信领域能力完成。
-
-完成阶段 0 后，为阶段 1 单独编写规格和实施计划；不要直接用本路线图指导具体文件修改。
+所有具体实现以 Phase 9 当前规格和计划为准，不直接从本路线图推断文件或契约。

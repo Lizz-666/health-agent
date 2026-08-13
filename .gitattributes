@@ -1,0 +1,10 @@
+# Phase 3 illustrations are content-hashed: each SVG's sha256 is stored in the
+# catalog (backend/app/training/data/exercises.v1.json) and audited by tests.
+# They must stay byte-identical on every platform, so treat them as binary and
+# never let git perform LF<->CRLF translation that would invalidate the hash.
+*.svg binary
+
+# Nutrition source manifests hash the exact committed bytes. Keep the reviewed
+# JSON subsets on LF on every platform so the audit is reproducible in CI.
+backend/app/nutrition/data/fdc_foundation_subset.v1.json text eol=lf
+backend/app/nutrition/data/fdc_sr_legacy_subset.v1.json text eol=lf

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_sensitive_health_consent
 from app.core.exceptions import NotFound
 from app.user.schemas import UserProfileResponse, UpdateProfileRequest
 from app.user import service
@@ -20,7 +20,7 @@ async def get_profile(user_id: str = Depends(get_current_user), db: AsyncSession
 @router.put("/profile", response_model=UserProfileResponse)
 async def update_profile(
     request: UpdateProfileRequest,
-    user_id: str = Depends(get_current_user),
+    user_id: str = Depends(require_sensitive_health_consent),
     db: AsyncSession = Depends(get_db),
 ):
     return await service.update_profile(db, user_id, request)

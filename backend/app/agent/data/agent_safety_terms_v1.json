@@ -1,0 +1,31 @@
+{
+  "version": "agent_safety_terms_v1",
+  "source": "docs/product/safety-boundaries.md 2/3 (existing signal names only)",
+  "note": "Conservative pre-provider text router. Encodes ONLY the existing safety-boundary signal names. It adds NO severity threshold, medical claim, or new safety rule. A match routes to the dedicated structured check-in/safety flow; a non-match is never a safe/normal clearance.",
+  "signals": {
+    "pain_injury": {
+      "zh": ["疼痛", "疼", "痛", "伤病", "受伤", "扭伤", "拉伤", "刺痛"],
+      "en": ["pain", "painful", "hurts", "hurt", "injury", "injured"]
+    },
+    "numbness": {
+      "zh": ["麻木", "发麻", "麻痹"],
+      "en": ["numbness", "numb", "tingling"]
+    },
+    "weakness": {
+      "zh": ["无力", "乏力", "没有力气", "使不上劲"],
+      "en": ["weakness", "weak"]
+    },
+    "dizziness": {
+      "zh": ["眩晕", "头晕", "晕眩"],
+      "en": ["dizziness", "dizzy", "vertigo", "lightheaded"]
+    },
+    "chest_discomfort": {
+      "zh": ["胸痛", "胸闷", "胸部不适", "胸口不适"],
+      "en": ["chest pain", "chest discomfort", "chest tightness"]
+    },
+    "acute_trauma": {
+      "zh": ["急性创伤", "骨折", "脱臼", "撞伤", "摔伤"],
+      "en": ["acute trauma", "fracture", "dislocation"]
+    }
+  }
+}

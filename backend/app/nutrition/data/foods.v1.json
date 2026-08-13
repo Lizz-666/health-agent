@@ -1,0 +1,1017 @@
+{
+  "catalog_version": "v1",
+  "foods": [
+    {
+      "allergen_codes": [],
+      "category": "grain",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 200,
+      "edible_portion_min_g": 150,
+      "exchange_group": "staple_grain",
+      "exclusion_codes": [],
+      "food_id": "rice_white",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 80,
+      "guideline_equivalent_min_g": 50,
+      "household_unit_code": "small_bowl_cooked_staple",
+      "image_key": "assets/images/nutrition/ingredients/rice_white.jpg",
+      "ingredient_tags": [
+        "grain",
+        "staple_grain"
+      ],
+      "name_zh": "白米饭",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 28.6,
+        "energy_kcal": 130.0,
+        "fat_g": 0.21,
+        "fibre_g": null,
+        "protein_g": 2.38
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Rice, white, medium-grain, cooked, unenriched",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "168930"
+    },
+    {
+      "allergen_codes": [],
+      "category": "grain",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 200,
+      "edible_portion_min_g": 150,
+      "exchange_group": "staple_grain",
+      "exclusion_codes": [],
+      "food_id": "rice_brown",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 80,
+      "guideline_equivalent_min_g": 50,
+      "household_unit_code": "small_bowl_cooked_staple",
+      "image_key": null,
+      "ingredient_tags": [
+        "grain",
+        "staple_grain"
+      ],
+      "name_zh": "糙米饭",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 25.6,
+        "energy_kcal": 123.0,
+        "fat_g": 0.97,
+        "fibre_g": 1.6,
+        "protein_g": 2.74
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Rice, brown, long-grain, cooked (Includes foods for USDA's Food Distribution Program)",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "169704"
+    },
+    {
+      "allergen_codes": [
+        "gluten_cereal"
+      ],
+      "category": "grain",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 200,
+      "edible_portion_min_g": 150,
+      "exchange_group": "staple_grain",
+      "exclusion_codes": [],
+      "food_id": "oats_cooked",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 80,
+      "guideline_equivalent_min_g": 50,
+      "household_unit_code": "small_bowl_cooked_staple",
+      "image_key": "assets/images/nutrition/ingredients/oats_cooked.jpg",
+      "ingredient_tags": [
+        "grain",
+        "staple_grain"
+      ],
+      "name_zh": "熟燕麦",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 12.0,
+        "energy_kcal": 71.0,
+        "fat_g": 1.52,
+        "fibre_g": 1.7,
+        "protein_g": 2.54
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Cereals, oats, regular and quick, unenriched, cooked with water (includes boiling and microwaving), without salt",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "173905"
+    },
+    {
+      "allergen_codes": [],
+      "category": "tuber",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 150,
+      "edible_portion_min_g": 100,
+      "exchange_group": "tuber",
+      "exclusion_codes": [],
+      "food_id": "potato_boiled",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 100,
+      "guideline_equivalent_min_g": 50,
+      "household_unit_code": "small_bowl_cooked_staple",
+      "image_key": null,
+      "ingredient_tags": [
+        "tuber",
+        "tuber"
+      ],
+      "name_zh": "煮土豆",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 20.0,
+        "energy_kcal": 86.0,
+        "fat_g": 0.1,
+        "fibre_g": 1.8,
+        "protein_g": 1.71
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Potatoes, boiled, cooked without skin, flesh, without salt",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "170440"
+    },
+    {
+      "allergen_codes": [],
+      "category": "tuber",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 150,
+      "edible_portion_min_g": 100,
+      "exchange_group": "tuber",
+      "exclusion_codes": [],
+      "food_id": "sweet_potato_boiled",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 100,
+      "guideline_equivalent_min_g": 50,
+      "household_unit_code": "small_bowl_cooked_staple",
+      "image_key": "assets/images/nutrition/ingredients/sweet_potato_boiled.jpg",
+      "ingredient_tags": [
+        "tuber",
+        "tuber"
+      ],
+      "name_zh": "煮红薯",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 17.7,
+        "energy_kcal": 76.0,
+        "fat_g": 0.14,
+        "fibre_g": 2.5,
+        "protein_g": 1.37
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Sweet potato, cooked, boiled, without skin",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "168484"
+    },
+    {
+      "allergen_codes": [],
+      "category": "tuber",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 150,
+      "edible_portion_min_g": 100,
+      "exchange_group": "tuber",
+      "exclusion_codes": [],
+      "food_id": "yam_cooked",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 100,
+      "guideline_equivalent_min_g": 50,
+      "household_unit_code": "small_bowl_cooked_staple",
+      "image_key": null,
+      "ingredient_tags": [
+        "tuber",
+        "tuber"
+      ],
+      "name_zh": "熟山药",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 27.5,
+        "energy_kcal": 116.0,
+        "fat_g": 0.14,
+        "fibre_g": 3.9,
+        "protein_g": 1.49
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Yam, cooked, boiled, drained, or baked, without salt",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "170072"
+    },
+    {
+      "allergen_codes": [],
+      "category": "vegetable",
+      "dark_vegetable": true,
+      "edible_portion_max_g": 150,
+      "edible_portion_min_g": 100,
+      "exchange_group": "vegetable",
+      "exclusion_codes": [],
+      "food_id": "broccoli",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 150,
+      "guideline_equivalent_min_g": 100,
+      "household_unit_code": "fist_vegetable",
+      "image_key": "assets/images/nutrition/ingredients/broccoli.jpg",
+      "ingredient_tags": [
+        "vegetable",
+        "vegetable"
+      ],
+      "name_zh": "西兰花",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 6.27,
+        "energy_kcal": 31.0,
+        "fat_g": 0.34,
+        "fibre_g": 2.4,
+        "protein_g": 2.57
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "raw",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "Foundation",
+      "source_description_en": "Broccoli, raw",
+      "source_id": "fdc-foundation-2026-04",
+      "source_publication_date": "2019-12-16",
+      "source_record_id": "747447"
+    },
+    {
+      "allergen_codes": [],
+      "category": "vegetable",
+      "dark_vegetable": true,
+      "edible_portion_max_g": 150,
+      "edible_portion_min_g": 100,
+      "exchange_group": "vegetable",
+      "exclusion_codes": [],
+      "food_id": "spinach_cooked",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 150,
+      "guideline_equivalent_min_g": 100,
+      "household_unit_code": "fist_vegetable",
+      "image_key": null,
+      "ingredient_tags": [
+        "vegetable",
+        "vegetable"
+      ],
+      "name_zh": "熟菠菜",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 3.75,
+        "energy_kcal": 23.0,
+        "fat_g": 0.26,
+        "fibre_g": 2.4,
+        "protein_g": 2.97
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Spinach, cooked, boiled, drained, without salt",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "168463"
+    },
+    {
+      "allergen_codes": [],
+      "category": "vegetable",
+      "dark_vegetable": true,
+      "edible_portion_max_g": 150,
+      "edible_portion_min_g": 100,
+      "exchange_group": "vegetable",
+      "exclusion_codes": [],
+      "food_id": "bok_choy_cooked",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 150,
+      "guideline_equivalent_min_g": 100,
+      "household_unit_code": "fist_vegetable",
+      "image_key": null,
+      "ingredient_tags": [
+        "vegetable",
+        "vegetable"
+      ],
+      "name_zh": "熟小白菜",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 1.78,
+        "energy_kcal": 12.0,
+        "fat_g": 0.16,
+        "fibre_g": 1.0,
+        "protein_g": 1.56
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Cabbage, chinese (pak-choi), cooked, boiled, drained, without salt",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "170391"
+    },
+    {
+      "allergen_codes": [],
+      "category": "fruit",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 200,
+      "edible_portion_min_g": 150,
+      "exchange_group": "fruit",
+      "exclusion_codes": [],
+      "food_id": "apple_raw",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 200,
+      "guideline_equivalent_min_g": 150,
+      "household_unit_code": "fist_fruit",
+      "image_key": "assets/images/nutrition/ingredients/apple_raw.jpg",
+      "ingredient_tags": [
+        "fruit",
+        "fruit"
+      ],
+      "name_zh": "苹果",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 13.8,
+        "energy_kcal": 52.0,
+        "fat_g": 0.17,
+        "fibre_g": 2.4,
+        "protein_g": 0.26
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "raw",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "171688"
+    },
+    {
+      "allergen_codes": [],
+      "category": "fruit",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 200,
+      "edible_portion_min_g": 150,
+      "exchange_group": "fruit",
+      "exclusion_codes": [],
+      "food_id": "banana_raw",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 200,
+      "guideline_equivalent_min_g": 150,
+      "household_unit_code": "fist_fruit",
+      "image_key": "assets/images/nutrition/ingredients/banana_raw.jpg",
+      "ingredient_tags": [
+        "fruit",
+        "fruit"
+      ],
+      "name_zh": "香蕉",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 23.0,
+        "energy_kcal": 97.0,
+        "fat_g": 0.29,
+        "fibre_g": 1.7,
+        "protein_g": 0.74
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "raw",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "Foundation",
+      "source_description_en": "Bananas, ripe and slightly ripe, raw",
+      "source_id": "fdc-foundation-2026-04",
+      "source_publication_date": "2020-04-01",
+      "source_record_id": "1105314"
+    },
+    {
+      "allergen_codes": [],
+      "category": "fruit",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 200,
+      "edible_portion_min_g": 150,
+      "exchange_group": "fruit",
+      "exclusion_codes": [],
+      "food_id": "orange_raw",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 200,
+      "guideline_equivalent_min_g": 150,
+      "household_unit_code": "fist_fruit",
+      "image_key": "assets/images/nutrition/ingredients/orange_raw.jpg",
+      "ingredient_tags": [
+        "fruit",
+        "fruit"
+      ],
+      "name_zh": "橙子",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 11.8,
+        "energy_kcal": 47.0,
+        "fat_g": 0.15,
+        "fibre_g": 2.0,
+        "protein_g": 0.91
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "raw",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "Foundation",
+      "source_description_en": "Oranges, raw, navels",
+      "source_id": "fdc-foundation-2026-04",
+      "source_publication_date": "2019-12-16",
+      "source_record_id": "746771"
+    },
+    {
+      "allergen_codes": [],
+      "category": "animal_protein",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 120,
+      "edible_portion_min_g": 80,
+      "exchange_group": "animal_protein",
+      "exclusion_codes": [],
+      "food_id": "chicken_breast",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 120,
+      "guideline_equivalent_min_g": 80,
+      "household_unit_code": "palm_protein_food",
+      "image_key": "assets/images/nutrition/ingredients/chicken_breast.jpg",
+      "ingredient_tags": [
+        "animal_protein",
+        "animal_protein"
+      ],
+      "name_zh": "鸡胸肉",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 0.0,
+        "energy_kcal": 166.0,
+        "fat_g": 3.24,
+        "fibre_g": null,
+        "protein_g": 32.1
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "Foundation",
+      "source_description_en": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, cooked, braised",
+      "source_id": "fdc-foundation-2026-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "331960"
+    },
+    {
+      "allergen_codes": [],
+      "category": "animal_protein",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 120,
+      "edible_portion_min_g": 80,
+      "exchange_group": "animal_protein",
+      "exclusion_codes": [
+        "avoid_beef"
+      ],
+      "food_id": "beef_tenderloin",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 120,
+      "guideline_equivalent_min_g": 80,
+      "household_unit_code": "palm_protein_food",
+      "image_key": null,
+      "ingredient_tags": [
+        "animal_protein",
+        "animal_protein"
+      ],
+      "name_zh": "牛里脊",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 0.0,
+        "energy_kcal": 176.0,
+        "fat_g": 6.36,
+        "fibre_g": null,
+        "protein_g": 27.7
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "Foundation",
+      "source_description_en": "Beef, loin, tenderloin roast, separable lean only, boneless, trimmed to 0\" fat, select, cooked, roasted",
+      "source_id": "fdc-foundation-2026-04",
+      "source_publication_date": "2019-12-16",
+      "source_record_id": "746758"
+    },
+    {
+      "allergen_codes": [],
+      "category": "animal_protein",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 120,
+      "edible_portion_min_g": 80,
+      "exchange_group": "animal_protein",
+      "exclusion_codes": [
+        "avoid_pork"
+      ],
+      "food_id": "pork_tenderloin",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 120,
+      "guideline_equivalent_min_g": 80,
+      "household_unit_code": "palm_protein_food",
+      "image_key": null,
+      "ingredient_tags": [
+        "animal_protein",
+        "animal_protein"
+      ],
+      "name_zh": "猪里脊",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 0.0,
+        "energy_kcal": 143.0,
+        "fat_g": 3.51,
+        "fibre_g": 0.0,
+        "protein_g": 26.2
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "cooked",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Pork, fresh, loin, tenderloin, separable lean only, cooked, roasted",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "168250"
+    },
+    {
+      "allergen_codes": [
+        "egg"
+      ],
+      "category": "egg",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 60,
+      "edible_portion_min_g": 40,
+      "exchange_group": "egg",
+      "exclusion_codes": [],
+      "food_id": "egg_chicken",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 60,
+      "guideline_equivalent_min_g": 40,
+      "household_unit_code": "palm_protein_food",
+      "image_key": "assets/images/nutrition/ingredients/egg_chicken.jpg",
+      "ingredient_tags": [
+        "egg",
+        "egg"
+      ],
+      "name_zh": "鸡蛋",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 0.96,
+        "energy_kcal": 148.0,
+        "fat_g": 9.96,
+        "fibre_g": 0.0,
+        "protein_g": 12.4
+      },
+      "preparation_note_code": "cook_thoroughly",
+      "preparation_state": "raw",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "Foundation",
+      "source_description_en": "Eggs, Grade A, Large, egg whole",
+      "source_id": "fdc-foundation-2026-04",
+      "source_publication_date": "2019-12-16",
+      "source_record_id": "748967"
+    },
+    {
+      "allergen_codes": [
+        "egg"
+      ],
+      "category": "egg",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 80,
+      "edible_portion_min_g": 60,
+      "exchange_group": "egg",
+      "exclusion_codes": [],
+      "food_id": "egg_duck",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 60,
+      "guideline_equivalent_min_g": 40,
+      "household_unit_code": "palm_protein_food",
+      "image_key": null,
+      "ingredient_tags": [
+        "egg",
+        "egg"
+      ],
+      "name_zh": "鸭蛋",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 1.45,
+        "energy_kcal": 185.0,
+        "fat_g": 13.8,
+        "fibre_g": 0.0,
+        "protein_g": 12.8
+      },
+      "preparation_note_code": "cook_thoroughly",
+      "preparation_state": "raw",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Egg, duck, whole, fresh, raw",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "172189"
+    },
+    {
+      "allergen_codes": [
+        "egg"
+      ],
+      "category": "egg",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 60,
+      "edible_portion_min_g": 40,
+      "exchange_group": "egg",
+      "exclusion_codes": [],
+      "food_id": "egg_quail",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 60,
+      "guideline_equivalent_min_g": 40,
+      "household_unit_code": "palm_protein_food",
+      "image_key": null,
+      "ingredient_tags": [
+        "egg",
+        "egg"
+      ],
+      "name_zh": "鹌鹑蛋",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 0.41,
+        "energy_kcal": 158.0,
+        "fat_g": 11.1,
+        "fibre_g": 0.0,
+        "protein_g": 13.0
+      },
+      "preparation_note_code": "cook_thoroughly",
+      "preparation_state": "raw",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Egg, quail, whole, fresh, raw",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "172191"
+    },
+    {
+      "allergen_codes": [
+        "milk"
+      ],
+      "category": "dairy",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 300,
+      "edible_portion_min_g": 250,
+      "exchange_group": "dairy",
+      "exclusion_codes": [],
+      "food_id": "milk_whole",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 300,
+      "guideline_equivalent_min_g": 250,
+      "household_unit_code": "cup_dairy",
+      "image_key": "assets/images/nutrition/ingredients/milk_whole.jpg",
+      "ingredient_tags": [
+        "dairy",
+        "dairy"
+      ],
+      "name_zh": "全脂牛奶",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 4.63,
+        "energy_kcal": 60.0,
+        "fat_g": 3.2,
+        "fibre_g": null,
+        "protein_g": 3.27
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "fluid",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "Foundation",
+      "source_description_en": "Milk, whole, 3.25% milkfat, with added vitamin D",
+      "source_id": "fdc-foundation-2026-04",
+      "source_publication_date": "2019-12-16",
+      "source_record_id": "746782"
+    },
+    {
+      "allergen_codes": [
+        "milk"
+      ],
+      "category": "dairy",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 300,
+      "edible_portion_min_g": 250,
+      "exchange_group": "dairy",
+      "exclusion_codes": [],
+      "food_id": "milk_lowfat",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 300,
+      "guideline_equivalent_min_g": 250,
+      "household_unit_code": "cup_dairy",
+      "image_key": null,
+      "ingredient_tags": [
+        "dairy",
+        "dairy"
+      ],
+      "name_zh": "低脂牛奶",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 5.18,
+        "energy_kcal": 43.0,
+        "fat_g": 0.95,
+        "fibre_g": null,
+        "protein_g": 3.38
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "fluid",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "Foundation",
+      "source_description_en": "Milk, lowfat, fluid, 1% milkfat, with added vitamin A and vitamin D",
+      "source_id": "fdc-foundation-2026-04",
+      "source_publication_date": "2019-12-16",
+      "source_record_id": "746772"
+    },
+    {
+      "allergen_codes": [
+        "milk"
+      ],
+      "category": "dairy",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 300,
+      "edible_portion_min_g": 250,
+      "exchange_group": "dairy",
+      "exclusion_codes": [],
+      "food_id": "yogurt_plain",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 300,
+      "guideline_equivalent_min_g": 250,
+      "household_unit_code": "cup_dairy",
+      "image_key": null,
+      "ingredient_tags": [
+        "dairy",
+        "dairy"
+      ],
+      "name_zh": "原味全脂酸奶",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 4.66,
+        "energy_kcal": 61.0,
+        "fat_g": 3.25,
+        "fibre_g": 0.0,
+        "protein_g": 3.47
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "ready_to_eat",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Yogurt, plain, whole milk",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "171284"
+    },
+    {
+      "allergen_codes": [
+        "soy"
+      ],
+      "category": "soy",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 120,
+      "edible_portion_min_g": 80,
+      "exchange_group": "soy_nut",
+      "exclusion_codes": [],
+      "food_id": "tofu_firm",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 25,
+      "guideline_equivalent_min_g": 10,
+      "household_unit_code": "palm_protein_food",
+      "image_key": "assets/images/nutrition/ingredients/tofu_firm.jpg",
+      "ingredient_tags": [
+        "soy",
+        "soy_nut"
+      ],
+      "name_zh": "北豆腐",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 2.85,
+        "energy_kcal": 78.0,
+        "fat_g": 4.17,
+        "fibre_g": 0.9,
+        "protein_g": 9.04
+      },
+      "preparation_note_code": "cook_thoroughly",
+      "preparation_state": "ready_to_cook",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Tofu, firm, prepared with calcium sulfate and magnesium chloride (nigari)",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "172448"
+    },
+    {
+      "allergen_codes": [
+        "soy"
+      ],
+      "category": "soy",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 120,
+      "edible_portion_min_g": 80,
+      "exchange_group": "soy_nut",
+      "exclusion_codes": [],
+      "food_id": "tofu_soft",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 25,
+      "guideline_equivalent_min_g": 10,
+      "household_unit_code": "palm_protein_food",
+      "image_key": null,
+      "ingredient_tags": [
+        "soy",
+        "soy_nut"
+      ],
+      "name_zh": "嫩豆腐",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 1.18,
+        "energy_kcal": 61.0,
+        "fat_g": 3.69,
+        "fibre_g": 0.2,
+        "protein_g": 7.17
+      },
+      "preparation_note_code": "cook_thoroughly",
+      "preparation_state": "ready_to_cook",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Tofu, soft, prepared with calcium sulfate and magnesium chloride (nigari)",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "172449"
+    },
+    {
+      "allergen_codes": [
+        "tree_nut"
+      ],
+      "category": "nut",
+      "dark_vegetable": false,
+      "edible_portion_max_g": 12,
+      "edible_portion_min_g": 8,
+      "exchange_group": "soy_nut",
+      "exclusion_codes": [],
+      "food_id": "almonds_raw",
+      "generation_eligible": true,
+      "guideline_equivalent_max_g": 12,
+      "guideline_equivalent_min_g": 10,
+      "household_unit_code": "thumb_nuts",
+      "image_key": "assets/images/nutrition/ingredients/almonds_raw.jpg",
+      "ingredient_tags": [
+        "nut",
+        "soy_nut"
+      ],
+      "name_zh": "巴旦木（扁桃仁）",
+      "nutrients_per_100g": {
+        "carbohydrate_g": 21.6,
+        "energy_kcal": 579.0,
+        "fat_g": 49.9,
+        "fibre_g": 12.5,
+        "protein_g": 21.2
+      },
+      "preparation_note_code": "ordinary_preparation",
+      "preparation_state": "raw",
+      "quality_limit_codes": [
+        "us_food_composition_variability",
+        "china_portion_mapping_project_authored"
+      ],
+      "review_status": "approved",
+      "reviewed_at": "2026-07-30",
+      "reviewer_role": "nutrition_content_reviewer",
+      "source_data_type": "SR Legacy",
+      "source_description_en": "Nuts, almonds",
+      "source_id": "fdc-sr-legacy-2018-04",
+      "source_publication_date": "2019-04-01",
+      "source_record_id": "170567"
+    }
+  ],
+  "media_manifest_version": "v1",
+  "published_at": "2026-08-01",
+  "schema_version": "v1",
+  "source_manifest_version": "v1"
+}

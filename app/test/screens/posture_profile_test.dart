@@ -775,7 +775,7 @@ void main() {
     },
   );
 
-  testWidgets('can_generate_plan button is present and always disabled', (
+  testWidgets('can_generate_plan button is present and disabled without confirmed goals', (
     tester,
   ) async {
     final adapter = FakeDioAdapter();
@@ -798,7 +798,8 @@ void main() {
 
     final planBtn = find.textContaining('生成改善计划');
     expect(planBtn, findsOneWidget);
-    // Disabled: tapping it never hits any plan endpoint.
+    // Disabled without confirmed goals (can_generate_plan false): tapping it
+    // never hits any plan endpoint.
     await tester.tap(planBtn, warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(

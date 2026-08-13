@@ -27,12 +27,13 @@ import random
 import socket
 import subprocess
 import time
+from pathlib import Path
 from typing import Callable, List, Optional
 from urllib.parse import urlparse
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -59,10 +60,11 @@ def _docker_available() -> bool:
 
 _DOCKER_OK = _docker_available()
 _PG_TEST_DSN_ENV = os.environ.get("PG_TEST_DSN", "")
+_SKIP_PG = os.environ.get("VERIFY_SKIP_PG", "").strip() == "1"
 
 # PG tests run whenever Docker is reachable OR an explicit PG_TEST_DSN is set.
 # The SQLite monkey-patch in conftest.py does NOT disable PG tests.
-pg_available = _DOCKER_OK or bool(_PG_TEST_DSN_ENV)
+pg_available = not _SKIP_PG and (_DOCKER_OK or bool(_PG_TEST_DSN_ENV))
 
 skip_reason = (
     "Docker not available (docker version failed and PG_TEST_DSN not set)"
@@ -71,6 +73,17 @@ skip_reason = (
 )
 
 requires_pg = pytest.mark.skipif(not pg_available, reason=skip_reason)
+
+
+@pytest.fixture(autouse=True)
+def record_pg_test_execution(request):
+    """Record every marked PG test that reaches fixture setup."""
+    if request.node.get_closest_marker("requires_pg") is None:
+        return
+    evidence_file = os.environ.get("PG_TEST_EVIDENCE_FILE", "").strip()
+    if evidence_file and pg_available:
+        with Path(evidence_file).open("a", encoding="utf-8") as fh:
+            fh.write(f"TEST:{request.node.nodeid}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -383,15 +396,19 @@ def _get_engine_and_sessionmaker(dsn: str):
 
 
 async def _truncate_all(engine) -> None:
-    """Wipe every data table for test isolation without dropping the schema."""
+    """Wipe every existing data table without assuming the schema is at head."""
     from app.db.base import Base
 
-    names = ", ".join(
-        '"{}"'.format(t) for t in sorted(Base.metadata.tables.keys())
-    )
-    if not names:
-        return
     async with engine.connect() as conn:
+        existing = set(
+            await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+        )
+        names = ", ".join(
+            '"{}"'.format(table)
+            for table in sorted(existing.intersection(Base.metadata.tables.keys()))
+        )
+        if not names:
+            return
         await conn.execute(text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
         await conn.commit()
 
@@ -456,6 +473,10 @@ def _ensure_pg_ready() -> str:
     )
 
     _run_alembic(_setup_dsn)
+    evidence_file = os.environ.get("PG_TEST_EVIDENCE_FILE", "").strip()
+    if evidence_file:
+        Path(evidence_file).write_text(
+            f"VERSION:{_pg_version}\n", encoding="utf-8")
     _setup_done = True
     return _setup_dsn
 

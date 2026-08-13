@@ -1,0 +1,41 @@
+{
+  "policy_version": "v1",
+  "review_scope": "personal_development",
+  "source": "Versioned product-policy constraints within the healthy-adult source envelope (WHO 2020, ACSM 2026). These are NOT medical prescriptions; they only narrow choices and bounds.",
+  "filter_order": [
+    "context_valid",
+    "gate",
+    "recommendation_ready",
+    "equipment",
+    "goal_and_posture",
+    "contraindication",
+    "conservative",
+    "dedup",
+    "conflict",
+    "sort"
+  ],
+  "role_priority": ["corrective", "strength", "mobility", "warmup", "recovery"],
+  "difficulty_priority": ["beginner", "intermediate", "advanced"],
+  "conservative_requires_conservative_eligible": true,
+  "dedup": {
+    "by": "movement_purpose_overlap",
+    "reason_code": "duplicate_movement_purpose"
+  },
+  "conflict_resolution": {
+    "pick": "lowest_sort_key",
+    "note": "When exercises share any movement_purpose, the one with the lowest deterministic sort key (role priority, then difficulty, then exercise_id) is kept; others are excluded as duplicates."
+  },
+  "session_volume": {
+    "max_exercises_per_session": 8,
+    "max_sets_per_session": 24
+  },
+  "weekly_volume": {
+    "max_sessions_per_week": 5,
+    "min_recovery_hours_between_sessions": 24
+  },
+  "sort_key_composition": [
+    "role_priority_index",
+    "difficulty_priority_index",
+    "exercise_id"
+  ]
+}

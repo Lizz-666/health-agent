@@ -3,19 +3,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'core/theme.dart';
+import 'models/agent.dart';
 import 'providers/auth_provider.dart';
-import 'providers/user_provider.dart';
+import 'screens/agent/agent_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/today/today_screen.dart';
 import 'screens/issues/issue_list_screen.dart';
 import 'screens/issues/issue_detail_screen.dart';
 import 'screens/test/self_test_screen.dart';
 import 'screens/test/photo_test_screen.dart';
 import 'screens/result/result_screen.dart';
 import 'screens/history/history_screen.dart';
+import 'screens/plan/plan_screen.dart';
+import 'screens/plan/weekly_review_screen.dart';
+import 'screens/nutrition/nutrition_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/profile/posture_profile_screen.dart';
+import 'screens/profile/health_profile_screen.dart';
+import 'screens/profile/weight_trend_screen.dart';
+import 'screens/profile/activity_grid_screen.dart';
 import 'screens/search/search_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -54,7 +62,6 @@ class _AuthNotifier extends ChangeNotifier {
   final Ref _ref;
   _AuthNotifier(this._ref) {
     _ref.listen(authProvider, (_, _) => notifyListeners());
-    _ref.listen(userProvider, (_, _) => notifyListeners());
   }
 }
 
@@ -71,35 +78,66 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: notifier,
     redirect: (context, state) {
       final authState = ref.read(authProvider);
-      final userState = ref.read(userProvider);
       final onLogin = state.matchedLocation == '/login';
       final onOnboarding = state.matchedLocation == '/onboarding';
 
       if (!authState.isLoggedIn && !onLogin) return '/login';
-      if (authState.isLoggedIn && onLogin) return '/';
-      if (authState.isLoggedIn &&
-          userState.profile != null &&
-          userState.profile!.hasProfile != true &&
-          !onOnboarding) {
+      if (authState.isLoggedIn && authState.isNewUser && !onOnboarding) {
         return '/onboarding';
+      }
+      if (authState.isLoggedIn &&
+          !authState.isNewUser &&
+          (onLogin || onOnboarding)) {
+        return '/today';
       }
       return null;
     },
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
+      GoRoute(path: '/', redirect: (_, _) => '/posture'),
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) =>
             AppShell(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(
-            routes: [GoRoute(path: '/', builder: (_, _) => const HomeScreen())],
+            routes: [
+              GoRoute(path: '/today', builder: (_, _) => const TodayScreen()),
+            ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/history',
-                builder: (_, _) => const HistoryScreen(),
+                path: '/plan',
+                builder: (_, _) => const PlanScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'nutrition',
+                    builder: (_, _) => const NutritionScreen(),
+                  ),
+                  GoRoute(
+                    path: 'weekly-review',
+                    builder: (_, _) => const WeeklyReviewScreen(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/agent',
+                builder: (_, state) {
+                  AgentRouteContext? routeContext;
+                  try {
+                    routeContext = AgentRouteContext.fromQuery(
+                      state.uri.queryParameters,
+                    );
+                  } on FormatException {
+                    routeContext = null;
+                  }
+                  return AgentScreen(routeContext: routeContext);
+                },
               ),
             ],
           ),
@@ -113,12 +151,28 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'posture',
                     builder: (_, _) => const PostureProfileScreen(),
                   ),
+                  GoRoute(
+                    path: 'health',
+                    builder: (_, _) => const HealthProfileScreen(),
+                  ),
+                  GoRoute(
+                    path: 'weight',
+                    builder: (_, _) => const WeightTrendScreen(),
+                  ),
+                  GoRoute(
+                    path: 'grid',
+                    builder: (_, _) => const ActivityGridScreen(),
+                  ),
                 ],
               ),
             ],
           ),
         ],
       ),
+      GoRoute(path: '/posture', builder: (_, _) => const HomeScreen()),
+      // History remains reachable (moved out of the bottom nav to make room
+      // for the Phase 4 计划 tab).
+      GoRoute(path: '/history', builder: (_, _) => const HistoryScreen()),
       GoRoute(
         path: '/issues/:category',
         builder: (_, state) =>
@@ -192,14 +246,19 @@ class AppShell extends StatelessWidget {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: '首页',
+            icon: Icon(Icons.today_outlined),
+            selectedIcon: Icon(Icons.today),
+            label: '今日',
           ),
           NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: '历史',
+            icon: Icon(Icons.fitness_center_outlined),
+            selectedIcon: Icon(Icons.fitness_center),
+            label: '计划',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.auto_awesome_outlined),
+            selectedIcon: Icon(Icons.auto_awesome),
+            label: '健康助手',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outlined),

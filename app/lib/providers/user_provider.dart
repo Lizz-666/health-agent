@@ -2,6 +2,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
+import '../core/constants.dart';
 import '../models/user.dart';
 
 class UserState {
@@ -80,6 +81,66 @@ class UserNotifier extends StateNotifier<UserState> {
     } catch (e) {
       if (!mounted) return false;
       state = state.copyWith(isLoading: false, error: '更新失败');
+      return false;
+    }
+  }
+
+  Future<bool> completeOnboarding({
+    required double height,
+    required double weight,
+    required int age,
+    required String gender,
+  }) async {
+    try {
+      state = state.copyWith(isLoading: true, clearError: true);
+      final consent = await _api.dio.get('/privacy/consent');
+      final consentData = consent.data;
+      final hasCurrentConsent =
+          consentData is Map<String, dynamic> &&
+          consentData['active'] == true &&
+          consentData['notice_version'] == AppConstants.privacyNoticeVersion;
+      if (!hasCurrentConsent) {
+        final granted = await _api.dio.post(
+          '/privacy/consent',
+          data: {
+            'action': 'grant',
+            'notice_version': AppConstants.privacyNoticeVersion,
+          },
+        );
+        final grantedData = granted.data;
+        if (grantedData is! Map<String, dynamic> ||
+            grantedData['active'] != true ||
+            grantedData['notice_version'] !=
+                AppConstants.privacyNoticeVersion) {
+          throw const FormatException('invalid consent response');
+        }
+      }
+      final response = await _api.dio.put(
+        '/user/profile',
+        data: {
+          'height': height,
+          'weight': weight,
+          'age': age,
+          'gender': gender,
+        },
+      );
+      if (!mounted) return false;
+      final profile = UserProfile.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+      state = state.copyWith(profile: profile, isLoading: false);
+      return true;
+    } on DioException catch (error) {
+      if (!mounted) return false;
+      final data = error.response?.data;
+      final message = data is Map<String, dynamic>
+          ? (data['detail'] as String?) ?? '保存资料失败，请重试'
+          : '保存资料失败，请检查网络后重试';
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (_) {
+      if (!mounted) return false;
+      state = state.copyWith(isLoading: false, error: '保存资料失败，请重试');
       return false;
     }
   }

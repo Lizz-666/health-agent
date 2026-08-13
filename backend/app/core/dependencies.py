@@ -3,7 +3,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.core.security import decode_token
-from app.core.exceptions import Unauthorized
+from app.core.exceptions import AppException, Unauthorized
+from app.auth.service import is_trial_session_active
+from app.core.config import settings
 
 security = HTTPBearer(auto_error=False)
 
@@ -18,4 +20,31 @@ async def get_current_user(
     user_id = payload.get("sub")
     if user_id is None or payload.get("type") != "access":
         raise Unauthorized("Token 无效或已过期")
+    session_id = payload.get("sid")
+    if settings.AUTH_MODE == "controlled_trial" and not session_id:
+        raise Unauthorized("Token invalid or expired")
+    if session_id and settings.AUTH_MODE != "controlled_trial":
+        raise Unauthorized("Token invalid or expired")
+    if session_id and not await is_trial_session_active(
+        db, session_id=session_id, user_id=user_id
+    ):
+        raise Unauthorized("Token invalid or expired")
+    return user_id
+
+
+async def require_sensitive_health_consent(
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> str:
+    """Require current consent only for controlled-trial health-data routes."""
+    if settings.AUTH_MODE != "controlled_trial":
+        return user_id
+    from app.privacy.service import consent_is_active
+
+    if not await consent_is_active(db, user_id):
+        raise AppException(
+            403,
+            "请先阅读并同意当前敏感健康信息告知",
+            "privacy_consent_required",
+        )
     return user_id

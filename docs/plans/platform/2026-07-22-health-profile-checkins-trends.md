@@ -1,5 +1,7 @@
 # Phase 2 Health Profile, Check-Ins, And Trends Implementation Plan
 
+> 状态（2026-07-26 Final Closure）：Tasks 1–8B 已完成，Phase 2 已完成。证据：后端 798 passed、ruff clean、Phase 2 E2E 6 passed、Flutter 300 passed、真实 PG16 集成 11 passed、一次性 PG16 容器裸 CLI `alembic upgrade head/current` 到 0006、Android Pixel 6 AVD 构建/安装/启动（MainActivity resumed）、一次性 PG16/uvicorn 实时旅程 15/15。**Android 人工逐屏业务回放由用户决定跳过，作为接受的残余风险；不写作“人工逐屏冒烟通过”。** 详见 `docs/reports/phase2-exit-audit-2026-07-26.md`。
+
 **Goal:** Deliver a verified Phase 2 vertical slice where users can maintain structured health profile data, complete daily check-ins, record optional weight, and review trends/grid data without AI inference or training-plan generation.
 
 **Spec:** `docs/specs/platform/2026-07-22-health-profile-checkins-trends.md`
@@ -9,6 +11,24 @@
 **Safety:** Phase 2 stores sensitive health data, requires abnormal-pain follow-up, classifies red-flag/restricted states deterministically, blocks future recommendation readiness when data is missing or unsafe, and never treats AI or missing data as normal.
 
 **Verification:** Focused backend tests per task, OpenAPI contract tests, migration checks, Flutter model/provider/widget tests, `flutter analyze`, full relevant test suites, and an Android emulator smoke before phase exit.
+
+## Layered Local And CI Verification
+
+本计划遵守路线图 `docs/product/roadmap.md` §13.1。仓库当前没有 `.github/workflows`，因此 Tasks 1-8 已记录的验证均为本地或可丢弃 PostgreSQL 环境的真实证据，不得改写为 CI 证据；后续 CI 落地不追溯改变这些结果。CI 只承担验证，不自动部署。
+
+| Phase 2 Task | Local focused | Fast CI（workflow 落地后） | Full CI / manual gate |
+| --- | --- | --- | --- |
+| Task 0 规格和账本 | 链接、charter 完整性、diff check | 可并入下一候选批次 | 不需要 |
+| Task 1 health domain + `0004` | domain/migration 相关 pytest、upgrade/downgrade、ruff | 必须 | 迁移属于高风险；候选和集成后必须含真实 PostgreSQL 演练 |
+| Task 2 profile API | API、鉴权、跨用户、删除、OpenAPI | 必须 | 与 Task 1 契约集成后必须 |
+| Task 3 daily check-in + `0005` | check-in、疼痛追问、风险分类、迁移测试 | 必须 | 健康安全和迁移均为高风险；候选和集成后必须 |
+| Task 4 weight/trends + `0006` | CRUD、趋势/grid、边界和迁移测试 | 必须 | 可与 Task 3/4 后端集成节点合并执行一次全量验证 |
+| Task 5 Flutter state | model/provider/session-reset 测试和 analyze | 必须 | 可延后到 Task 5-7 Flutter 集成节点 |
+| Task 6 My health UI | widget/navigation、删除和 analyze | 必须 | 与 Task 7 集成后运行 Flutter 全量测试和构建 |
+| Task 7 Today check-in UI | widget/navigation、失败状态、安全文案和 analyze | 必须 | 与 Task 6 集成后运行 Flutter 全量测试和构建 |
+| Task 8 exit audit | E2E、OpenAPI、迁移、隐私、账户切换、全量后端/Flutter | 必须 | 必须；Android 模拟器人工冒烟仍是独立退出门，CI build 不能替代 |
+
+实现 Agent 在 Task 内保持本地快速反馈，不等待或轮询 CI。Codex 审查真实 diff 并形成候选 commit 后，才按风险层级申请 push 并触发 CI；读取顺序为结果摘要 -> 失败 job -> 必要的局部日志，不默认把完整日志送入模型上下文。CI 摘要必须关联被验证 SHA，集成后旧证据失效。
 
 ## Task Definition Standard
 
@@ -24,6 +44,7 @@ Every task below is a self-contained charter that an independent implementation 
 - **Behavior** - the observable behavior change.
 - **Acceptance criteria** - the done-when conditions.
 - **Verification commands** - exact commands (with working directory) and expected outcome.
+- **Verification layers** - required Local focused, Fast CI, Full CI, and manual/device gates according to roadmap section 13.1.
 - **Report format** - see Task Report Format (shared by all tasks).
 
 ## Task Report Format
@@ -38,6 +59,7 @@ Every implementation-task completion report MUST include (per `AGENTS.md` sectio
 6. `git diff --stat` output.
 7. Unexpectedly generated files (tooling side-effects), if any.
 8. Scope-compliance statement: confirmation that only allowed files were touched and no forbidden scope was entered.
+9. Verification-layer evidence: Local results; Fast/Full CI run id, tested SHA, and status, or explicit `not configured` / `not required`; manual/device gates reported separately.
 
 Implementation agents do not commit, merge, rebase, or push unless the task prompt explicitly authorizes it.
 

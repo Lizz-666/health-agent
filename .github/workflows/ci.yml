@@ -1,0 +1,351 @@
+# Shared CI for the health-agent release-integration baseline.
+#
+# Layered verification per docs/product/roadmap.md section 13.1 and the
+# Phase 3/Phase 4 implementation plans:
+#   - fast    : ruff + targeted backend SQLite tests + git diff --check.
+#   - flutter : Flutter analyze + complete Flutter tests (Phase 4 Plan/UI).
+#   - full    : ruff + COMPLETE backend tests on a real PostgreSQL 16 service,
+#               enforcing exact PG execution and zero skips.
+#
+# Triggers: every pull request, push to main, and manual exact-SHA dispatch.
+# Pull requests and main run all six required engineering gates. Manual runs
+# may omit Full unless run_full is selected, so they can still provide a fast
+# exact-SHA checkpoint without weakening the PR/main contract.
+#
+# Constraints:
+#   - Least permissions: contents: read only. No deployment, release, package
+#     write, production secret, real photo, or real health data.
+#   - Third-party actions are pinned to reviewed immutable commit SHAs (no
+#     floating tags). SHAs verified 2026-07-27 against each action repository's
+#     latest release at that date; all run on the current Node 24 runtime (the
+#     previous pins targeted the deprecated Node 20 runtime).
+#   - Same-branch runs cancel stale runs; every job has an explicit timeout;
+#     caches hold no secrets (pip / pub caches only).
+#   - Synthetic data only. CI never dumps env values, health payloads, raw
+#     request bodies, or secrets.
+#   - CI failures stay failures; nothing converts a failure into a success.
+#
+# Phase 4 backend targets are appended to scripts/verify.py FAST_TEST_TARGETS by
+# the same task that creates each test file (Tasks 2-4), so Fast CI grows with
+# the suite rather than referencing files that do not yet exist.
+
+name: ci
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_full:
+        description: "Run the Full CI job (complete tests + PostgreSQL 16)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12.13"
+  FLUTTER_VERSION: "3.44.0"
+  VERIFY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  # Pinned dev/CI tools kept OUT of backend/requirements.txt by design (they
+  # are not runtime dependencies). Both are reproducible, immutable versions.
+  RUFF_VERSION: "0.15.22"
+  HYPOTHESIS_VERSION: "6.141.1"
+  PIP_AUDIT_VERSION: "2.9.0"
+
+jobs:
+  phase9-reliability:
+    name: Phase 9 reliability (synthetic HTTP + matrix)
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.lock
+      - name: Install hashed backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r backend/requirements-dev.lock
+      - name: Run isolated reliability acceptance
+        shell: bash
+        run: |
+          set -o pipefail
+          python scripts/phase9.py verify --surface all 2>&1 | tee "$RUNNER_TEMP/phase9-reliability-summary.txt"
+      - name: Upload sanitized reliability summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-phase9-reliability-summary
+          path: ${{ runner.temp }}/phase9-reliability-summary.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  phase9-security:
+    name: Phase 9 security (privacy + supply chain)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.lock
+      - name: Install hashed dependencies and pinned audit tool
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r backend/requirements-dev.lock
+          pip install pip-audit==${{ env.PIP_AUDIT_VERSION }}
+      - name: Verify secrets, artifacts, VEX, and dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            python scripts/phase9_security.py verify
+            python scripts/phase9_security.py dependencies
+            cd backend
+            python -m pytest tests/test_trial_privacy.py tests/test_security_observability.py tests/test_phase9_security.py -q
+          } 2>&1 | tee "$RUNNER_TEMP/phase9-security-summary.txt"
+      - name: Upload sanitized security summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-phase9-security-summary
+          path: ${{ runner.temp }}/phase9-security-summary.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  fast:
+    name: Fast (lint + SQLite tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        # actions/checkout v7.0.1 (Node 24). Verified 2026-07-27.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Set up Python
+        # actions/setup-python v7.0.0 (Node 24). Verified 2026-07-27.
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.lock
+            backend/requirements-dev.lock
+      - name: Install backend deps + pinned dev tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r backend/requirements-dev.lock
+          pip install ruff==${{ env.RUFF_VERSION }} hypothesis==${{ env.HYPOTHESIS_VERSION }}
+      - name: Fast verify (lint + SQLite tests + git diff --check)
+        env:
+          # The default GITHUB_TOKEN lets test_ci_action_pins authoritatively
+          # verify each pinned action SHA resolves to its declared tag.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERIFY_SUMMARY_FILE: ${{ runner.temp }}/fast-summary.txt
+          VERIFY_ARTIFACT_NAME: ci-fast-summary
+          VERIFY_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: python scripts/verify.py fast
+      - name: Upload summary artifact
+        if: always()
+        # actions/upload-artifact v7.0.1 (Node 24). Verified 2026-07-27.
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-fast-summary
+          path: ${{ runner.temp }}/fast-summary.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  flutter:
+    name: Flutter (analyze + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Set up Flutter
+        # subosito/flutter-action v2.23.0. Verified 2026-07-27.
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Flutter pub get
+        working-directory: app
+        run: flutter pub get
+      - name: Flutter analyze
+        id: flutter_analyze
+        working-directory: app
+        run: flutter analyze
+      - name: Flutter test
+        id: flutter_test
+        working-directory: app
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter test 2>&1 | tee ../flutter-test.log
+      - name: Build concise summary
+        if: always()
+        working-directory: app
+        run: |
+          {
+            echo "flutter CI summary (GitHub Actions evidence)"
+            echo "workflow=${GITHUB_WORKFLOW} sha=${GITHUB_SHA} job=${GITHUB_JOB}"
+            echo "flutter_version=${FLUTTER_VERSION}"
+            echo "analyze_status=${{ steps.flutter_analyze.conclusion }}"
+            echo "test_status=${{ steps.flutter_test.conclusion }}"
+            echo "--- last 20 test log lines ---"
+            tail -n 20 ../flutter-test.log 2>/dev/null || echo "(no test log produced)"
+          } > ../flutter-summary.txt
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-flutter-summary
+          path: flutter-summary.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  full:
+    name: Full (complete tests + PostgreSQL 16)
+    # Every PR gets the authoritative integration gate. Manual dispatch remains
+    # available once the workflow exists on the default branch.
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.run_full) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        # PostgreSQL 16 image pinned to an immutable reviewed digest.
+        image: postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: posture_pg_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Guarded external DSN contract enforced by tests/conftest_pg.py: the
+      # database name MUST be posture_pg_test[_*] and PG_TEST_ALLOW_DESTRUCTIVE
+      # MUST be set, or the suite fails closed (never silently skips).
+      PG_TEST_DSN: postgresql+asyncpg://postgres:testpass@localhost:5432/posture_pg_test
+      PG_TEST_ALLOW_DESTRUCTIVE: "1"
+      # Full CI contract: ANY skipped test is a hard failure, proving the
+      # PostgreSQL-backed tests actually ran (zero PG skips).
+      VERIFY_REQUIRE_PG: "1"
+      VERIFY_ARTIFACT_NAME: ci-full-summary
+      VERIFY_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.lock
+            backend/requirements-dev.lock
+      - name: Install backend deps + pinned dev tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r backend/requirements-dev.lock
+          pip install ruff==${{ env.RUFF_VERSION }} hypothesis==${{ env.HYPOTHESIS_VERSION }}
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+              echo "PostgreSQL is ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "PostgreSQL did not become ready" >&2
+          exit 1
+      - name: Full verify (lint + complete tests + PostgreSQL 16 + git diff)
+        env:
+          # Authenticate action-pin checks so Full's zero-skip contract is not
+          # affected by the shared unauthenticated GitHub API rate limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERIFY_SUMMARY_FILE: ${{ runner.temp }}/full-summary.txt
+        run: python scripts/verify.py full
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-full-summary
+          path: ${{ runner.temp }}/full-summary.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+  phase8-acceptance:
+    name: Phase 8 acceptance (synthetic HTTP + eval)
+    # This explicit, non-live acceptance surface is mandatory on PR/main and is
+    # also available for exact-SHA manual gates. It has no production secrets,
+    # real health data, photos, or cloud AI.
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.lock
+            backend/requirements-dev.lock
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r backend/requirements-dev.lock
+      - name: Run isolated real-HTTP and evaluation acceptance
+        run: |
+          set -o pipefail
+          python scripts/phase8.py verify --surface all 2>&1 | tee "$RUNNER_TEMP/phase8-summary.txt"
+      - name: Upload sanitized acceptance summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-phase8-summary
+          path: ${{ runner.temp }}/phase8-summary.txt
+          if-no-files-found: error
+          retention-days: 30

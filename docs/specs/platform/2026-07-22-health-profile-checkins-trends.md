@@ -1,5 +1,7 @@
 # Phase 2 Health Profile, Check-Ins, And Trends
 
+> 状态（2026-07-26 Final Closure）：**阶段 2 已完成**。完成依据：自动化验证（后端 798 passed、ruff clean、Flutter 300 passed）、真实 PostgreSQL 16 迁移/集成、Android Pixel 6 AVD 构建/安装/启动证据、Phase 2 业务流由 HTTP 实时旅程（15/15）+ 300 widget 测试覆盖。**Android 人工逐屏业务回放由用户决定跳过，作为接受的残余风险；不写作“人工逐屏冒烟通过”。** 详见 `docs/reports/phase2-exit-audit-2026-07-26.md`。本行为说明保持当前规格事实，未改动行为定义。
+
 ## Outcome
 
 Phase 2 establishes the structured health data needed by later training adjustments without relying on chat history, wearable data, or AI inference.

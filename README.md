@@ -2,13 +2,16 @@
 
 体态评估为核心的个人健康教练，Flutter + FastAPI 架构。
 
-当前阶段：阶段 0 已完成，下一步为阶段 1 规格设计
+当前阶段：Phase 0-9 已完成合成数据工程验收，正在进行 Release Integration。最新已验证
+Phase 9 代码基线为 `7f801255b0ecfab50b92f959a4f093a7919126a2`；这不是部署、真实测试者、
+真实健康数据、分发或公开发布批准。详见
+`docs/reports/phase9-codex-exit-audit-2026-08-13.md` 和 `docs/product/public-release-gate.md`。
 
 ## 运行时要求
 
 | 工具 | 版本 |
 | --- | --- |
-| Python | 3.9.13 |
+| Python | 3.12.13 |
 | Flutter | 3.44.0 |
 | Dart | 3.12.0 |
 | Java | 21.0.10 |
@@ -19,7 +22,8 @@
 
 ### 准备 PostgreSQL 数据库
 
-生产/开发后端依赖 PostgreSQL 16。测试（`pytest`）使用文件型 SQLite，不依赖 PostgreSQL。
+生产/开发后端依赖 PostgreSQL 16。默认 pytest/Fast 使用文件型 SQLite；严格 Full
+还会在一次性 PostgreSQL 16 中运行标记的迁移、约束和并发集成测试。
 
 **方式 A：使用已有 PostgreSQL 16**
 
@@ -97,8 +101,8 @@ python -m alembic downgrade base         # 回退到空库（会删除所有表�
 > 不要对包含真实或需要保留数据的数据库运行 `downgrade`。
 
 FastAPI 启动时**不会**自动建表；必须先运行 `alembic upgrade head`。
-测试使用文件型 SQLite 测试数据库 `./test.db`（`conftest.py` 自动建表和删表），
-不依赖 PostgreSQL，也不使用 Alembic migration。
+默认测试使用文件型 SQLite 测试数据库 `./test.db`（`conftest.py` 自动建表和删表），
+不使用 Alembic migration；严格 Full 的 `requires_pg` 用例另行使用可丢弃 PostgreSQL 16。
 
 ### 测试
 
@@ -107,9 +111,47 @@ cd backend
 python -m pytest tests -q
 ```
 
+### 分层验证（Phase 3 起）
+
+仓库提供共享本地验证入口 `scripts/verify.py`（从仓库根运行），并配置 GitHub
+Actions 分层 CI（`.github/workflows/ci.yml`）。三层定义见
+`docs/product/roadmap.md` 第 13.1 节：
+
+| 层级 | 命令 | 内容 |
+| --- | --- | --- |
+| Local focused | `python scripts/verify.py fast` | ruff（`app tests scripts`）+ 当前定向 SQLite/契约测试 + `git diff --check` |
+| Local full | `python scripts/verify.py full` | ruff + 后端全量测试；Docker/`PG_TEST_DSN` 可用时跑真实 PostgreSQL 16 |
+
+`fast` 明确禁用 PostgreSQL 用例；`full` 设置 `VERIFY_REQUIRE_PG=1` 时会核对
+预期/实际 PostgreSQL 用例数，且任何跳过都算硬失败。
+
+`ruff` 与 `hypothesis` 是开发/CI 工具，刻意不放入 `backend/requirements.txt`
+（非运行时依赖）。本地需自行安装：
+
+```bash
+pip install ruff==0.15.22            # lint（fast/full 必需）
+pip install hypothesis==6.141.1      # 仅 Task 5 起的 property 测试需要
+```
+
+GitHub Actions：
+
+- 每个 PR 和 push 到 `main` 都运行 Fast、Flutter、Full/PostgreSQL、Phase 8 acceptance、
+  Phase 9 security 和 Phase 9 reliability 六个门；手动 `workflow_dispatch` 只有勾选
+  `run_full` 才运行 Full，因此不能用未勾选的手动 run 代替严格集成证据。
+- 第三方 Action 固定到审查过的 immutable commit SHA（不用浮动 tag）；
+  默认权限 `contents: read`；不部署、不发布、不使用生产密钥或真实健康数据；
+  同分支取消过时 run；每个 job 有显式超时；pip 缓存不含密钥。
+- 远程 CI 在用户首次授权 push 前为 `not authorized / not run`；本地
+  `verify.py` 结果是本地证据，不得描述为 CI 结果。
+
 ### API 文档
 
 启动后端后访问 `http://127.0.0.1:8000/docs` 查看 OpenAPI 文档。
+
+营养建议 API 由后端 `NUTRITION_RUNTIME_ENABLED` 开关控制，默认关闭。Phase 6 的迁移、
+发布审计、客户端流程和 Android 合成数据验收已通过；个人开发时可在 `backend/.env`
+中设置 `NUTRITION_RUNTIME_ENABLED=true`。该授权不覆盖真实健康数据或生产流量。
+关闭时，营养数据删除接口仍保持可用。
 
 ## Flutter 客户端
 
@@ -126,6 +168,8 @@ flutter test
 | --- | --- | --- |
 | `API_BASE_URL` | `http://10.0.2.2:8000/api/v1` | 后端 API 地址 |
 | `PHOTO_ANALYSIS_ENABLED` | `false` | 是否启用照片分析入口 |
+| `AUTH_MODE` | `legacy` | 候选版必须显式设为 `controlled_trial` |
+| `CLIENT_VERSION_CODE` | `1` | 与服务端兼容窗口一致的 Android 版本码 |
 
 不得通过 `--dart-define` 传递 Token、密码或云服务密钥。
 
@@ -140,6 +184,23 @@ flutter run
 ```bash
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:9000/api/v1
 ```
+
+debug/profile 变体允许本机 HTTP 以支持模拟器开发；release manifest 强制禁用明文流量。
+
+### Release 签名
+
+release 构建不会回退到 debug key。构建前在受控环境提供四个变量，密钥文件和密码不得进入仓库、
+日志或 CI artifact：
+
+```text
+ANDROID_RELEASE_STORE_FILE=<absolute-keystore-path>
+ANDROID_RELEASE_STORE_PASSWORD=<secret>
+ANDROID_RELEASE_KEY_ALIAS=<alias>
+ANDROID_RELEASE_KEY_PASSWORD=<secret>
+```
+
+缺少任一变量时，任何 release Gradle 任务都会失败。候选版还必须使用 HTTPS API 地址；当前仓库
+不包含真实签名密钥，也不授权生成或分发 release APK。
 
 ## 数据模式
 
@@ -162,12 +223,11 @@ health/
 
 ## 已知限制
 
-- Android command-line tools 缺失，`flutter doctor --android-licenses` 无法执行（工具链告警，不阻塞构建或模拟器）
-- 照片分析默认关闭，隐私门和 STS 凭证尚未实现
-- 当前仅有体态问题浏览、图示自测和评估历史功能
+- 照片分析默认关闭，真实 OSS STS/签名 URL 和照片处理外部门尚未完成
+- 当前已包含体态、健康档案/签到、训练计划、受控 Agent 和普通饮食建议；营养与 live Agent 运行时默认关闭
 - AI 模型不可用时返回 503，不降级为正常结果
-- 详情页首次加载偶现"加载失败"，重试后恢复
-- 历史页登录后首次进入且评估记录为空时不提供下拉刷新入口
+- release 签名、TLS 域名、托管/备份地域、监控、事故联系人和真实运营主体尚未配置
+- 法律/隐私、健康专业和独立安全审查均为 `not obtained`
 
 ## Windows 构建前置
 
@@ -181,18 +241,21 @@ start ms-settings:developers   # 打开设置并启用开发者模式
 
 启用后 `flutter build apk --debug` 才能进入 Gradle 构建。
 
-## 当前测试状态
+## 当前验证状态
 
 | 验证项 | 结果 | 日期 |
 | --- | --- | --- |
-| 后端 pytest | 81 passed | 2026-07-11 |
-| Alembic 离线 upgrade/downgrade SQL | 通过 | 2026-07-11 |
-| 真实 PostgreSQL 迁移演练 | 通过（upgrade/downgrade base/re-upgrade + schema 核验） | 2026-07-11 |
-| Flutter analyze | No issues found | 2026-07-11 |
-| Flutter test | 7 passed | 2026-07-11 |
-| 当前源码 APK 构建 | 成功（app-debug.apk，构建日志无 KGP 兼容性警告） | 2026-07-11 |
-| 真实后端 API 流程 | 通过（health/login/issues/detail/assess/history） | 2026-07-11 |
-| Android 完整业务冒烟 | 通过（登录→问题→详情→自测→结果→历史） | 2026-07-11 |
+| Release Integration exact-SHA CI | `43a54b0`，PR #6 run `31714419165`，六个 job 全部成功；Full 1821/0/0、PG 33/33 | 2026-08-13 |
+| 最新 Phase 9 exact-SHA CI | `7f80125`，run `31701841156`，六个 job 全部成功 | 2026-08-13 |
+| 后端严格 Full / PostgreSQL 16 | 1816 passed，0 failed，0 skipped；PG 33/33 | 2026-08-13 |
+| Fast / Flutter | Fast 1052 passed、14 条件 skip；analyze 无问题、539 tests | 2026-08-13 |
+| Phase 8 / Phase 9 合成验收 | Phase 8 HTTP 11/11 + eval 13/13；Phase 9 HTTP 11/11 + 时区 2/2；零残留 | 2026-08-13 |
+| Alembic | 单一迁移头 `0014_controlled_trial_privacy`；`0014 -> 0013 -> head` 停服演练通过 | 2026-08-13 |
+| Android 设备证据 | Gate 4 SHA `4d01312`：API 34（TalkBack 开启）和 API 28 均主路径 5/5 + 不可达 1/1 | 2026-08-13 |
+
+Phase 9 后续 onboarding/navigation 修复已在 `7f80125` 通过 Flutter、HTTP 和严格 CI，但没有把
+Gate 4 的 Android 设备证据改写为已在该 SHA 重跑。Release Integration 的新 SHA 也必须重新通过
+适用门后才能成为新的集成证据。
 
 ### 依赖升级记录
 

@@ -1,16 +1,25 @@
+from __future__ import annotations
+
 from typing import Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.auth.models import User as UserModel
+from app.auth.models import TrialCredential
 from app.user.schemas import UpdateProfileRequest, UserProfileResponse
+from app.core.config import settings
 from app.core.exceptions import NotFound
+from app.posture.user_lock import acquire_user_transaction_lock
+from app.privacy.service import consent_is_active
 
 
-def _to_profile(user: UserModel) -> UserProfileResponse:
+def _to_profile(
+    user: UserModel, account_name: str | None = None
+) -> UserProfileResponse:
     return UserProfileResponse(
         id=str(user.id),
         phone=user.phone,
+        account_name=account_name,
         nickname=user.nickname,
         height=float(user.height) if user.height else None,
         weight=float(user.weight) if user.weight else None,
@@ -26,10 +35,24 @@ async def get_profile(db: AsyncSession, user_id: str) -> Optional[UserProfileRes
     user = result.scalar_one_or_none()
     if user is None:
         return None
-    return _to_profile(user)
+    account_name = await db.scalar(
+        select(TrialCredential.login_id).where(TrialCredential.user_id == user.id)
+    )
+    if settings.AUTH_MODE == "controlled_trial" and not await consent_is_active(
+        db, user_id
+    ):
+        return UserProfileResponse(
+            id=str(user.id),
+            phone=None,
+            account_name=account_name,
+            membership_level=user.membership_level,
+            created_at=user.created_at.isoformat() if user.created_at else None,
+        )
+    return _to_profile(user, account_name)
 
 
 async def update_profile(db: AsyncSession, user_id: str, request: UpdateProfileRequest) -> UserProfileResponse:
+    await acquire_user_transaction_lock(db, user_id)
     result = await db.execute(select(UserModel).where(UserModel.id == UUID(user_id)))
     user = result.scalar_one_or_none()
     if user is None:
@@ -39,4 +62,7 @@ async def update_profile(db: AsyncSession, user_id: str, request: UpdateProfileR
         setattr(user, key, value)
     await db.commit()
     await db.refresh(user)
-    return _to_profile(user)
+    account_name = await db.scalar(
+        select(TrialCredential.login_id).where(TrialCredential.user_id == user.id)
+    )
+    return _to_profile(user, account_name)

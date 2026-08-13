@@ -59,6 +59,7 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen> {
                         final issue = issues[i];
                         final state = postureStates[issue.id];
                         return IssueCard(
+                          key: Key('issue-list-item-${issue.id}'),
                           issue: issue,
                           result: state?.result,
                           onTap: () => context.push('/issue/${issue.id}/detail'),

@@ -1,0 +1,445 @@
+{
+ "catalog_id": "phase3-fixture-catalog",
+ "content_version": "fixture-v1",
+ "schema_version": "v1",
+ "published_at": "2026-07-26",
+ "policy_compatibility": [
+  "v1"
+ ],
+ "source_manifest_version": "v1",
+ "exercises": [
+  {
+   "exercise_id": "ex_bodyweight_squat",
+   "names": {
+    "name_en": "Bodyweight Squat",
+    "name_zh": "徒手深蹲"
+   },
+   "training_roles": [
+    "strength"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "basic_strength",
+    "fat_loss",
+    "general_wellness"
+   ],
+   "movement_patterns": [
+    "squat"
+   ],
+   "movement_purposes": [
+    "lower_push_strength"
+   ],
+   "primary_muscles": [
+    "quadriceps",
+    "gluteals"
+   ],
+   "secondary_muscles": [
+    "hamstrings",
+    "core"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "lower_limb"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition"
+    ],
+    "body_regions": [
+     "knee"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "sharp_knee_pain",
+     "display_text_en": "Stop on sharp knee pain.",
+     "display_text_zh": "膝盖剧烈疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Stand with feet shoulder-width apart.",
+    "Lower hips back and down until thighs parallel.",
+    "Drive through heels to stand."
+   ],
+   "form_cues": [
+    "Keep chest tall",
+    "Knees track over toes"
+   ],
+   "common_mistakes": [
+    "Heels lifting",
+    "Knees collapsing inward"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 8,
+    "reps_max": 15,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 12,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce depth or hold a support if balance is unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_bodyweight_squat.svg",
+    "alt_text_en": "Bodyweight squat side view.",
+    "alt_text_zh": "徒手深蹲侧视图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "hand-authored-svg",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "8093dac8d49ddf6f611dd59ce5244486a4735f6c9a121b3863b4dd4b2623051f",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": "Project-authored (repository license)",
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-library-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness Exercise Library",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/",
+      "license": null,
+      "scope": "Healthy-adult exercise setup and general form review only.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment",
+     "primaryMuscles"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "v1"
+   }
+  },
+  {
+   "exercise_id": "ex_band_seated_row",
+   "names": {
+    "name_en": "Resistance Band Seated Row",
+    "name_zh": "弹力带坐姿划船"
+   },
+   "training_roles": [
+    "strength",
+    "corrective"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "posture_improvement",
+    "basic_strength"
+   ],
+   "movement_patterns": [
+    "pull"
+   ],
+   "movement_purposes": [
+    "upper_pull_strength"
+   ],
+   "primary_muscles": [
+    "latissimus_dorsi",
+    "rhomboids"
+   ],
+   "secondary_muscles": [
+    "biceps",
+    "rear_deltoid"
+   ],
+   "equipment": [
+    "resistance_band"
+   ],
+   "applicable_posture_signals": [
+    "shoulder_thorax"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury"
+    ],
+    "body_regions": [
+     "shoulder"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "shoulder_pain",
+     "display_text_en": "Stop on shoulder pain.",
+     "display_text_zh": "肩部疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Sit with legs extended, band around feet.",
+    "Pull handles to hips, squeezing shoulder blades.",
+    "Return with control."
+   ],
+   "form_cues": [
+    "Straight back",
+    "Squeeze shoulder blades"
+   ],
+   "common_mistakes": [
+    "Rounding back",
+    "Using momentum"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "reps",
+    "sets_min": 3,
+    "sets_max": 4,
+    "reps_min": 8,
+    "reps_max": 15,
+    "rest_seconds_min": 45,
+    "rest_seconds_max": 90,
+    "conservative_sets_max": 3,
+    "conservative_reps_max": 12,
+    "recovery_hours_min": 48,
+    "weekly_sessions_max": 3,
+    "conservative_eligible": true,
+    "progression_condition": "add one rep when all sets feel manageable for two sessions",
+    "regression_condition": "reduce depth or hold a support if balance is unstable"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_band_seated_row.svg",
+    "alt_text_en": "Seated band row front view.",
+    "alt_text_zh": "弹力带坐姿划船正视图。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "hand-authored-svg",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "9f335e3caedf4ce0114152c0f614cc824dd973363465911a9e1e342e7d824501",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": "Project-authored (repository license)",
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-library-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness Exercise Library",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/",
+      "license": null,
+      "scope": "Healthy-adult exercise setup and general form review only.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [
+     "name",
+     "equipment",
+     "primaryMuscles"
+    ],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "v1"
+   }
+  },
+  {
+   "exercise_id": "ex_mobility_cat_cow",
+   "names": {
+    "name_en": "Cat-Cow Mobility",
+    "name_zh": "猫牛活动度"
+   },
+   "training_roles": [
+    "warmup",
+    "mobility",
+    "recovery"
+   ],
+   "difficulty": "beginner",
+   "goals": [
+    "mobility",
+    "posture_improvement"
+   ],
+   "movement_patterns": [
+    "spinal_mobility"
+   ],
+   "movement_purposes": [
+    "spine_mobility"
+   ],
+   "primary_muscles": [
+    "erector_spinae"
+   ],
+   "secondary_muscles": [
+    "core"
+   ],
+   "equipment": [
+    "bodyweight"
+   ],
+   "applicable_posture_signals": [
+    "pelvis_spine",
+    "head_neck"
+   ],
+   "not_applicable_posture_signals": [],
+   "contraindications": {
+    "risk_qualifiers": [
+     "recent_surgery_or_major_injury",
+     "major_chronic_condition"
+    ],
+    "body_regions": [
+     "spine"
+    ],
+    "requires_complete_pain_screening": true
+   },
+   "stop_conditions": [
+    {
+     "code": "spine_pain",
+     "display_text_en": "Stop on spine pain.",
+     "display_text_zh": "脊柱疼痛时停止。"
+    }
+   ],
+   "instruction_steps": [
+    "Begin on hands and knees.",
+    "Inhale and arch the spine.",
+    "Exhale and round the spine."
+   ],
+   "form_cues": [
+    "Move segment by segment",
+    "Match breath to movement"
+   ],
+   "common_mistakes": [
+    "Rushing",
+    "Holding breath"
+   ],
+   "progression_ids": [],
+   "regression_ids": [],
+   "substitution_ids": [],
+   "prescription": {
+    "mode": "duration",
+    "sets_min": 2,
+    "sets_max": 3,
+    "duration_seconds_min": 30,
+    "duration_seconds_max": 60,
+    "rest_seconds_min": 0,
+    "rest_seconds_max": 30,
+    "conservative_sets_max": 2,
+    "conservative_duration_seconds_max": 45,
+    "recovery_hours_min": 24,
+    "weekly_sessions_max": 5,
+    "conservative_eligible": true,
+    "progression_condition": "increase duration by ten seconds when comfortable",
+    "regression_condition": "reduce range of motion if any discomfort"
+   },
+   "illustration": {
+    "asset_key": "assets/training/illustrations/ex_mobility_cat_cow.svg",
+    "alt_text_en": "Cat-cow on hands and knees.",
+    "alt_text_zh": "猫牛四足支撑位。",
+    "provenance": {
+     "creator_type": "project_authored",
+     "generation_tool": "hand-authored-svg",
+     "created_at": "2026-07-26",
+     "source_declaration": "original_no_external_reference",
+     "content_hash": "f2a77df7ac3373f00993998fbd586fe67e18ac201a2c9dd7e6a8e54cdd67952c",
+     "review_status": "approved",
+     "review_scope": "personal_development",
+     "reviewer_role": "project_reviewer",
+     "reviewed_at": "2026-07-26"
+    }
+   },
+   "provenance": {
+    "sources": [
+     {
+      "source_id": "health-training-catalog-v1",
+      "source_type": "project_authored",
+      "name": "Health project Phase 3 training catalog (project-authored)",
+      "pinned_version": "content v1, 2026-07-26",
+      "url": "backend/app/training/data/exercises.v1.json",
+      "license": "Project-authored (repository license)",
+      "scope": "Project-authored curated content for personal-development validation.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "hasaneyldrm-exercises-dataset",
+      "source_type": "dataset",
+      "name": "hasaneyldrm/exercises-dataset",
+      "pinned_version": "7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "url": "https://github.com/hasaneyldrm/exercises-dataset/tree/7455efae41b330c265e7cd4b78dfa848e7ce5ebd",
+      "license": "MIT",
+      "scope": "MIT-covered non-media metadata discovery only.",
+      "verified_date": "2026-07-26"
+     },
+     {
+      "source_id": "ace-exercise-library-2026",
+      "source_type": "professional_reference",
+      "name": "ACE Fitness Exercise Library",
+      "pinned_version": "reviewed 2026-07-26",
+      "url": "https://www.acefitness.org/resources/everyone/exercise-library/",
+      "license": null,
+      "scope": "Healthy-adult exercise setup and general form review only.",
+      "verified_date": "2026-07-26"
+     }
+    ],
+    "imported_fields": [],
+    "review_status": "approved",
+    "review_scope": "personal_development",
+    "reviewer_role": "project_reviewer",
+    "reviewed_at": "2026-07-26",
+    "content_version": "v1"
+   }
+  }
+ ]
+}

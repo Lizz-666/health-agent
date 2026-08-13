@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="March in Place">
+<title>March in Place</title>
+<rect x="6" y="6" width="188" height="188" rx="12" ry="12" fill="#f7f9fc" stroke="#c9d4e3" stroke-width="2"/>
+<g fill="none" stroke="#2b3a4a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<line x1="30.0" y1="178.0" x2="170.0" y2="178.0"/>
+<circle cx="100.0" cy="52.0" r="12.0"/>
+<line x1="100.0" y1="64.0" x2="100.0" y2="130.0"/>
+<line x1="100.0" y1="80.0" x2="126.0" y2="65.0"/>
+<line x1="100.0" y1="80.0" x2="126.0" y2="95.0"/>
+<line x1="100.0" y1="130.0" x2="94.2" y2="114.0"/>
+<line x1="94.2" y1="114.0" x2="85.7" y2="99.3"/>
+<line x1="100.0" y1="130.0" x2="105.8" y2="114.0"/>
+<line x1="105.8" y1="114.0" x2="114.3" y2="99.3"/>
+</g></svg>

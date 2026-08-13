@@ -4,6 +4,8 @@ A single advisory-lock domain serializes ALL user-scoped write paths:
   * service.py  save_self_assessment / save_photo_assessment
   * safety.py   record_safety_signal
   * purge.py    run_purge (start / completion / cancel / retry resume)
+  * health.service upsert_today (including abnormal-pain preservation)
+  * agent.persistence consent / proposal / confirmation / deletion writes
 
 PostgreSQL: ``pg_advisory_xact_lock(hashtext(user_id))`` — held until COMMIT.
 SQLite (test DB): single-writer, no advisory locks → no-op.

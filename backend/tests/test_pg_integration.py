@@ -29,6 +29,7 @@ from tests.conftest_pg import pg_available, requires_pg, skip_reason
 # genuinely unavailable — never because the SQLite patch is active).
 pytestmark = [
     requires_pg,
+    pytest.mark.requires_pg,
     pytest.mark.asyncio,
 ]
 
@@ -877,3 +878,117 @@ async def test_pg_migration_0003_round_trip(pg_dsn):
         except Exception:
             pass
         await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 Agent MVP — PostgreSQL account-deletion coverage (Task 2)
+# ---------------------------------------------------------------------------
+
+
+async def test_pg_account_deletion_purges_agent_tables(pg_session):
+    """On real PostgreSQL, account_deletion removes the four Agent tables
+    (FK/constraint parity), proving the reviewed cross-domain purge extension."""
+    assert pg_session.bind.dialect.name == "postgresql"
+
+    from app.agent.models import (
+        AgentActionProposal,
+        AgentCloudConsent,
+        AgentRun,
+        AgentToolEvent,
+    )
+    from app.posture import purge
+
+    user_id = await _make_user(pg_session)
+    now = datetime.now(timezone.utc)
+    pg_session.add(
+        AgentCloudConsent(
+            user_id=user_id,
+            purpose="agent_cloud_processing",
+            provider_id="p",
+            disclosure_version="d1",
+            status="granted",
+            sequence_no=1,
+        )
+    )
+    await pg_session.flush()
+    run = AgentRun(
+        user_id=user_id,
+        client_turn_id="t1",
+        entry_type="general",
+        status="completed",
+        started_at=now,
+        expires_at=now + timedelta(days=30),
+    )
+    pg_session.add(run)
+    await pg_session.flush()
+    pg_session.add(
+        AgentToolEvent(
+            run_id=run.run_id,
+            user_id=user_id,
+            tool_name="get_today_checkin",
+            side_effect_class="read",
+            status="ok",
+        )
+    )
+    pg_session.add(
+        AgentActionProposal(
+            run_id=run.run_id,
+            user_id=user_id,
+            tool_name="create_weight_record",
+            arguments_json={"weight_kg": 70.0},
+            arguments_hash="h",
+            iana_timezone="Asia/Shanghai",
+            status="pending",
+            expires_at=now + timedelta(minutes=15),
+        )
+    )
+    await pg_session.commit()
+
+    store = purge.FakeObjectStore()
+    result = await purge.run_purge(
+        pg_session, user_id, store,
+        trigger="account_deletion", encryption_key=_TEST_KEY,
+    )
+    assert result.status == "completed"
+
+    for model in (
+        AgentCloudConsent,
+        AgentRun,
+        AgentToolEvent,
+        AgentActionProposal,
+    ):
+        rows = (
+            await pg_session.execute(
+                select(model).where(model.user_id == user_id)
+            )
+        ).scalars().all()
+        assert rows == [], f"{model.__name__} rows must be deleted on PG"
+
+
+async def test_pg_concurrent_consent_grant_serializes(pg_session_factory):
+    """Concurrent consent grants for the same user serialize under the per-user
+    advisory lock and allocate distinct contiguous sequence numbers (no tie, no
+    duplicate sequence)."""
+    from app.agent import persistence as ap
+
+    async with pg_session_factory() as db:
+        user_id = await _make_user(db)
+        await db.commit()
+    uid = str(user_id)
+
+    async def _grant(key):
+        async with pg_session_factory() as db:
+            res = await ap.grant_consent(
+                db,
+                uid,
+                accepted_provider_id="prov",
+                accepted_disclosure_version="d1",
+                current_provider_id="prov",
+                current_disclosure_version="d1",
+                idempotency_key=key,
+            )
+            await db.commit()
+            return res.sequence_no
+
+    seqs = await asyncio.gather(_grant("k-a"), _grant("k-b"))
+    assert sorted(seqs) == [1, 2]

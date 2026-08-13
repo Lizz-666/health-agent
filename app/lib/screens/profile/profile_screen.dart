@@ -31,7 +31,7 @@ class ProfileScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(profile?.phone ?? '未登录',
+                      Text(profile?.accountName ?? profile?.phone ?? '未登录',
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const Text('普通用户', style: TextStyle(color: Color(0xFF8892B0))),
                     ],
@@ -66,6 +66,12 @@ class ProfileScreen extends ConsumerWidget {
               children: [
                 _menuItem('我的体态档案', Icons.assignment, () => context.push('/profile/posture')),
                 const Divider(height: 1),
+                _menuItem('健康档案', Icons.favorite_outline, () => context.push('/profile/health')),
+                const Divider(height: 1),
+                _menuItem('体重趋势', Icons.show_chart, () => context.push('/profile/weight')),
+                const Divider(height: 1),
+                _menuItem('活动记录', Icons.grid_view_outlined, () => context.push('/profile/grid')),
+                const Divider(height: 1),
                 _menuItem('评估历史', Icons.history, () => context.push('/history')),
                 const Divider(height: 1),
                 _menuItem('关于', Icons.info_outline, () => _showAbout(context)),
@@ -81,7 +87,6 @@ class ProfileScreen extends ConsumerWidget {
               child: OutlinedButton(
                 onPressed: () async {
                   await ref.read(authProvider.notifier).logout();
-                  if (context.mounted) context.go('/login');
                 },
                 style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFFF1744)),
                 child: const Text('退出登录'),
