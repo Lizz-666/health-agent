@@ -1,7 +1,7 @@
 # Phase 9 Android 小范围受控试用候选版规格
 
 > 日期：2026-08-12
-> 状态：Gate 0 closure candidate；候选 exact-SHA CI 已通过，closure 须自证
+> 状态：Gate 4 工程验收候选；实现 exact-SHA CI 已通过，closure 须自证
 > 唯一业务基线：`2ae03345a93d8cc22d0e47fcac415411798df48b`
 > 基线分支：`codex/phase8-flutter-driver`
 
@@ -218,3 +218,14 @@ Gate 4 后仍需单独的用户决定和授权才能进入真实试用，包括�
 - 候选启动检测备份复活身份；结构化日志只允许稳定码、服务端 request ID 和聚合 count。
 - threat model、VEX、license、secret/artifact、事故和备份恢复证据见 `docs/security/**`、
   `docs/privacy/**`、`docs/operations/**`。这些仍不是外部专业审查或真实试用授权。
+
+## 14. Gate 4 工程验收（2026-08-13）
+
+接受实现 `4d013120cbe499b55d008679915d7eb0a3740701` 已从唯一 Phase 8 closure 派生，
+完成真实本机合成 HTTP、跨账号健康档案隔离、Android API 34/API 28、TalkBack 开启设备、
+不可达服务、时区、删除/恢复、供应链和回归验证。严格 CI `31686265174` 六个 job 全部成功，
+P0/P1/P2 为零。详细证据见 `docs/reports/phase9-codex-exit-audit-2026-08-13.md`。
+
+本结论仅为“Phase 9 Android 小范围受控试用候选版工程验收通过”。外部法律/隐私、健康专业
+和独立安全审查仍为 `not obtained`；真实数据、真实测试者、生产凭据、live AI、照片、部署、
+分发和公开发布均未授权。

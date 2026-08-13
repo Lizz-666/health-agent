@@ -305,6 +305,14 @@ spec/plan/ADR/roadmap/ACTIVE_TASKS、运维与隐私证据、Gate 4/退出报告
 必须继续声明：外部法律/隐私、健康专业和独立安全审查未取得；真实数据、真实测试者、
 生产凭据、live AI、照片、部署、分发和公开发布未授权。
 
+**Execution status (2026-08-13):** 接受实现
+`4d013120cbe499b55d008679915d7eb0a3740701` 已完成 Phase 9 HTTP `11/11`、时区 `2/2`、
+Flutter `532/532`、Android API 34（TalkBack 开启）与 API 28 各主路径 `5/5`、不可达 `1/1`。
+严格 CI `31686265174` 为 Fast `1052/0/14`、Flutter `532`、Full `1816/0/0`、
+PostgreSQL `33/33`、Phase 8 `11/11 + 13/13`、Phase 9 security `19/19`、reliability
+`11/11 + 2/2`，六个 job 全部成功。Codex findings-first 冷审无未解决 P0/P1/P2，Task 4
+工程验收接受；本状态由承载退出审计的 closure exact-SHA 严格 CI 自证，失败即撤销。
+
 ## 7. OpenCode 提示词硬边界
 
 Gate 3A 是 Phase 9 默认唯一可委派实现批次。提示词必须包含：

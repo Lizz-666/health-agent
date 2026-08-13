@@ -1,7 +1,7 @@
 # 个人体态健康教练 Agent 总路线图
 
 > 日期：2026-06-12
-> 最近修订：2026-08-13（Phase 9 Gate 3B Android 可靠性工程验收）
+> 最近修订：2026-08-13（Phase 9 Android 受控试用候选版工程验收）
 > 基线：现有 Flutter + FastAPI 体态分析 MVP
 > 目标：从个人开发闭环推进到受控试用候选准备
 
@@ -541,13 +541,16 @@ analyze 无问题且 384 tests，Android API 34 上启用/禁用营养流程 2/2
 
 ## 13. 阶段 9：Android 小范围受控试用候选准备
 
-> 状态（2026-08-13）：**Gate 3B Android 可靠性已接受，Gate 4 集成候选退出进行中**。
+> 状态（2026-08-13）：**Phase 9 Android 小范围受控试用候选版工程验收通过**。
 > 唯一业务基线为 Phase 8 closure
 > `2ae03345a93d8cc22d0e47fcac415411798df48b`。当前只批准中国大陆一般健康
 > 成年人、Android 非公开小范围候选准备；Gate 0-4 仍只用合成数据，live AI 和
 > 真实照片保持关闭。当前不授权真实试用、部署、分发或公开发布。
 > Gate 3B closure 为 `1783573067d6eb599591ead8fc938a909ab08d43`，严格 exact-SHA CI
 > `31676368735` 的 Fast/Flutter/Full/Phase8/Phase9 security/reliability 六个 job 全部成功。
+> Gate 4 接受实现为 `4d013120cbe499b55d008679915d7eb0a3740701`，严格 CI
+> `31686265174` 六个 job 全部成功；退出审计见
+> `docs/reports/phase9-codex-exit-audit-2026-08-13.md`。这不是部署、真实试用或发布批准。
 > 当前规格：`docs/specs/platform/2026-08-12-controlled-trial-readiness.md`。
 > 当前计划：`docs/plans/platform/2026-08-12-controlled-trial-readiness.md`。
 
