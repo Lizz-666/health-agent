@@ -466,11 +466,33 @@ void main() {
         (_) => {'has_draft': false},
       );
 
-    await tester.pumpWidget(_wrap(_apiWith(adapter)));
+    final router = GoRouter(
+      initialLocation: '/plan',
+      routes: [
+        GoRoute(path: '/plan', builder: (_, _) => const PlanScreen()),
+        GoRoute(
+          path: '/profile/health',
+          builder: (_, _) => const Scaffold(body: Text('HEALTH_PROFILE_PAGE')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(_wrapWithRouter(_apiWith(adapter), router));
     await tester.pumpAndSettle();
 
-    expect(find.text('请先完善健康档案'), findsOneWidget);
+    expect(find.text('健康档案还没有完善'), findsOneWidget);
+    expect(find.text('先补充几项必要信息，我们才能为你生成更合适的训练计划。'), findsOneWidget);
     expect(find.byKey(const Key('plan-generate-button')), findsNothing);
+    expect(
+      find.byKey(const Key('plan-complete-profile-button')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('plan-complete-profile-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('HEALTH_PROFILE_PAGE'), findsOneWidget);
   });
 
   testWidgets('active session renders local SVG and substitution action', (

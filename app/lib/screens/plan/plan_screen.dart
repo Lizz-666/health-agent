@@ -197,12 +197,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
           title: '当前安全状态不允许生成训练计划',
           detail: '受限或红旗状态不会被显示为普通失败，也不会创建可确认草案。',
         ),
-        DraftFailureState.missingInput => const _StatusCard(
-          key: Key('plan-status-missing'),
-          icon: Icons.assignment_late_outlined,
-          title: '缺少生成计划所需信息',
-          detail: '请先补全当前健康档案和安全筛查，再重新生成。',
-        ),
+        DraftFailureState.missingInput => _profileRequired(),
         DraftFailureState.stale => const _StatusCard(
           key: Key('plan-status-stale'),
           icon: Icons.sync_problem,
@@ -250,10 +245,14 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     );
   }
 
-  Widget _profileRequired() => const _StatusCard(
+  Widget _profileRequired() => _StatusCard(
+    key: const Key('plan-profile-required'),
     icon: Icons.assignment_ind_outlined,
-    title: '请先完善健康档案',
-    detail: '训练目标、频率、时长和器材必须来自当前健康档案，不能使用页面默认值代替。',
+    title: '健康档案还没有完善',
+    detail: '先补充几项必要信息，我们才能为你生成更合适的训练计划。',
+    action: () => context.push('/profile/health'),
+    actionLabel: '去完善健康档案',
+    actionKey: const Key('plan-complete-profile-button'),
   );
 
   Future<void> _generate() async {
@@ -1139,6 +1138,7 @@ class _StatusCard extends StatelessWidget {
   final String? detail;
   final VoidCallback? action;
   final String? actionLabel;
+  final Key? actionKey;
   const _StatusCard({
     Key? key,
     required this.icon,
@@ -1146,6 +1146,7 @@ class _StatusCard extends StatelessWidget {
     this.detail,
     this.action,
     this.actionLabel,
+    this.actionKey,
   }) : semanticsKey = key;
 
   @override
@@ -1179,7 +1180,11 @@ class _StatusCard extends StatelessWidget {
             ),
             if (action != null && actionLabel != null) ...[
               const SizedBox(height: 16),
-              OutlinedButton(onPressed: action, child: Text(actionLabel!)),
+              OutlinedButton(
+                key: actionKey,
+                onPressed: action,
+                child: Text(actionLabel!),
+              ),
             ],
           ],
         ),
